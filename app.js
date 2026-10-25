@@ -50,9 +50,11 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0 };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
+  var claimsReady = false; // true once daily star claims have loaded
+  var bookmarksReady = false; // true once saved research has loaded
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -99,7 +101,7 @@
       selectNewer('projects', 'tags, image, updated_at', 'id, profile_id, title, link, description, sources, created_at'),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
-      client.from('project_likes').select('user_id, project_id'),
+      client.from('project_likes').select('user_id, project_id, created_at'),
       client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at'),
       client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at')
     ]).then(function (res) {
@@ -124,7 +126,7 @@
         return { userId: f.user_id, profileId: f.profile_id, since: Date.parse(f.created_at) || 0 };
       });
       state.projectLikes = res[5].error ? [] : res[5].data.map(function (l) {
-        return { userId: l.user_id, projectId: l.project_id };
+        return { userId: l.user_id, projectId: l.project_id, at: Date.parse(l.created_at) || 0 };
       });
       commentsReady = !res[6].error;
       state.comments = res[6].error ? [] : res[6].data.map(function (c) {
@@ -141,12 +143,14 @@
           createdAt: Date.parse(c.created_at) || 0, respondedAt: Date.parse(c.responded_at) || 0
         };
       });
-      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; return; }
+      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = []; return; }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
         client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
         client.from('shop_purchases').select('item, price').eq('user_id', me.id),
-        client.from('star_gifts').select('stars').eq('user_id', me.id)
+        client.from('star_gifts').select('stars').eq('user_id', me.id),
+        client.from('star_claims').select('day').eq('user_id', me.id),
+        client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false })
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -163,6 +167,11 @@
         if (!extra[3].error) {
           state.giftStars = extra[3].data.reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
         }
+        // Daily stars claimed (one per day) and saved research. Both stay hidden until their tables exist.
+        claimsReady = !extra[4].error;
+        if (!extra[4].error) state.claims = extra[4].data.map(function (r) { return r.day; });
+        bookmarksReady = !extra[5].error;
+        if (!extra[5].error) state.bookmarks = extra[5].data.map(function (r) { return r.project_id; });
       });
     });
   }
@@ -1424,6 +1433,8 @@
       var box = $('comment-input-' + q.id);
       if (recentCommentsOpen[q.id] && box) box.focus();
     }));
+    var recentSave = researchSaveButton(q);
+    if (recentSave) tools.appendChild(recentSave);
     card.appendChild(tools);
     if (open) {
       var owner = findProfile(q.profileId);
@@ -1655,9 +1666,60 @@
     }
   });
 
+  // Opens a portfolio and scrolls to one of its research cards.
+  function goToResearch(profileId, projectId) {
+    showProfile(profileId, true);
+    var target = $('project-' + projectId);
+    if (!target) return;
+    target.scrollIntoView({ block: 'center' });
+    target.classList.add('flash');
+    setTimeout(function () { target.classList.remove('flash'); }, 1600);
+  }
+
+  // ---- Home: Top research this week, ranked by likes from the last 7 days ----
+  var TOP_LIMIT = 5;
+  function renderTop() {
+    var section = $('top-research');
+    var weekAgo = Date.now() - 7 * 86400000;
+    var counts = {};
+    state.projectLikes.forEach(function (l) {
+      if (l.at >= weekAgo) counts[l.projectId] = (counts[l.projectId] || 0) + 1;
+    });
+    var ranked = [];
+    state.profiles.forEach(function (p) {
+      p.projects.forEach(function (q) { if (counts[q.id]) ranked.push({ p: p, q: q, n: counts[q.id] }); });
+    });
+    ranked.sort(function (a, b) { return b.n - a.n || b.q.createdAt - a.q.createdAt; });
+    ranked = ranked.slice(0, TOP_LIMIT);
+    section.hidden = !client || !loaded || !!loadError || !ranked.length;
+    var list = $('top-list');
+    list.textContent = '';
+    ranked.forEach(function (it, i) {
+      var li = make('li', 'top-item' + (i === 0 ? ' first' : ''));
+      var b = make('button', 'top-open');
+      b.type = 'button';
+      b.appendChild(make('span', 'top-rank', String(i + 1)));
+      var text = make('span', 'top-text');
+      text.appendChild(make('span', 'top-title', it.q.title));
+      var by = make('span', 'top-by');
+      by.appendChild(document.createTextNode('by '));
+      var nm = make('span');
+      paintName(nm, it.p.name);
+      by.appendChild(nm);
+      text.appendChild(by);
+      b.appendChild(text);
+      b.appendChild(make('span', 'top-likes', '♥ ' + it.n + ' this week'));
+      b.setAttribute('aria-label', 'Number ' + (i + 1) + ': ' + it.q.title + ', by ' + it.p.name + ', ' + plural(it.n, 'like') + ' this week');
+      b.addEventListener('click', function () { goToResearch(it.p.id, it.q.id); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
   function renderHome() {
     var list = state.profiles;
     renderRecent();
+    renderTop();
     myPortfolioBtn.hidden = !myProfile();
     paintName(hubNameEl, state.hubName);
     hubIntroEl.textContent = state.hubIntro;
@@ -2098,6 +2160,56 @@
       list.appendChild(li);
     });
     $('achievements-sub').textContent = done + ' of ' + Object.keys(PET_UNLOCKS).length + ' unlocked. Each achievement unlocks a pet to pick in Edit character.';
+    renderBadges(p);
+  }
+
+  // Badges: extra goals shown under the pet achievements. They don't unlock anything, they're just for fun.
+  function badgeGoals(p) {
+    var projectIds = p.projects.map(function (q) { return q.id; });
+    var likes = countFor(state.likes, p.id) +
+      state.projectLikes.filter(function (l) { return projectIds.indexOf(l.projectId) >= 0; }).length;
+    var followers = state.follows.filter(function (f) { return f.profileId === p.id; }).length;
+    var comments = state.comments.filter(function (c) { return c.userId === p.ownerId; }).length;
+    var topics = {};
+    p.projects.forEach(function (q) { q.tags.forEach(function (t) { topics[t] = true; }); });
+    var goals = [
+      { icon: '✎', name: 'Prolific', task: 'Post 5 research projects', have: p.projects.length, goal: 5 },
+      { icon: '♥', name: 'Well liked', task: 'Get 10 likes on your portfolio and research', have: likes, goal: 10 },
+      { icon: '★', name: 'Popular', task: 'Get 5 followers', have: followers, goal: 5 },
+      { icon: '❝', name: 'Chatterbox', task: 'Leave 10 comments or tips on research', have: comments, goal: 10 }
+    ];
+    if (extrasReady) goals.push({ icon: '◆', name: 'Explorer', task: 'Research 3 different topics', have: Object.keys(topics).length, goal: 3 });
+    if (me && p.ownerId === me.id && claimsReady) {
+      goals.push({ icon: '☀', name: 'Regular', task: 'Claim your daily star 7 days in a row', have: streakDays(), goal: 7 });
+    }
+    return goals;
+  }
+  function renderBadges(p) {
+    var list = $('badge-list');
+    list.textContent = '';
+    var goals = badgeGoals(p);
+    var done = goals.filter(function (g) { return g.have >= g.goal; }).length;
+    $('badges-sub').textContent = done + ' of ' + goals.length + ' earned.';
+    goals.forEach(function (g) {
+      var earned = g.have >= g.goal;
+      var li = make('li', 'badge' + (earned ? ' done' : ''));
+      var icon = make('span', 'badge-icon', g.icon);
+      icon.setAttribute('aria-hidden', 'true');
+      li.appendChild(icon);
+      var text = make('span', 'badge-text');
+      text.appendChild(make('span', 'badge-name', g.name + (earned ? ' · Earned' : '')));
+      text.appendChild(make('span', 'badge-task', g.task));
+      if (!earned) {
+        var bar = make('span', 'pet-goal-bar');
+        var fill = make('span', 'pet-goal-fill');
+        fill.style.width = Math.round(Math.min(g.have, g.goal) / g.goal * 100) + '%';
+        bar.appendChild(fill);
+        text.appendChild(bar);
+        text.appendChild(make('span', 'pet-goal-count', Math.min(g.have, g.goal) + ' of ' + g.goal));
+      }
+      li.appendChild(text);
+      list.appendChild(li);
+    });
   }
 
   // The Achievements pop-up opens from the Achievements link at the top of a portfolio.
@@ -2174,7 +2286,59 @@
     mine.forEach(function (p) { p.projects.forEach(function (q) { projectIds.push(q.id); }); });
     return state.likes.filter(function (l) { return profileIds.indexOf(l.profileId) >= 0; }).length +
       state.projectLikes.filter(function (l) { return projectIds.indexOf(l.projectId) >= 0; }).length +
-      state.giftStars;
+      state.giftStars + state.claims.length;
+  }
+
+  // ---- Daily star: one free star a day, with a streak for coming back day after day ----
+  // Days are US Eastern days, the same as claim_daily_star() in supabase/more-features.sql.
+  function dayKey(t) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(t));
+  }
+  function claimedToday() { return state.claims.indexOf(dayKey(Date.now())) >= 0; }
+  // How many days in a row, ending today (or yesterday, if today isn't claimed yet).
+  function streakDays() {
+    var have = {};
+    state.claims.forEach(function (d) { have[d] = true; });
+    var n = 0;
+    var t = Date.now();
+    if (!have[dayKey(t)]) t -= 86400000;
+    while (have[dayKey(t)]) { n++; t -= 86400000; }
+    return n;
+  }
+  var claiming = false;
+  function claimDailyStar() {
+    if (!claimsReady || claiming || claimedToday()) return;
+    claiming = true;
+    renderShop();
+    client.rpc('claim_daily_star').then(function (res) {
+      claiming = false;
+      if (res.error) { showToast(dbMessage(res.error)); renderShop(); return; }
+      var today = res.data && res.data.day ? res.data.day : dayKey(Date.now());
+      if (state.claims.indexOf(today) < 0) state.claims.push(today);
+      showToast('+1 star! ' + (streakDays() > 1 ? streakDays() + '-day streak. ' : '') + 'Come back tomorrow for another.');
+      renderCart();
+      renderShop();
+      refresh();
+    });
+  }
+  function renderDailyStar() {
+    var box = $('daily-star');
+    box.hidden = !claimsReady;
+    if (!claimsReady) return;
+    box.textContent = '';
+    var streak = streakDays();
+    var text = make('div', 'daily-text');
+    text.appendChild(make('span', 'daily-title', claimedToday() ? 'Daily star claimed' : 'Your daily star is ready!'));
+    text.appendChild(make('span', 'daily-sub', streak
+      ? plural(streak, 'day') + ' in a row' + (claimedToday() ? '. Come back tomorrow to keep it going.' : '. Claim today to keep it going.')
+      : 'Claim a free star every day and build a streak.'));
+    box.appendChild(make('span', 'daily-icon', '★'));
+    box.appendChild(text);
+    var b = make('button', 'btn btn-solid daily-claim', claimedToday() ? 'Claimed ✓' : claiming ? 'Claiming…' : 'Claim +1 ★');
+    b.type = 'button';
+    b.disabled = claimedToday() || claiming;
+    b.addEventListener('click', claimDailyStar);
+    box.appendChild(b);
   }
   function starBalance() {
     var spent = state.purchases.reduce(function (sum, p) { return sum + p.price; }, 0);
@@ -2191,7 +2355,10 @@
     if (!show) { shopDialog.hidden = true; return; }
     var stars = starBalance();
     $('cart-stars').textContent = '★' + stars;
-    cartBtn.setAttribute('aria-label', 'Star Shop, ' + plural(stars, 'star') + ' to spend');
+    // A little dot on the cart when today's free star is waiting.
+    var waiting = claimsReady && !claimedToday();
+    cartBtn.classList.toggle('nudge', waiting);
+    cartBtn.setAttribute('aria-label', 'Star Shop, ' + plural(stars, 'star') + ' to spend' + (waiting ? '. Your daily star is ready.' : ''));
     if (!shopDialog.hidden) renderShop();
   }
   function renderShop() {
@@ -2199,6 +2366,7 @@
     $('shop-balance').textContent = '★ ' + stars;
     $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
     var open = shopOpen();
+    renderDailyStar();
     renderInventory();
     var gift = $('shop-gift');
     gift.hidden = !state.giftStars;
@@ -2746,6 +2914,8 @@
       var box = $('comment-input-' + p.id);
       if (commentsOpen[p.id] && box) box.focus();
     }));
+    var save = researchSaveButton(p);
+    if (save) tools.appendChild(save);
 
     if (mineToEdit) {
       var edit = make('button', 'mini-btn', 'Edit');
@@ -2801,6 +2971,113 @@
     talk.addEventListener('click', onClick);
     return talk;
   }
+
+  // ---- Saved research (bookmarks): a private list of research you want to come back to ----
+  function isSaved(q) { return state.bookmarks.indexOf(q.id) >= 0; }
+  var savingId = null;
+  // The Save button on a research card. Only shows when you're signed in and saving is set up.
+  function researchSaveButton(q) {
+    if (!me || !bookmarksReady) return null;
+    var saved = isSaved(q);
+    var b = make('button', 'card-like card-save');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', saved ? 'true' : 'false');
+    b.setAttribute('aria-label', (saved ? 'Remove ' : 'Save ') + q.title + (saved ? ' from your saved research' : ' for later'));
+    b.appendChild(bookmarkIcon());
+    b.appendChild(make('span', null, saved ? 'Saved' : 'Save'));
+    b.disabled = savingId === q.id;
+    b.addEventListener('click', function () { toggleBookmark(q); });
+    return b;
+  }
+  function bookmarkIcon() {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'card-save-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1Z');
+    svg.appendChild(path);
+    return svg;
+  }
+  function toggleBookmark(q) {
+    if (!me || !bookmarksReady || savingId) return;
+    var saved = isSaved(q);
+    savingId = q.id;
+    // Show the change right away, and undo it if saving fails.
+    if (saved) state.bookmarks = state.bookmarks.filter(function (id) { return id !== q.id; });
+    else state.bookmarks.unshift(q.id);
+    rerenderResearch();
+    var req = saved
+      ? client.from('bookmarks').delete().eq('user_id', me.id).eq('project_id', q.id)
+      : client.from('bookmarks').insert({ project_id: q.id });
+    req.then(function (res) {
+      savingId = null;
+      if (res.error && res.error.code !== '23505') {
+        if (saved) state.bookmarks.unshift(q.id);
+        else state.bookmarks = state.bookmarks.filter(function (id) { return id !== q.id; });
+        showToast(dbMessage(res.error));
+      } else {
+        showToast(saved ? 'Removed from your saved research.' : 'Saved! Find it in your account menu under Saved research.');
+      }
+      rerenderResearch();
+      renderHeader();
+      if (!savedDialog.hidden) renderSaved();
+    });
+  }
+  var savedDialog = $('saved-dialog');
+  var savedBtn = $('saved-btn');
+  var savedOpener = null;
+  function savedItems() {
+    var items = [];
+    state.bookmarks.forEach(function (id) {
+      state.profiles.forEach(function (p) {
+        p.projects.forEach(function (q) { if (q.id === id) items.push({ p: p, q: q }); });
+      });
+    });
+    return items;
+  }
+  function renderSaved() {
+    var list = $('saved-list');
+    list.textContent = '';
+    var items = savedItems();
+    $('saved-sub').textContent = items.length
+      ? plural(items.length, 'saved research project') + '. Only you can see this list.'
+      : 'Nothing saved yet. Click Save on any research card to keep it here for later.';
+    items.forEach(function (it) {
+      var li = make('li', 'saved-item');
+      var open = make('button', 'research-result');
+      open.type = 'button';
+      open.appendChild(make('span', 'research-result-title', it.q.title));
+      var by = make('span', 'research-result-by');
+      by.appendChild(document.createTextNode('by '));
+      var nm = make('span');
+      paintName(nm, it.p.name);
+      by.appendChild(nm);
+      open.appendChild(by);
+      open.addEventListener('click', function () { closeSaved(); goToResearch(it.p.id, it.q.id); });
+      li.appendChild(open);
+      var remove = make('button', 'mini-btn', 'Remove');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Remove ' + it.q.title + ' from saved research');
+      remove.addEventListener('click', function () { toggleBookmark(it.q); });
+      li.appendChild(remove);
+      list.appendChild(li);
+    });
+  }
+  function openSaved() {
+    savedOpener = accountBtn;
+    closeAccountMenu();
+    renderSaved();
+    savedDialog.hidden = false;
+    $('saved-close').focus();
+  }
+  function closeSaved() {
+    savedDialog.hidden = true;
+    if (savedOpener && savedOpener.focus) savedOpener.focus();
+  }
+  savedBtn.addEventListener('click', openSaved);
+  $('saved-close').addEventListener('click', closeSaved);
+  savedDialog.addEventListener('click', function (e) { if (e.target === savedDialog) closeSaved(); });
   // Likes and comments can change from a portfolio or from Recent research: redraw whichever is showing.
   function rerenderResearch() {
     if (!profileView.hidden && current()) renderProjects();
@@ -3892,8 +4169,11 @@
     if (me) {
       accountBtn.textContent = (me.email || '?').charAt(0).toUpperCase();
       accountEmail.textContent = 'Signed in as ' + (me.email || 'your account');
+      savedBtn.hidden = !bookmarksReady;
+      savedBtn.textContent = 'Saved research' + (state.bookmarks.length ? ' (' + savedItems().length + ')' : '');
     } else {
       closeAccountMenu();
+      savedDialog.hidden = true;
     }
   }
   function closeAccountMenu() {
@@ -3919,6 +4199,7 @@
     if (e.key !== 'Escape') return;
     if (!authDialog.hidden) { closeAuth(); return; }
     if (!achievementsDialog.hidden) { closeAchievements(); return; }
+    if (!savedDialog.hidden) { closeSaved(); return; }
     if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
     if (!accountMenu.hidden) { closeAccountMenu(); accountBtn.focus(); }

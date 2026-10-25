@@ -1044,3 +1044,76 @@ img { max-width: 100%; }
 .research-result-title { font-weight: 700; overflow-wrap: anywhere; }
 .research-result-by { font-size: 0.85rem; color: var(--muted); }
 .research-result-by .dollar { color: var(--accent); }
+
+  /* Daily star in the Star Shop, and the dot on the cart when it's waiting */
+  .daily-star {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.9rem; margin: 0.2rem 0;
+    padding: 0.8rem 1rem; border-radius: 1.25rem; background: #FFF8E1; border: 1.5px solid #F6C945;
+  }
+  .daily-icon {
+    flex: none; display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%;
+    background: #F6C945; color: #fff; font-size: 1.5rem; line-height: 1; box-shadow: 0 0 0 4px #FFE9A8;
+  }
+  .daily-text { flex: 1 1 12rem; display: grid; gap: 0.1rem; min-width: 0; }
+  .daily-title { font-weight: 700; color: #6B4508; }
+  .daily-sub { font-size: 0.85rem; color: #8A6A2A; }
+  .daily-claim { flex: none; }
+  .daily-claim:disabled { opacity: 0.7; cursor: default; }
+  .cart-btn.nudge::after {
+    content: ""; position: absolute; left: -0.1rem; top: -0.1rem; width: 0.65rem; height: 0.65rem;
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  /* Badges under the pet achievements */
+  .dialog .badges-head { font-family: var(--display); font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0; color: var(--fg); }
+  .badge-grid {
+    list-style: none; margin: 0.4rem 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: 0.7rem;
+  }
+  .badge {
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.8rem 0.9rem;
+    border: 1.5px dashed var(--pink); border-radius: 1.1rem; background: var(--surface);
+  }
+  .badge.done { border: 1.5px solid #F6C945; background: #FFF8E1; }
+  .badge-icon {
+    flex: none; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: var(--blush); color: var(--muted); font-size: 1.2rem; line-height: 1;
+  }
+  .badge.done .badge-icon { background: #F6C945; color: #fff; }
+  .badge-text { display: grid; gap: 0.15rem; min-width: 0; flex: 1; }
+  .badge-name { font-weight: 700; color: var(--fg); }
+  .badge.done .badge-name { color: #6B4508; }
+  .badge-task { font-size: 0.82rem; color: var(--muted); }
+  .badge .pet-goal-bar { width: 100%; }
+
+  /* Top research this week */
+  .top-band { padding-block: 3rem 1rem; }
+  .top-list { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+  .top-open {
+    display: flex; align-items: center; gap: 0.9rem; width: 100%; text-align: left; cursor: pointer; font: inherit;
+    padding: 0.8rem 1.1rem; border-radius: 1.25rem; border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  }
+  .top-open:hover { border-color: var(--pink); background: var(--blush); }
+  .top-rank {
+    flex: none; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%;
+    background: var(--blush); color: var(--button-fg); font-family: var(--display); font-weight: 600; font-size: 1.1rem;
+  }
+  .top-item.first .top-rank { background: #F6C945; color: #6B4508; box-shadow: 0 0 0 3px #FFE9A8; }
+  .top-text { flex: 1; display: grid; gap: 0.1rem; min-width: 0; }
+  .top-title { font-weight: 700; overflow-wrap: anywhere; }
+  .top-by { font-size: 0.85rem; color: var(--muted); }
+  .top-by .dollar { color: var(--accent); }
+  .top-likes { flex: none; font-weight: 700; font-size: 0.85rem; color: var(--button-fg); white-space: nowrap; }
+  @media (max-width: 520px) {
+    .top-open { flex-wrap: wrap; }
+    .top-likes { margin-left: 3.1rem; }
+  }
+
+  /* Save button on research cards and the Saved research pop-up */
+  .card-save-icon { width: 0.95rem; height: 0.95rem; fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; }
+  .card-save[aria-pressed="true"] { background: var(--button); border-color: var(--button); }
+  .card-save[aria-pressed="true"] .card-save-icon { fill: var(--button-fg); stroke: var(--button-fg); }
+  .dialog.saved-dialog { width: min(32rem, 100%); }
+  .saved-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+  .saved-item { display: flex; align-items: center; gap: 0.6rem; }
+  .saved-item .research-result { flex: 1; min-width: 0; }

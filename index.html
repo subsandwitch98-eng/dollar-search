@@ -40,6 +40,7 @@
         <button class="account-btn" id="account-btn" type="button" aria-expanded="false" aria-controls="account-menu" aria-label="Your account"></button>
         <div class="account-menu" id="account-menu" hidden>
           <span class="account-email" id="account-email"></span>
+          <button class="btn btn-ghost" id="saved-btn" type="button" hidden>Saved research</button>
           <button class="btn btn-ghost" id="signout-btn" type="button">Sign out</button>
         </div>
       </div>
@@ -148,6 +149,16 @@
         <div class="recent-tags" id="recent-tags" role="group" aria-label="Show research about" hidden></div>
         <ol class="recent-strip" id="recent-strip" aria-label="Recent research, newest first"></ol>
         <p class="empty-note" id="recent-empty" hidden>No research yet. Add a research project to your portfolio and it shows up here.</p>
+      </div>
+    </section>
+
+    <section class="top-band" id="top-research" hidden>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Top research this week</h2>
+          <p class="section-sub">The research with the most likes in the last 7 days.</p>
+        </div>
+        <ol class="top-list" id="top-list"></ol>
       </div>
     </section>
 
@@ -357,7 +368,8 @@
     <p class="shop-limited" id="shop-limited"><span class="shop-limited-tag">Limited items</span> <span id="shop-limited-text">The Halloween items leave the shop on October 31, 2026.</span></p>
     <p class="shop-balance"><span class="shop-balance-stars" id="shop-balance">★ 0</span> <span id="shop-balance-note">to spend</span></p>
     <p class="shop-gift" id="shop-gift" hidden></p>
-    <p class="shop-how">You earn 1 star for every like your portfolio or your research gets. Spend them on items for your character, then pick them in Edit character.</p>
+    <div class="daily-star" id="daily-star" hidden></div>
+    <p class="shop-how">You earn 1 star for every like your portfolio or your research gets, plus your daily star. Spend them on items for your character, then pick them in Edit character.</p>
     <div class="shop-inventory" id="shop-inventory" hidden>
       <p class="edit-label">Your items</p>
       <ul class="inventory-list" id="shop-inventory-list"></ul>
@@ -376,6 +388,21 @@
     </div>
     <p id="achievements-sub">Each achievement unlocks a pet to pick in Edit character.</p>
     <ul class="achievement-grid" id="achievement-list"></ul>
+    <h3 class="badges-head">Badges</h3>
+    <p id="badges-sub"></p>
+    <ul class="badge-grid" id="badge-list"></ul>
+  </div>
+</div>
+
+<!-- Saved research pop-up, opened from the account menu -->
+<div class="dialog-backdrop" id="saved-dialog" hidden>
+  <div class="dialog saved-dialog" role="dialog" aria-modal="true" aria-labelledby="saved-title">
+    <div class="achievements-head">
+      <h2 id="saved-title">Saved research</h2>
+      <button class="dialog-close" id="saved-close" type="button" aria-label="Close saved research">×</button>
+    </div>
+    <p id="saved-sub">Research you've saved with the Save button. Only you can see this list.</p>
+    <ul class="saved-list" id="saved-list"></ul>
   </div>
 </div>
 

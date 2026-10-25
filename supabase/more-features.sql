@@ -36,3 +36,53 @@ grant update (title, link, description, sources, tags, image) on public.projects
 
 alter table public.profiles add column if not exists pinned_project uuid references public.projects (id) on delete set null;
 grant update (name, description, email, avatar, pinned_project) on public.profiles to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Daily star: one free star per day (US Eastern days), claimed through claim_daily_star().
+-- ---------------------------------------------------------------------------
+create table if not exists public.star_claims (
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  day date not null,
+  primary key (user_id, day)
+);
+alter table public.star_claims enable row level security;
+drop policy if exists "see own claims" on public.star_claims;
+create policy "see own claims" on public.star_claims for select to authenticated using (user_id = auth.uid());
+grant select on public.star_claims to authenticated;
+
+create or replace function public.claim_daily_star()
+returns json
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  today date := (now() at time zone 'America/New_York')::date;
+  added int;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to claim your star.';
+  end if;
+  insert into public.star_claims (user_id, day) values (auth.uid(), today)
+  on conflict (user_id, day) do nothing;
+  get diagnostics added = row_count;
+  return json_build_object('claimed', added > 0, 'day', today);
+end;
+$$;
+revoke all on function public.claim_daily_star() from public;
+grant execute on function public.claim_daily_star() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Bookmarks: research you've saved. Private to you.
+-- ---------------------------------------------------------------------------
+create table if not exists public.bookmarks (
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  project_id uuid not null references public.projects (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, project_id)
+);
+alter table public.bookmarks enable row level security;
+drop policy if exists "own bookmarks" on public.bookmarks;
+create policy "own bookmarks" on public.bookmarks for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+grant select, insert, delete on public.bookmarks to authenticated;

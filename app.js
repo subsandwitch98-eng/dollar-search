@@ -50,11 +50,15 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
+    reactions: [], messages: [], notes: {} };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
   var bookmarksReady = false; // true once saved research has loaded
+  var reactionsReady = false; // true once research reactions (Inspiring, Smart, Well-sourced) have loaded
+  var messagesReady = false;  // true once messages with friends have loaded
+  var notesReady = false;     // true once team notes have loaded
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -103,7 +107,8 @@
       client.from('follows').select('user_id, profile_id, created_at'),
       client.from('project_likes').select('user_id, project_id, created_at'),
       client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at'),
-      client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at')
+      client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at'),
+      client.from('project_reactions').select('user_id, project_id, kind')
     ]).then(function (res) {
       // Research likes, comments and collabs are optional: if their tables aren't set up yet, the rest of the site still loads.
       res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
@@ -143,14 +148,24 @@
           createdAt: Date.parse(c.created_at) || 0, respondedAt: Date.parse(c.responded_at) || 0
         };
       });
-      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = []; return; }
+      reactionsReady = !res[8].error;
+      state.reactions = res[8].error ? [] : res[8].data.map(function (r) {
+        return { userId: r.user_id, projectId: r.project_id, kind: r.kind };
+      });
+      if (!me) {
+        isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = [];
+        messagesReady = false; notesReady = false; state.messages = []; state.notes = {};
+        return;
+      }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
         client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
         client.from('shop_purchases').select('item, price').eq('user_id', me.id),
         client.from('star_gifts').select('stars').eq('user_id', me.id),
         client.from('star_claims').select('day').eq('user_id', me.id),
-        client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false })
+        client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false }),
+        client.from('messages').select('id, from_user, to_user, body, created_at, read_at').order('created_at'),
+        client.from('collab_notes').select('project_id, body, updated_by, updated_at')
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -172,6 +187,20 @@
         if (!extra[4].error) state.claims = extra[4].data.map(function (r) { return r.day; });
         bookmarksReady = !extra[5].error;
         if (!extra[5].error) state.bookmarks = extra[5].data.map(function (r) { return r.project_id; });
+        // Messages with friends, and team notes on research you work on.
+        messagesReady = !extra[6].error;
+        if (!extra[6].error) {
+          state.messages = extra[6].data.map(function (m) {
+            return { id: m.id, from: m.from_user, to: m.to_user, body: m.body || '', at: Date.parse(m.created_at) || 0, readAt: Date.parse(m.read_at) || 0 };
+          });
+        }
+        notesReady = !extra[7].error;
+        if (!extra[7].error) {
+          state.notes = {};
+          extra[7].data.forEach(function (n) {
+            state.notes[n.project_id] = { body: n.body || '', by: n.updated_by, at: Date.parse(n.updated_at) || 0 };
+          });
+        }
       });
     });
   }
@@ -2930,7 +2959,24 @@
       pin.addEventListener('click', function () { togglePin(p); });
       tools.appendChild(pin);
     }
+    var team = hasTeamNotes(p);
+    if (team) {
+      var notesBtn = make('button', 'mini-btn notes-btn', 'Team notes');
+      notesBtn.type = 'button';
+      notesBtn.setAttribute('aria-expanded', notesOpen[p.id] ? 'true' : 'false');
+      notesBtn.title = 'A shared notepad for you and your collaborators';
+      notesBtn.addEventListener('click', function () {
+        notesOpen[p.id] = !notesOpen[p.id];
+        renderProjects();
+        var box = $('notes-input-' + p.id);
+        if (notesOpen[p.id] && box) box.focus();
+      });
+      tools.appendChild(notesBtn);
+    }
+    var reacts = reactionRow(p);
+    if (reacts) card.appendChild(reacts);
     card.appendChild(tools);
+    if (team && notesOpen[p.id]) card.appendChild(notesPanel(p));
     if (open) card.appendChild(commentsPanel(p, comments, editable));
     return card;
   }
@@ -2970,6 +3016,134 @@
     talk.appendChild(make('span', null, String(count)));
     talk.addEventListener('click', onClick);
     return talk;
+  }
+
+  // ---- Reactions: Inspiring, Smart and Well-sourced buttons under a research card ----
+  var REACTIONS = [
+    { kind: 'inspiring', icon: '✦', label: 'Inspiring' },
+    { kind: 'smart', icon: '◉', label: 'Smart' },
+    { kind: 'sourced', icon: '✓', label: 'Well-sourced' }
+  ];
+  var reacting = null; // "projectId:kind" while saving
+  function reactionRow(q) {
+    if (!reactionsReady) return null;
+    var own = canEditProject(q);
+    var row = make('div', 'reaction-row');
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'Reactions to ' + q.title);
+    REACTIONS.forEach(function (r) {
+      var list = state.reactions.filter(function (x) { return x.projectId === q.id && x.kind === r.kind; });
+      var on = !!me && list.some(function (x) { return x.userId === me.id; });
+      // Your own research shows its counts, but only ones people have given.
+      if (own && !list.length) return;
+      var b = make('button', 'reaction-btn reaction-' + r.kind);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var icon = make('span', 'reaction-icon', r.icon);
+      icon.setAttribute('aria-hidden', 'true');
+      b.appendChild(icon);
+      b.appendChild(make('span', null, r.label));
+      if (list.length) b.appendChild(make('span', 'reaction-count', String(list.length)));
+      b.setAttribute('aria-label', r.label + ', ' + list.length + (on ? '. You reacted. Click to take it back.' : ''));
+      if (own) {
+        b.disabled = true;
+        b.title = 'Reactions people gave your research';
+      } else {
+        b.disabled = reacting === q.id + ':' + r.kind;
+        b.addEventListener('click', function () { toggleReaction(q, r.kind); });
+      }
+      row.appendChild(b);
+    });
+    return row.childNodes.length ? row : null;
+  }
+  function toggleReaction(q, kind) {
+    if (!me) { openAuth('signin', 'Sign in to react to research.'); return; }
+    if (reacting) return;
+    var on = state.reactions.some(function (x) { return x.projectId === q.id && x.kind === kind && x.userId === me.id; });
+    reacting = q.id + ':' + kind;
+    rerenderResearch();
+    var req = on
+      ? client.from('project_reactions').delete().eq('user_id', me.id).eq('project_id', q.id).eq('kind', kind)
+      : client.from('project_reactions').insert({ project_id: q.id, kind: kind });
+    req.then(function (res) {
+      reacting = null;
+      if (res.error && res.error.code !== '23505') {
+        showToast(dbMessage(res.error));
+      } else if (on) {
+        state.reactions = state.reactions.filter(function (x) { return !(x.projectId === q.id && x.kind === kind && x.userId === me.id); });
+      } else if (!res.error) {
+        state.reactions.push({ userId: me.id, projectId: q.id, kind: kind });
+      }
+      rerenderResearch();
+    });
+  }
+
+  // ---- Team notes: a shared notepad on research that has collaborators ----
+  var notesOpen = {};   // research id -> its notes are open
+  var noteDrafts = {};  // research id -> unsaved text
+  var savingNote = null;
+  function hasTeamNotes(q) {
+    return notesReady && !!me && canEditProject(q) && acceptedCollabs(q.id).length > 0;
+  }
+  function notesPanel(q) {
+    var saved = state.notes[q.id] || { body: '', by: null, at: 0 };
+    var box = make('div', 'notes-panel');
+    box.id = 'notes-' + q.id;
+    var head = make('div', 'notes-head');
+    head.appendChild(make('span', 'notes-title', 'Team notes'));
+    head.appendChild(make('span', 'notes-who', 'Only you and your collaborators can see these'));
+    box.appendChild(head);
+    var label = make('label', 'sr-only', 'Team notes for ' + q.title);
+    label.htmlFor = 'notes-input-' + q.id;
+    box.appendChild(label);
+    var input = make('textarea', 'notes-input');
+    input.id = 'notes-input-' + q.id;
+    input.rows = 6;
+    input.maxLength = 4000;
+    input.placeholder = 'Plans, to-dos, who is doing what…';
+    input.value = noteDrafts[q.id] != null ? noteDrafts[q.id] : saved.body;
+    input.addEventListener('input', function () { noteDrafts[q.id] = input.value; });
+    box.appendChild(input);
+    var foot = make('div', 'notes-foot');
+    var save = make('button', 'btn btn-solid', savingNote === q.id ? 'Saving…' : 'Save notes');
+    save.type = 'button';
+    save.disabled = savingNote === q.id;
+    save.addEventListener('click', function () { saveNotes(q, input.value); });
+    foot.appendChild(save);
+    var when = '';
+    if (saved.at) {
+      var who = saved.by === me.id ? 'you' : ownerName(saved.by);
+      when = 'Last saved ' + timeAgo(saved.at).toLowerCase() + (who ? ' by ' + who : '');
+    }
+    foot.appendChild(make('span', 'notes-when', when || 'Nothing saved yet'));
+    box.appendChild(foot);
+    return box;
+  }
+  // The name of someone's first portfolio, for showing who did something.
+  function ownerName(userId) {
+    var p = state.profiles.filter(function (x) { return x.ownerId === userId; })[0];
+    return p ? p.name : '';
+  }
+  function saveNotes(q, body) {
+    if (savingNote) return;
+    savingNote = q.id;
+    renderProjects();
+    var row = { body: body, updated_by: me.id, updated_at: new Date().toISOString() };
+    // Update the notes if they exist, otherwise start them.
+    client.from('collab_notes').update(row).eq('project_id', q.id).select('project_id').then(function (res) {
+      if (res.error || (res.data && res.data.length)) return res;
+      return client.from('collab_notes').insert({ project_id: q.id, body: body });
+    }).then(function (res) {
+      savingNote = null;
+      if (res.error) {
+        showToast(dbMessage(res.error));
+      } else {
+        state.notes[q.id] = { body: body, by: me.id, at: Date.now() };
+        delete noteDrafts[q.id];
+        showToast('Team notes saved.');
+      }
+      renderProjects();
+    });
   }
 
   // ---- Saved research (bookmarks): a private list of research you want to come back to ----
@@ -3626,6 +3800,8 @@
     var ownFriends = $('own-friends');
     ownFriends.hidden = !own;
     if (own) ownFriends.textContent = plural(friendCount(p.ownerId), 'friend');
+    // Friends can message each other from the portfolio.
+    $('message-btn').hidden = own || !me || !messagesReady || !areFriends(me.id, p.ownerId);
     renderFollowers(p);
     renderCollabs(p, own);
   }
@@ -4153,6 +4329,167 @@
     if (notifPanel.hidden) openNotifs(); else closeNotifs();
   });
 
+  // ---- Messages: private chats between friends (people who follow each other) ----
+  var msgBtn = $('msg-btn');
+  var msgDialog = $('msg-dialog');
+  var msgInput = $('msg-input');
+  var msgOpener = null;
+  var chatWith = null;   // the friend whose chat is open, or null for the list of chats
+  var sendingMsg = false;
+  // Everyone you can chat with: your friends, plus anyone you already have messages with.
+  function chatPeople() {
+    var ids = {};
+    state.profiles.forEach(function (p) { if (areFriends(me.id, p.ownerId)) ids[p.ownerId] = true; });
+    state.messages.forEach(function (m) { ids[m.from === me.id ? m.to : m.from] = true; });
+    delete ids[me.id];
+    return Object.keys(ids).filter(function (id) { return ownerName(id); }).map(function (id) {
+      var msgs = chatMessages(id);
+      var last = msgs[msgs.length - 1];
+      return { id: id, last: last || null, unread: msgs.filter(function (m) { return m.to === me.id && !m.readAt; }).length };
+    }).sort(function (a, b) { return (b.last ? b.last.at : 0) - (a.last ? a.last.at : 0) || ownerName(a.id).localeCompare(ownerName(b.id)); });
+  }
+  function chatMessages(userId) {
+    return state.messages.filter(function (m) {
+      return (m.from === me.id && m.to === userId) || (m.from === userId && m.to === me.id);
+    });
+  }
+  function unreadMessages() {
+    return state.messages.filter(function (m) { return m.to === me.id && !m.readAt; }).length;
+  }
+  function renderMsgButton() {
+    var show = !!me && messagesReady && loaded && !loadError;
+    msgBtn.hidden = !show;
+    if (!show) { msgDialog.hidden = true; return; }
+    var n = unreadMessages();
+    var badge = $('msg-badge');
+    badge.hidden = !n;
+    badge.textContent = n > 9 ? '9+' : String(n);
+    msgBtn.setAttribute('aria-label', 'Messages' + (n ? ', ' + plural(n, 'unread message') : ''));
+    if (!msgDialog.hidden) renderMessages();
+  }
+  function profileFor(userId) {
+    return state.profiles.filter(function (x) { return x.ownerId === userId; })[0] || null;
+  }
+  function renderMessages() {
+    var chats = $('msg-chats');
+    var wrap = $('msg-thread-wrap');
+    $('msg-back').hidden = !chatWith;
+    chats.hidden = !!chatWith;
+    wrap.hidden = !chatWith;
+    if (!chatWith) {
+      $('msg-title').textContent = 'Messages';
+      var people = chatPeople();
+      $('msg-sub').textContent = people.length
+        ? 'Chat with your friends: people who follow you back. Only the two of you can see a chat.'
+        : 'No chats yet. When someone you follow follows you back, you become friends and can message each other here.';
+      chats.textContent = '';
+      people.forEach(function (c) {
+        var li = make('li');
+        var b = make('button', 'msg-chat' + (c.unread ? ' unread' : ''));
+        b.type = 'button';
+        var fp = profileFor(c.id);
+        var pic = fp ? pictureNode(fp.avatar, fp.name) : null;
+        var avatar = make('span', 'avatar msg-avatar', pic ? null : ownerName(c.id).charAt(0).toUpperCase());
+        if (pic) avatar.appendChild(pic);
+        avatar.setAttribute('aria-hidden', 'true');
+        b.appendChild(avatar);
+        var text = make('span', 'msg-chat-text');
+        var nm = make('span', 'msg-chat-name');
+        paintName(nm, ownerName(c.id));
+        text.appendChild(nm);
+        text.appendChild(make('span', 'msg-chat-last', c.last
+          ? (c.last.from === me.id ? 'You: ' : '') + c.last.body
+          : 'Say hi!'));
+        b.appendChild(text);
+        if (c.unread) b.appendChild(make('span', 'msg-unread', String(c.unread)));
+        else if (c.last) b.appendChild(make('span', 'msg-chat-when', timeAgo(c.last.at)));
+        b.addEventListener('click', function () { openChat(c.id); });
+        li.appendChild(b);
+        chats.appendChild(li);
+      });
+      return;
+    }
+    $('msg-title').textContent = ownerName(chatWith);
+    var friends = areFriends(me.id, chatWith);
+    $('msg-sub').textContent = friends ? 'Only the two of you can see this chat.' : 'You are not friends anymore, so you can read this chat but not send new messages.';
+    var thread = $('msg-thread');
+    thread.textContent = '';
+    var msgs = chatMessages(chatWith);
+    if (!msgs.length) thread.appendChild(make('li', 'msg-empty', 'No messages yet. Say hi!'));
+    msgs.forEach(function (m) {
+      var li = make('li', 'msg-bubble' + (m.from === me.id ? ' mine' : ''));
+      li.appendChild(make('span', 'msg-body', m.body));
+      var when = make('span', 'msg-when', timeAgo(m.at));
+      when.title = exactTime(m.at);
+      li.appendChild(when);
+      thread.appendChild(li);
+    });
+    thread.scrollTop = thread.scrollHeight;
+    msgInput.disabled = !friends || sendingMsg;
+    $('msg-send').disabled = !friends || sendingMsg;
+  }
+  // Opening a chat marks the friend's messages as read.
+  function openChat(userId) {
+    chatWith = userId;
+    $('msg-status').textContent = '';
+    renderMessages();
+    msgInput.focus();
+    var unread = chatMessages(userId).filter(function (m) { return m.to === me.id && !m.readAt; });
+    if (!unread.length) return;
+    var now = new Date().toISOString();
+    unread.forEach(function (m) { m.readAt = Date.now(); });
+    renderMsgButton();
+    client.from('messages').update({ read_at: now }).eq('to_user', me.id).eq('from_user', userId).is('read_at', null).then(function () {});
+  }
+  function openMessages(userId) {
+    if (!me || !messagesReady) return;
+    msgOpener = document.activeElement;
+    closeNotifs();
+    closeAccountMenu();
+    msgDialog.hidden = false;
+    if (userId) openChat(userId);
+    else { chatWith = null; renderMessages(); $('msg-close').focus(); }
+  }
+  function closeMessages() {
+    msgDialog.hidden = true;
+    chatWith = null;
+    if (msgOpener && msgOpener.focus) msgOpener.focus();
+  }
+  msgBtn.addEventListener('click', function () { openMessages(null); });
+  $('msg-close').addEventListener('click', closeMessages);
+  $('msg-back').addEventListener('click', function () { chatWith = null; renderMessages(); $('msg-close').focus(); });
+  msgDialog.addEventListener('click', function (e) { if (e.target === msgDialog) closeMessages(); });
+  // Enter sends; Shift+Enter makes a new line.
+  msgInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('msg-form').requestSubmit(); }
+  });
+  $('msg-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = msgInput.value.trim();
+    if (!body || !chatWith || sendingMsg) return;
+    var to = chatWith;
+    sendingMsg = true;
+    $('msg-status').textContent = '';
+    renderMessages();
+    client.from('messages').insert({ to_user: to, body: body }).then(function (res) {
+      sendingMsg = false;
+      if (res.error) {
+        $('msg-status').textContent = /row-level security|permission/i.test(res.error.message || '')
+          ? 'You can only message friends: people who follow you back.'
+          : dbMessage(res.error);
+      } else {
+        msgInput.value = '';
+        state.messages.push({ id: 'new-' + Date.now(), from: me.id, to: to, body: body, at: Date.now(), readAt: 0 });
+      }
+      renderMessages();
+      msgInput.focus();
+    });
+  });
+  $('message-btn').addEventListener('click', function () {
+    var p = current();
+    if (p) openMessages(p.ownerId);
+  });
+
   // ---- Account: sign in, sign up, sign out ----
   var signinBtn = $('signin-btn');
   var account = $('account');
@@ -4200,6 +4537,7 @@
     if (!authDialog.hidden) { closeAuth(); return; }
     if (!achievementsDialog.hidden) { closeAchievements(); return; }
     if (!savedDialog.hidden) { closeSaved(); return; }
+    if (!msgDialog.hidden) { closeMessages(); return; }
     if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
     if (!accountMenu.hidden) { closeAccountMenu(); accountBtn.focus(); }
@@ -4375,13 +4713,16 @@
   function busy() {
     var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; });
     var typingCollab = !collabPanel.hidden && collabPanel.contains(document.activeElement);
-    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab;
+    // Unsaved team notes are kept in noteDrafts, so only pause while someone is typing in them.
+    var typingNotes = !!document.activeElement && document.activeElement.classList.contains('notes-input');
+    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab || typingNotes;
   }
   var routed = false;
   function renderAll() {
     renderHeader();
     renderBell();
     renderCart();
+    renderMsgButton();
     if (!routed && loaded) { routed = true; route(); return; }
     if (busy()) return;
     if (currentId) {

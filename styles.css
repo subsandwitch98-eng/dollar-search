@@ -941,7 +941,9 @@ img { max-width: 100%; }
 .react-btn.own { opacity: 0.6; }
 
 /* Like button at the bottom of each research card */
-.project-tools { align-items: center; }
+.project-tools { align-items: center; flex-wrap: wrap; }
+.project-tools .mini-btn { white-space: nowrap; }
+.notes-btn[aria-expanded="true"] { background: #FFF3CF; border-color: #F6C945; color: #6B4508; }
 .card-like {
   display: inline-flex; align-items: center; gap: 0.35rem;
   font-family: var(--body); font-weight: 700; font-size: 0.85rem; color: var(--button-fg);
@@ -1117,3 +1119,81 @@ img { max-width: 100%; }
   .saved-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
   .saved-item { display: flex; align-items: center; gap: 0.6rem; }
   .saved-item .research-result { flex: 1; min-width: 0; }
+
+  /* Reactions under a research card: Inspiring, Smart, Well-sourced */
+  .reaction-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+  .reaction-btn {
+    display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer;
+    font-family: var(--body); font-weight: 700; font-size: 0.78rem; color: var(--muted);
+    background: transparent; border: 1px dashed var(--pink); border-radius: 999px; padding: 0.22rem 0.7rem;
+  }
+  .reaction-btn:hover:not(:disabled) { background: var(--blush); border-style: solid; }
+  .reaction-btn:disabled { cursor: default; }
+  .reaction-icon { font-size: 0.85rem; line-height: 1; }
+  .reaction-inspiring .reaction-icon { color: #E0A82E; }
+  .reaction-smart .reaction-icon { color: #7B6CC4; }
+  .reaction-sourced .reaction-icon { color: #3F9C7A; }
+  .reaction-count { font-variant-numeric: tabular-nums; color: var(--button-fg); }
+  .reaction-btn[aria-pressed="true"] { border-style: solid; color: var(--button-fg); }
+  .reaction-inspiring[aria-pressed="true"] { background: #FFF3CF; border-color: #F6C945; }
+  .reaction-smart[aria-pressed="true"] { background: #ECE8FB; border-color: #B9A6E8; }
+  .reaction-sourced[aria-pressed="true"] { background: #E2F5EC; border-color: #9BD3AE; }
+  @media (pointer: coarse) { .reaction-btn { min-height: 2.5rem; padding-inline: 0.9rem; } }
+
+  /* Team notes: a shared notepad under a research card */
+  .notes-panel {
+    display: grid; gap: 0.5rem; margin-top: 0.8rem; padding: 0.9rem 1rem;
+    border-radius: 1rem; background: #FFFBEA; border: 1px solid #F3E2A6;
+  }
+  .notes-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; }
+  .notes-title { font-weight: 700; color: #6B4508; }
+  .notes-who { font-size: 0.8rem; color: #8A6A2A; }
+  .notes-input {
+    width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 0.92rem; line-height: 1.5;
+    color: var(--fg); background: #FFFDF4;
+    border: 1px solid #F3E2A6; border-radius: 0.75rem; padding: 0.6rem 0.8rem;
+  }
+  .notes-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; }
+  .notes-when { font-size: 0.8rem; color: #8A6A2A; }
+
+  /* Messages: the envelope by the bell and the chats pop-up */
+  .msg-btn .bell-badge { top: -0.25rem; right: -0.35rem; }
+  .dialog.msg-dialog { width: min(30rem, 100%); gap: 0.5rem; }
+  .msg-dialog .achievements-head h2 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .msg-back { flex: none; }
+  .msg-chats { list-style: none; margin: 0.25rem 0 0; padding: 0; display: grid; gap: 0.45rem; }
+  .msg-chat {
+    display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left; cursor: pointer; font: inherit;
+    padding: 0.65rem 0.8rem; border-radius: 1rem; border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  }
+  .msg-chat:hover { background: var(--blush); border-color: var(--pink); }
+  .msg-chat.unread { border-color: var(--accent); }
+  .msg-avatar { flex: none; width: 2.6rem; height: 2.6rem; }
+  .msg-chat-text { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+  .msg-chat-name { font-weight: 700; }
+  .msg-chat-last { font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg-chat.unread .msg-chat-last { color: var(--fg); font-weight: 700; }
+  .msg-chat-when { flex: none; font-size: 0.75rem; color: var(--muted); }
+  .msg-unread {
+    flex: none; min-width: 1.4rem; height: 1.4rem; border-radius: 999px; padding: 0 0.35rem; box-sizing: border-box;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 0.75rem; line-height: 1.4rem; text-align: center;
+  }
+  .msg-thread-wrap { display: grid; gap: 0.6rem; }
+  .msg-thread {
+    list-style: none; margin: 0; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.45rem;
+    height: min(22rem, 50vh); overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 1rem;
+  }
+  .msg-bubble {
+    align-self: flex-start; max-width: 80%; display: grid; gap: 0.15rem;
+    padding: 0.5rem 0.8rem; border-radius: 1rem 1rem 1rem 0.3rem; background: var(--surface); border: 1px solid var(--line);
+  }
+  .msg-bubble.mine { align-self: flex-end; background: var(--button); border-color: var(--button); border-radius: 1rem 1rem 0.3rem 1rem; }
+  .msg-body { color: var(--fg); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .msg-bubble.mine .msg-body { color: var(--button-fg); }
+  .msg-when { font-size: 0.7rem; color: var(--muted); }
+  .msg-empty { margin: auto; color: var(--muted); font-size: 0.9rem; }
+  .msg-form { display: flex; gap: 0.5rem; align-items: flex-end; }
+  .msg-form textarea {
+    flex: 1; min-width: 0; resize: none; box-sizing: border-box; font: inherit; font-size: 0.95rem; color: var(--fg);
+    background: var(--surface); border: 1.5px solid var(--pink); border-radius: 1rem; padding: 0.55rem 0.8rem;
+  }

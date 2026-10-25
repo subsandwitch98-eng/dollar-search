@@ -21,7 +21,7 @@
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
-    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
+    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk', 'Vampire'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A'],
     frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb'],
     pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy'],
@@ -770,7 +770,7 @@
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
-    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry, 10 Smirk.
+    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry, 10 Smirk, 11 Vampire.
     // Eyes sit at (51,58) and (69,58). Tinted lenses (Shades, Hearts, Stars, Aviators) cover them, so the eyes are skipped then.
     var tinted = c.glasses === 2 || c.glasses === 5 || c.glasses === 6 || c.glasses === 7;
     var f = c.face;
@@ -822,6 +822,10 @@
       add('path', { d: 'M65 50 Q69 47 73 50', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
     }
     if (f === 0 || f === 4) add('path', line('M52 67 Q60 74 68 67'));
+    if (f === 11) { // Star Shop Halloween: Vampire, a smile with two little fangs hanging from it
+      add('path', { d: 'M54.1 68.9 L56.7 69.8 L55.5 73.2 Z M65.9 68.9 L63.3 69.8 L64.5 73.2 Z', fill: '#FFFFFF', stroke: ink, 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
+      add('path', line('M52 67 Q60 74 68 67'));
+    }
     if (f === 1 || f === 9) add('path', { d: 'M51 66 Q60 77 69 66 Z', fill: '#FFFFFF', stroke: ink, 'stroke-width': 2, 'stroke-linejoin': 'round' });
     if (f === 2 || f === 3) add('path', line('M53 69 Q61 71 68 66'));
     if (f === 5) { // Laugh: big open mouth with a tongue
@@ -2007,6 +2011,7 @@
     { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 },
     { id: 'midnight-bg', name: 'Midnight background', kind: 'Background', key: 'bg', index: 6, price: 1 },
     { id: 'devil-horns', name: 'Devil horns', kind: 'Headwear', key: 'headwear', index: 14, price: 2 },
+    { id: 'vampire-fangs', name: 'Vampire fangs', kind: 'Face', key: 'face', index: 11, price: 2 },
     { id: 'candy-crown', name: 'Candy corn crown', kind: 'Headwear', key: 'headwear', index: 15, price: 3 },
     { id: 'candy-frame', name: 'Candy corn frame', kind: 'Frame', key: 'frame', index: 10, price: 3 },
     { id: 'vampire-cape', name: 'Vampire cape', kind: 'Clothing', key: 'outfit', index: 6, price: 4 },

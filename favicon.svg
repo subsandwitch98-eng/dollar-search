@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="16" fill="#F7C8D4"/>
+  <text x="29" y="49" text-anchor="middle" font-family="Fredoka, 'Arial Rounded MT Bold', Nunito, Arial, sans-serif" font-weight="700" font-size="46" fill="#8E3553">$</text>
+  <polygon points="51,5 53.6,11.2 60.3,11.8 55.2,16.2 56.8,22.8 51,19.3 45.2,22.8 46.8,16.2 41.7,11.8 48.4,11.2" fill="#F6C945" stroke="#E0A82E" stroke-width="1.2" stroke-linejoin="round"/>
+</svg>

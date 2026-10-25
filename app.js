@@ -21,7 +21,7 @@
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
-    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk', 'Vampire', 'Scarecrow', 'Witch'],
+    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk', 'Vampire', 'Scarecrow (removed)', 'Witch'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A'],
     frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb'],
     pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy'],
@@ -29,12 +29,17 @@
   };
   var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame', 'pet', 'petColor'];
   var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0, pet: 0, petColor: 0 };
+  // Options that were removed. They keep their place in the lists above (so the options after them keep
+  // their numbers), but nobody can pick them and characters that had one go back to the default.
+  var RETIRED = { face: [12] }; // 12: Scarecrow smile
+  function isRetired(key, index) { return !!RETIRED[key] && RETIRED[key].indexOf(index) >= 0; }
   function normalizeCharacter(src) {
     var c = {};
     src = src && typeof src === 'object' ? src : {};
     CHAR_KEYS.forEach(function (k) {
       var v = src[k];
-      c[k] = typeof v === 'number' && Math.floor(v) === v && v >= 0 && v < CHAR[k].length ? v : DEFAULT_CHAR[k];
+      var ok = typeof v === 'number' && Math.floor(v) === v && v >= 0 && v < CHAR[k].length && !isRetired(k, v);
+      c[k] = ok ? v : DEFAULT_CHAR[k];
     });
     return c;
   }
@@ -770,7 +775,7 @@
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
-    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry, 10 Smirk, 11 Vampire, 12 Scarecrow, 13 Witch.
+    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry, 10 Smirk, 11 Vampire, 12 (removed), 13 Witch.
     // Eyes sit at (51,58) and (69,58). Tinted lenses (Shades, Hearts, Stars, Aviators) cover them, so the eyes are skipped then.
     var tinted = c.glasses === 2 || c.glasses === 5 || c.glasses === 6 || c.glasses === 7;
     var f = c.face;
@@ -825,12 +830,6 @@
     if (f === 11) { // Star Shop Halloween: Vampire, a wide smile with two big fangs hanging from it
       add('path', { d: 'M52.4 68.8 L57.6 70.3 L55.4 75 Z M67.6 68.8 L62.4 70.3 L64.6 75 Z', fill: '#FFFFFF', stroke: ink, 'stroke-width': 1, 'stroke-linejoin': 'round' });
       add('path', line('M49.5 66.5 Q60 75.5 70.5 66.5'));
-    }
-    if (f === 12) { // Star Shop Halloween: Scarecrow, a long stitched smile
-      add('path', line('M47 66 Q60 75.5 73 66'));
-      [[50.4, 68.1, -38], [54.2, 70.1, -24], [58, 71.2, -8], [62, 71.2, 8], [65.8, 70.1, 24], [69.6, 68.1, 38]].forEach(function (s) {
-        add('path', { d: 'M' + s[0] + ' ' + (s[1] - 2.4) + ' L' + s[0] + ' ' + (s[1] + 2.4), stroke: ink, 'stroke-width': 1.4, 'stroke-linecap': 'round', transform: 'rotate(' + s[2] + ' ' + s[0] + ' ' + s[1] + ')' });
-      });
     }
     if (f === 13) { // Star Shop Halloween: Witch, mischievous brows, green cheeks, a cackling grin and a beauty mark
       add('circle', { cx: 47, cy: 66, r: 4.2, fill: '#9BD3AE', opacity: 0.8 });
@@ -2026,7 +2025,6 @@
     { id: 'midnight-bg', name: 'Midnight background', kind: 'Background', key: 'bg', index: 6, price: 1 },
     { id: 'devil-horns', name: 'Devil horns', kind: 'Headwear', key: 'headwear', index: 14, price: 2 },
     { id: 'vampire-fangs', name: 'Vampire fangs', kind: 'Face', key: 'face', index: 11, price: 2 },
-    { id: 'scarecrow-mouth', name: 'Scarecrow smile', kind: 'Face', key: 'face', index: 12, price: 2 },
     { id: 'witch-face', name: 'Witch face', kind: 'Face', key: 'face', index: 13, price: 3 },
     { id: 'candy-crown', name: 'Candy corn crown', kind: 'Headwear', key: 'headwear', index: 15, price: 3 },
     { id: 'candy-frame', name: 'Candy corn frame', kind: 'Frame', key: 'frame', index: 10, price: 3 },
@@ -2317,6 +2315,7 @@
           b.setAttribute('aria-label', value + ', locked. ' + goal.task + '.');
         }
         // Star Shop items stay locked until bought (one you're already wearing stays picked).
+        if (isRetired(key, i)) return; // removed options aren't offered
         // Once the limited items have left the shop, ones you didn't buy disappear from here too.
         var shopItem = shopItemFor(key, i);
         if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i && !shopOpen()) return;
@@ -2363,7 +2362,7 @@
       PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
         var choices = CHAR[g[1]].map(function (_, i) { return i; });
         if (g[1] === 'pet') choices = choices.filter(function (i) { return !PET_UNLOCKS[i] || petProgress(p, i).unlocked; });
-        choices = choices.filter(function (i) { var s = shopItemFor(g[1], i); return !s || ownsItem(s); });
+        choices = choices.filter(function (i) { var s = shopItemFor(g[1], i); return !isRetired(g[1], i) && (!s || ownsItem(s)); });
         picDraft.character[g[1]] = choices[Math.floor(Math.random() * choices.length)];
       });
       buildPicForm('pic-shuffle');

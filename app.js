@@ -304,11 +304,12 @@
           add('circle', { cx: c[0] + b[0], cy: c[1] + b[1], r: b[2], fill: '#FFFFFF' });
         });
       });
-    } else if (kind === 6) { // Sparkles
+    } else if (kind === 6) { // Sparkles on a soft purple ring
+      ring(M, '#E4DAFA', 60 - FRAME_INNER);
       around(8, M, 0, function (x, y, deg, i) {
         add('path', { d: sparklePath(x, y, i % 2 ? 3.8 : 5.6), fill: i % 2 ? '#F29BB2' : '#F6C945' });
       });
-      around(8, M, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#B9A6E8' }); });
+      around(8, M, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#FFFFFF' }); });
     } else if (kind === 7) { // Polka dots with a bow at the bottom
       around(24, M, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.5, fill: '#F7A8C0' }); });
       var bow = 'translate(60 ' + (60 + M) + ') scale(0.72) translate(-60 -110)';

@@ -9,7 +9,7 @@
     : null;
   var SITE_URL = location.origin + location.pathname;
 
-  // ---- Profile pictures: an uploaded photo (small JPEG data URL) or a character built from these options ----
+  // ---- Profile pictures: a character built from these options ----
   var CHAR = {
     skin: ['#FCE3D3', '#F5CDB4', '#E5AF8C', '#C98E6A', '#9C6646', '#6E4630'],
     // New styles and colors go on the end of each list so characters people already saved keep their look.
@@ -24,8 +24,6 @@
   };
   var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'top', 'headwear', 'glasses', 'face', 'bg'];
   var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0 };
-  var PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/;
-
   function normalizeCharacter(src) {
     var c = {};
     src = src && typeof src === 'object' ? src : {};
@@ -35,14 +33,10 @@
     });
     return c;
   }
+  // Profile pictures are characters only; anything else saved in the past is ignored.
   function normalizeAvatar(a) {
-    if (!a || typeof a !== 'object') return null;
-    if (a.mode === 'photo') {
-      return typeof a.photo === 'string' && a.photo.length < 200000 && PHOTO_RE.test(a.photo)
-        ? { mode: 'photo', photo: a.photo } : null;
-    }
-    if (a.mode === 'character') return { mode: 'character', character: normalizeCharacter(a.character) };
-    return null;
+    if (!a || typeof a !== 'object' || a.mode !== 'character') return null;
+    return { mode: 'character', character: normalizeCharacter(a.character) };
   }
 
   // ---- State, loaded from the database ----
@@ -436,37 +430,7 @@
   }
   function pictureNode(avatar, name) {
     if (!avatar) return null;
-    if (avatar.mode === 'photo') {
-      var img = make('img');
-      img.src = avatar.photo;
-      img.alt = name + "'s profile picture";
-      return img;
-    }
     return renderCharacter(avatar.character, name + "'s character");
-  }
-  // Crops a chosen image to a centered square and shrinks it to a small JPEG.
-  function loadPhoto(file, onDone, onError) {
-    if (!file || !/^image\//.test(file.type)) { onError('Choose an image file, such as a JPG or PNG.'); return; }
-    var url = URL.createObjectURL(file);
-    var img = new Image();
-    img.onload = function () {
-      var size = 320;
-      var canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      var side = Math.min(img.naturalWidth, img.naturalHeight);
-      var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, size, size);
-      ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
-      URL.revokeObjectURL(url);
-      try { onDone(canvas.toDataURL('image/jpeg', 0.85)); } catch (e) { onError('That image could not be used. Try a different photo.'); }
-    };
-    img.onerror = function () {
-      URL.revokeObjectURL(url);
-      onError('That image could not be opened. Try a JPG or PNG photo.');
-    };
-    img.src = url;
   }
 
   // ---- Views and addresses: the homepage is "./", a profile is "./?p=<id>" ----
@@ -833,12 +797,12 @@
     });
   });
 
-  // ---- Profile: picture (photo or character) ----
+  // ---- Profile: character picture ----
   var picBtn = $('edit-pic');
   var picForm = $('pic-form');
   var portrait = $('portrait');
   var profileArt = $('profile-art');
-  var picDraft = null; // { mode, photo, character } while the picture editor is open
+  var picDraft = null; // { character } while the character builder is open
   var PIC_GROUPS = [
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
     ['Outfit', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
@@ -853,7 +817,6 @@
     profileArt.classList.toggle('has-portrait', !!pic);
   }
   function draftAvatar() {
-    if (picDraft.mode === 'photo') return picDraft.photo ? { mode: 'photo', photo: picDraft.photo } : null;
     return { mode: 'character', character: picDraft.character };
   }
   function closePicEditor() {
@@ -863,17 +826,14 @@
   }
   picBtn.addEventListener('click', function () {
     var a = current().avatar;
-    picDraft = {
-      mode: a ? a.mode : 'character',
-      photo: a && a.mode === 'photo' ? a.photo : '',
-      character: normalizeCharacter(a && a.mode === 'character' ? a.character : DEFAULT_CHAR)
-    };
+    picDraft = { character: normalizeCharacter(a ? a.character : DEFAULT_CHAR) };
     editBtn.hidden = true;
     picBtn.hidden = true;
-    buildPicForm('pic-mode-' + picDraft.mode);
+    buildPicForm(null);
     picForm.hidden = false;
   });
 
+  // The character builder: pick each feature and watch the preview (and the portrait on the tracks) update.
   function buildPicForm(focusId) {
     var p = current();
     picForm.textContent = '';
@@ -881,96 +841,55 @@
     var preview = make('div', 'pic-preview');
     function updatePreview() {
       preview.textContent = '';
-      var pic = pictureNode(draftAvatar(), p.name);
-      if (pic) preview.appendChild(pic); else preview.textContent = 'No photo yet';
-      paintPortrait(draftAvatar() || p.avatar, p.name);
+      preview.appendChild(pictureNode(draftAvatar(), p.name));
+      paintPortrait(draftAvatar(), p.name);
     }
-    var modes = make('div', 'card-tabs');
-    modes.setAttribute('role', 'group');
-    modes.setAttribute('aria-label', 'Picture type');
-    [['character', 'Character'], ['photo', 'Photo']].forEach(function (m) {
-      var b = make('button', 'card-tab', m[1]);
-      b.type = 'button';
-      b.id = 'pic-mode-' + m[0];
-      b.setAttribute('aria-pressed', picDraft.mode === m[0] ? 'true' : 'false');
-      b.addEventListener('click', function () {
-        if (picDraft.mode === m[0]) return;
-        picDraft.mode = m[0];
-        buildPicForm(b.id);
-      });
-      modes.appendChild(b);
-    });
     top.appendChild(preview);
-    top.appendChild(modes);
+    top.appendChild(make('p', 'pic-note', 'Build your character. Everyone who visits the site can see it.'));
     picForm.appendChild(top);
 
     var statusEl = statusLine('');
-    if (picDraft.mode === 'character') {
-      PIC_GROUPS.forEach(function (g) {
-        var key = g[1];
-        var group = make('div', 'option-group');
-        var label = make('span', 'edit-label', g[0]);
-        label.id = 'pic-label-' + key;
-        var chips = make('div', 'chips');
-        chips.setAttribute('role', 'group');
-        chips.setAttribute('aria-labelledby', label.id);
-        CHAR[key].forEach(function (value, i) {
-          var b = make('button', g[2], g[2] === 'chip' ? value : null);
-          b.type = 'button';
-          if (g[2] === 'swatch') {
-            b.style.background = value;
-            b.setAttribute('aria-label', g[0] + ' ' + (i + 1));
-          }
-          b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
-          b.addEventListener('click', function () {
-            picDraft.character[key] = i;
-            Array.prototype.forEach.call(chips.children, function (x, j) {
-              x.setAttribute('aria-pressed', j === i ? 'true' : 'false');
-            });
-            updatePreview();
+    PIC_GROUPS.forEach(function (g) {
+      var key = g[1];
+      var group = make('div', 'option-group');
+      var label = make('span', 'edit-label', g[0]);
+      label.id = 'pic-label-' + key;
+      var chips = make('div', 'chips');
+      chips.setAttribute('role', 'group');
+      chips.setAttribute('aria-labelledby', label.id);
+      CHAR[key].forEach(function (value, i) {
+        var b = make('button', g[2], g[2] === 'chip' ? value : null);
+        b.type = 'button';
+        if (g[2] === 'swatch') {
+          b.style.background = value;
+          b.setAttribute('aria-label', g[0] + ' ' + (i + 1));
+        }
+        b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          picDraft.character[key] = i;
+          Array.prototype.forEach.call(chips.children, function (x, j) {
+            x.setAttribute('aria-pressed', j === i ? 'true' : 'false');
           });
-          chips.appendChild(b);
-        });
-        group.appendChild(label);
-        group.appendChild(chips);
-        picForm.appendChild(group);
-      });
-      var shuffle = make('button', 'mini-btn add-source', 'Shuffle');
-      shuffle.type = 'button';
-      shuffle.id = 'pic-shuffle';
-      shuffle.style.justifySelf = 'start';
-      shuffle.addEventListener('click', function () {
-        CHAR_KEYS.forEach(function (k) { picDraft.character[k] = Math.floor(Math.random() * CHAR[k].length); });
-        buildPicForm('pic-shuffle');
-      });
-      picForm.appendChild(shuffle);
-    } else {
-      var fileIn = make('input', 'sr-only');
-      fileIn.type = 'file';
-      fileIn.accept = 'image/*';
-      fileIn.id = 'pic-file';
-      var pick = make('label', 'btn btn-ghost', picDraft.photo ? 'Choose a different photo' : 'Choose a photo');
-      pick.htmlFor = 'pic-file';
-      pick.style.justifySelf = 'start';
-      fileIn.addEventListener('change', function () {
-        var file = fileIn.files && fileIn.files[0];
-        fileIn.value = '';
-        if (!file) return;
-        statusEl.textContent = 'Loading photo…';
-        loadPhoto(file, function (data) {
-          picDraft.photo = data;
-          pick.textContent = 'Choose a different photo';
-          statusEl.textContent = 'Photo ready. Click Save picture to use it.';
           updatePreview();
-        }, function (message) { statusEl.textContent = message; });
+        });
+        chips.appendChild(b);
       });
-      picForm.appendChild(fileIn);
-      picForm.appendChild(pick);
-      picForm.appendChild(make('p', 'pic-note', 'The middle of the photo is cropped to a circle. Everyone who visits the site can see it.'));
-    }
+      group.appendChild(label);
+      group.appendChild(chips);
+      picForm.appendChild(group);
+    });
+    var shuffle = make('button', 'mini-btn add-source', 'Shuffle');
+    shuffle.type = 'button';
+    shuffle.id = 'pic-shuffle';
+    shuffle.style.justifySelf = 'start';
+    shuffle.addEventListener('click', function () {
+      CHAR_KEYS.forEach(function (k) { picDraft.character[k] = Math.floor(Math.random() * CHAR[k].length); });
+      buildPicForm('pic-shuffle');
+    });
+    picForm.appendChild(shuffle);
 
     var actions = make('div', 'edit-actions');
-    var save = make('button', 'btn btn-solid', 'Save picture');
+    var save = make('button', 'btn btn-solid', 'Save character');
     save.type = 'submit';
     var cancel = make('button', 'btn btn-ghost', 'Cancel');
     cancel.type = 'button';
@@ -978,7 +897,7 @@
     actions.appendChild(cancel);
     var buttons = [save, cancel];
     if (p.avatar) {
-      var removePic = make('button', 'btn btn-ghost', 'Remove picture');
+      var removePic = make('button', 'btn btn-ghost', 'Remove character');
       removePic.type = 'button';
       removePic.addEventListener('click', function () {
         updateProfile(p, { avatar: null }, statusEl, buttons, function () { p.avatar = null; finishPic(); });
@@ -993,12 +912,11 @@
     picForm.onsubmit = function (e) {
       e.preventDefault();
       var avatar = draftAvatar();
-      if (!avatar) { statusEl.textContent = 'Choose a photo first, or switch to Character.'; return; }
       updateProfile(p, { avatar: avatar }, statusEl, buttons, function () { p.avatar = avatar; finishPic(); });
     };
 
     updatePreview();
-    var focusEl = focusId && $(focusId);
+    var focusEl = (focusId && $(focusId)) || picForm.querySelector('button');
     if (focusEl) focusEl.focus();
   }
   function finishPic() {

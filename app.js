@@ -45,7 +45,7 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0 };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var me = null;          // the signed-in account, or null
@@ -115,11 +115,12 @@
           createdAt: Date.parse(c.created_at) || 0, respondedAt: Date.parse(c.responded_at) || 0
         };
       });
-      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; return; }
+      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; return; }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
         client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
-        client.from('shop_purchases').select('item, price').eq('user_id', me.id)
+        client.from('shop_purchases').select('item, price').eq('user_id', me.id),
+        client.from('star_gifts').select('stars').eq('user_id', me.id)
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -131,6 +132,10 @@
           state.purchases = extra[2].data.map(function (r) { return { item: r.item, price: r.price }; });
         } else if (!state.purchases.length) {
           shopReady = false;
+        }
+        // Gifted stars (like the early tester gift). Keep the last known total if a reload fails.
+        if (!extra[3].error) {
+          state.giftStars = extra[3].data.reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
         }
       });
     });
@@ -1935,7 +1940,7 @@
   function ownsItem(item) {
     return state.purchases.some(function (p) { return p.item === item.id; });
   }
-  // Stars earned: one per like on your portfolio and on your research.
+  // Stars earned: one per like on your portfolio and on your research, plus any gifted stars.
   function starsEarned() {
     if (!me) return 0;
     var mine = state.profiles.filter(function (p) { return p.ownerId === me.id; });
@@ -1943,7 +1948,8 @@
     var projectIds = [];
     mine.forEach(function (p) { p.projects.forEach(function (q) { projectIds.push(q.id); }); });
     return state.likes.filter(function (l) { return profileIds.indexOf(l.profileId) >= 0; }).length +
-      state.projectLikes.filter(function (l) { return projectIds.indexOf(l.projectId) >= 0; }).length;
+      state.projectLikes.filter(function (l) { return projectIds.indexOf(l.projectId) >= 0; }).length +
+      state.giftStars;
   }
   function starBalance() {
     var spent = state.purchases.reduce(function (sum, p) { return sum + p.price; }, 0);
@@ -1969,6 +1975,9 @@
     $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
     var open = shopOpen();
     renderInventory();
+    var gift = $('shop-gift');
+    gift.hidden = !state.giftStars;
+    gift.textContent = 'Includes a gift of ' + plural(state.giftStars, 'star') + '. Thanks for being an early tester!';
     $('shop-limited').classList.toggle('ended', !open);
     $('shop-limited-text').textContent = open
       ? 'The Halloween items leave the shop on October 31, 2026. ' + shopTimeLeft()

@@ -362,6 +362,37 @@ create policy "see own purchases" on public.shop_purchases for select to authent
   using (user_id = auth.uid());
 grant select on public.shop_purchases to authenticated;
 
+-- Stars given as gifts (for example, to early testers). Each gift has a reason, and a person
+-- gets each reason only once, so running this file again never doubles a gift.
+create table if not exists public.star_gifts (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  reason text not null check (char_length(reason) between 1 and 60),
+  stars int not null check (stars > 0),
+  created_at timestamptz not null default now(),
+  primary key (user_id, reason)
+);
+
+alter table public.star_gifts enable row level security;
+
+-- You can see only your own gifts. Gifts are added here in the SQL Editor, not from the website.
+drop policy if exists "see own gifts" on public.star_gifts;
+create policy "see own gifts" on public.star_gifts for select to authenticated
+  using (user_id = auth.uid());
+grant select on public.star_gifts to authenticated;
+
+-- 100 stars for each early tester (the portfolios with the magic wand; keep in step with
+-- earlyTesterProfileIds in config.js).
+insert into public.star_gifts (user_id, reason, stars)
+select owner_id, 'early-tester', 100 from public.profiles
+where id in (
+  'f5a93142-7bf7-4cae-834c-ebfe4ef78a51', -- $ubway's Subway
+  '2ab64137-3e43-4c2a-9fc3-62b1c2a26188', -- The One and Only Ramko
+  'e218a1b2-63f5-4c31-b7f1-dc7af94d1965', -- Purplelicious Sudiksha
+  'd85d9644-8f3a-408c-ad73-4c5539d0812e', -- Promprompromise
+  '71767f0d-6a43-4455-b325-b99b6804f70c'  -- Soph_Soph
+)
+on conflict (user_id, reason) do nothing;
+
 create or replace function public.buy_shop_item(item_id text)
 returns json
 language plpgsql
@@ -398,7 +429,7 @@ begin
   if exists (select 1 from public.shop_purchases where user_id = auth.uid() and item = item_id) then
     raise exception 'You already own that item.';
   end if;
-  -- Stars earned: likes on your portfolio plus likes on your research.
+  -- Stars earned: likes on your portfolio, likes on your research, and gifted stars.
   select
     (select count(*) from public.likes l
        join public.profiles p on p.id = l.profile_id
@@ -407,6 +438,7 @@ begin
          join public.projects r on r.id = pl.project_id
          join public.profiles p on p.id = r.profile_id
         where p.owner_id = auth.uid())
+    + (select coalesce(sum(g.stars), 0) from public.star_gifts g where g.user_id = auth.uid())
   into earned;
   select coalesce(sum(price), 0) from public.shop_purchases where user_id = auth.uid() into spent;
   if earned - spent < cost then

@@ -412,6 +412,7 @@ img { max-width: 100%; }
   .dialog .shop-limited.ended { background: var(--blush); border-color: var(--pink); color: var(--button-fg); }
   .shop-limited.ended .shop-limited-tag { background: var(--button-fg); }
   .dialog .shop-balance { display: flex; align-items: baseline; gap: 0.4rem; color: var(--fg); font-weight: 700; }
+  .dialog .shop-gift { color: #8A5A10; font-weight: 700; font-size: 0.88rem; margin-top: -0.2rem; }
   .shop-balance-stars { font-family: var(--display); font-size: 1.7rem; color: #C8901A; }
   .shop-grid {
     list-style: none; margin: 0.75rem 0 0; padding: 0;

@@ -962,6 +962,9 @@
     meta.appendChild(make('span', null, plural(p.projects.length, 'research project')));
     meta.appendChild(make('span', null, '♥ ' + countFor(state.likes, p.id)));
     meta.appendChild(make('span', null, plural(countFor(state.follows, p.id), 'follower')));
+    var friendTab = make('span', 'friends-tab', plural(friendCount(p.ownerId), 'friend'));
+    friendTab.title = 'People who follow each other with this portfolio';
+    meta.appendChild(friendTab);
     if (canEdit(p)) meta.appendChild(make('span', 'you-badge', 'Your profile'));
     who.appendChild(meta);
     top.appendChild(avatar);
@@ -1993,6 +1996,15 @@
   // Two people are friends when each follows the other's portfolio.
   function areFriends(userA, userB) {
     return userA !== userB && !!followOfOwner(userA, userB) && !!followOfOwner(userB, userA);
+  }
+  // How many people this person follows each other with.
+  function friendCount(ownerId) {
+    var seen = {};
+    state.follows.forEach(function (f) {
+      var target = findProfile(f.profileId);
+      if (target && target.ownerId === ownerId && areFriends(ownerId, f.userId)) seen[f.userId] = true;
+    });
+    return Object.keys(seen).length;
   }
   function followerItem(fp, line) {
     var li = make('li');

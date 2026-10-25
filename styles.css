@@ -231,6 +231,7 @@ img { max-width: 100%; }
     fill: #F6C945; stroke: #E0A82E; stroke-width: 7; stroke-linejoin: round; overflow: visible;
   }
   .profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+  .friends-tab { background: #ECE6FA; color: #6E58B0; border-radius: 999px; padding: 0.05rem 0.55rem; }
   #profile-filter { justify-self: start; }
 
   /* Likes and followers */

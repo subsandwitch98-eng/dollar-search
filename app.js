@@ -677,10 +677,18 @@
     };
     var bang = BANGS[c.bangs];
     if (bang) {
-      bang[0].forEach(function (d) { add('path', { d: d, fill: hair }); });
-      strands(bang[1]);
+      // With Long and Wavy hair the bangs reach further out to the sides, into the side locks.
+      var wide = style === 2 || style === 8 ? 'translate(60 0) scale(1.14 1) translate(-60 0)' : '';
+      var bangAttrs = function (a) {
+        if (wide) a.transform = wide + (a.transform ? ' ' + a.transform : '');
+        return a;
+      };
+      bang[0].forEach(function (d) { add('path', bangAttrs({ d: d, fill: hair })); });
+      bang[1].forEach(function (d) {
+        add('path', bangAttrs({ d: d, fill: 'none', stroke: hairDark, 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.8 }));
+      });
       if (c.bangs === 10) { // a hair clip, in the clothing color
-        add('rect', { x: 42, y: 42, width: 10, height: 3.2, rx: 1.6, fill: top, stroke: shade(top, -0.3), 'stroke-width': 0.8, transform: 'rotate(-22 47 43.6)' });
+        add('rect', bangAttrs({ x: 42, y: 42, width: 10, height: 3.2, rx: 1.6, fill: top, stroke: shade(top, -0.3), 'stroke-width': 0.8, transform: 'rotate(-22 47 43.6)' }));
       }
     }
     // Face

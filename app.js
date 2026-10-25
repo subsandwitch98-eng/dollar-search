@@ -19,7 +19,7 @@
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69'],
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
-    glasses: ['None', 'Glasses', 'Shades'],
+    glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
   };
@@ -449,7 +449,8 @@
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry.
-    // Eyes sit at (51,58) and (69,58); shades (glasses 2) cover them, so the eyes are skipped then.
+    // Eyes sit at (51,58) and (69,58). Tinted lenses (Shades, Hearts, Stars, Aviators) cover them, so the eyes are skipped then.
+    var tinted = c.glasses === 2 || c.glasses === 5 || c.glasses === 6 || c.glasses === 7;
     var f = c.face;
     var mouthRed = '#7A2E3E';
     function eyeDots(r) {
@@ -469,7 +470,7 @@
       }
       add('polygon', { points: pts.join(' '), fill: '#F6C945', stroke: ink, 'stroke-width': 0.8, 'stroke-linejoin': 'round' });
     }
-    if (c.glasses !== 2) {
+    if (!tinted) {
       if (f === 3) { // Wink: left eye open, right eye closed
         add('circle', { cx: 51, cy: 58, r: 2.6, fill: ink });
         add('path', line('M65.5 58.5 Q69 55.5 72.5 58.5'));
@@ -514,6 +515,50 @@
       add('rect', { x: 43, y: 53, width: 15, height: 10, rx: 4, fill: ink });
       add('rect', { x: 62, y: 53, width: 15, height: 10, rx: 4, fill: ink });
       add('path', { d: 'M58 57 L62 57', stroke: ink, 'stroke-width': 2 });
+    }
+    var gold = '#C9A227';
+    function bridge(color) { add('path', { d: 'M57.5 57 L62.5 57', stroke: color, 'stroke-width': 2, 'stroke-linecap': 'round' }); }
+    if (c.glasses === 3) { // Square frames
+      add('rect', { x: 44.5, y: 52.5, width: 13, height: 11, rx: 2, fill: 'none', stroke: ink, 'stroke-width': 2 });
+      add('rect', { x: 62.5, y: 52.5, width: 13, height: 11, rx: 2, fill: 'none', stroke: ink, 'stroke-width': 2 });
+      bridge(ink);
+    }
+    if (c.glasses === 4) { // Cat-eye, with frames in a deep shade of the clothing color
+      var cat = shade(top, -0.4);
+      add('ellipse', { cx: 51, cy: 58.5, rx: 6.6, ry: 5.2, fill: 'rgba(255,255,255,0.15)', stroke: cat, 'stroke-width': 2 });
+      add('ellipse', { cx: 69, cy: 58.5, rx: 6.6, ry: 5.2, fill: 'rgba(255,255,255,0.15)', stroke: cat, 'stroke-width': 2 });
+      add('path', { d: 'M45 56 L40.5 51 L47 53.5 Z', fill: cat, stroke: cat, 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M75 56 L79.5 51 L73 53.5 Z', fill: cat, stroke: cat, 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      bridge(cat);
+    }
+    if (c.glasses === 5) { // Heart-shaped pink shades
+      [51, 69].forEach(function (cx) {
+        add('path', { d: 'M' + cx + ' 64 C' + (cx - 9) + ' 58 ' + (cx - 6) + ' 50.5 ' + cx + ' 54.5 C' + (cx + 6) + ' 50.5 ' + (cx + 9) + ' 58 ' + cx + ' 64 Z', fill: '#E5537E', stroke: ink, 'stroke-width': 1.3, 'stroke-linejoin': 'round' });
+      });
+      bridge(ink);
+    }
+    if (c.glasses === 6) { // Star-shaped gold shades
+      [51, 69].forEach(function (cx) {
+        var pts = [];
+        for (var i = 0; i < 10; i++) {
+          var rad = i % 2 ? 3.6 : 7.6;
+          var ang = Math.PI / 5 * i - Math.PI / 2;
+          pts.push((cx + Math.cos(ang) * rad).toFixed(1) + ',' + (58.5 + Math.sin(ang) * rad).toFixed(1));
+        }
+        add('polygon', { points: pts.join(' '), fill: '#F6C945', stroke: ink, 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      });
+      bridge(ink);
+    }
+    if (c.glasses === 7) { // Aviators: dark teardrop lenses in thin gold frames
+      add('path', { d: 'M43.5 54 Q51 52 57.5 54 Q58 63.5 51 64.5 Q43.5 63.5 43.5 54 Z', fill: '#3F4256', stroke: gold, 'stroke-width': 1.4, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M62.5 54 Q69 52 76.5 54 Q76.5 63.5 69 64.5 Q62 63.5 62.5 54 Z', fill: '#3F4256', stroke: gold, 'stroke-width': 1.4, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M44 53.2 L76 53.2', stroke: gold, 'stroke-width': 1.2 });
+      add('path', { d: 'M46 56 Q48 54.5 51 55', fill: 'none', stroke: 'rgba(255,255,255,0.45)', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M65 56 Q67 54.5 70 55', fill: 'none', stroke: 'rgba(255,255,255,0.45)', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+    }
+    if (c.glasses === 8) { // Monocle over the right eye, on a gold chain
+      add('circle', { cx: 69, cy: 58, r: 6.6, fill: 'rgba(255,255,255,0.2)', stroke: gold, 'stroke-width': 2 });
+      add('path', { d: 'M75.3 60 Q81 71 75 83', fill: 'none', stroke: gold, 'stroke-width': 1.2, 'stroke-dasharray': '2 1.5', 'stroke-linecap': 'round' });
     }
     // Headwear, in the outfit color
     if (c.headwear === 1) {

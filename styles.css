@@ -162,21 +162,24 @@ img { max-width: 100%; }
     background: repeating-linear-gradient(to bottom, transparent 0 18px, var(--pink) 18px 26px);
     opacity: 0.9;
   }
-  .art .coin {
-    position: absolute; width: 16%; aspect-ratio: 1; border-radius: 50%;
-    background: var(--surface); border: 4px solid var(--accent);
-    display: grid; place-items: center;
-    font-family: var(--display); font-weight: 700; color: var(--accent); font-size: clamp(1rem, 3vw, 1.6rem);
-  }
-  .art .c1 { top: 16%; left: 22%; }
+  /* Floating gold stars: each bobs and rocks, and pops with a glow in turn. */
+  .art .float-star { position: absolute; width: 16%; aspect-ratio: 1; overflow: visible; }
+  .art .float-star-body { transform-box: fill-box; transform-origin: center; }
+  .art .float-star-shape { fill: #F6C945; stroke: #E0A82E; stroke-width: 6; stroke-linejoin: round; }
+  .art .float-star-shine { fill: none; stroke: #FFF6D6; stroke-width: 6; stroke-linecap: round; }
+  .art .c1 { top: 14%; left: 20%; }
   .art .c2 { top: 30%; left: 56%; width: 12%; }
-  .art .c3 { top: 8%; left: 66%; width: 9%; font-size: clamp(0.7rem, 2vw, 1rem); }
+  .art .c3 { top: 7%; left: 67%; width: 10%; }
   @media (prefers-reduced-motion: no-preference) {
-    .art .coin { animation: bob 3.2s ease-in-out infinite; }
-    .art .c2 { animation-delay: -1s; }
-    .art .c3 { animation-delay: -2s; }
+    .art .float-star { animation: star-bob 4s ease-in-out infinite; }
+    .art .float-star-body { animation: star-flash 3s ease-in-out infinite; }
+    .art .c2, .art .c2 .float-star-body { animation-delay: -1.3s; }
+    .art .c3, .art .c3 .float-star-body { animation-delay: -2.6s; }
   }
-  @keyframes bob { 50% { transform: translateY(-8px); } }
+  @keyframes star-bob {
+    0%, 100% { transform: translateY(0) rotate(-8deg); }
+    50% { transform: translateY(-8px) rotate(8deg); }
+  }
 
   /* Bands (Profiles on the homepage, Research on a profile) */
   .band { padding-block: 4rem; background: var(--surface); border-block: 1px solid var(--line); }

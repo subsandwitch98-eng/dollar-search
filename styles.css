@@ -1005,6 +1005,21 @@ img { max-width: 100%; }
 .wand-spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #F6C945; }
 .wand-spark.pink { background: var(--accent); }
 
+/* The Inventory tab in Edit character */
+.inv-tab { display: grid; gap: 0.6rem; justify-items: start; }
+.inv-grid {
+  list-style: none; margin: 0; padding: 0; width: 100%;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.75rem;
+}
+.inv-card {
+  display: grid; justify-items: center; gap: 0.3rem; text-align: center;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 1.1rem; padding: 0.85rem 0.6rem 0.75rem;
+}
+.inv-card.wearing { border: 1.5px solid #F6C945; background: #FFF8E1; }
+.avatar.inv-pic { width: 4.25rem; font-size: 1.3rem; --ring: 3px; margin: 0.45rem 0 0.25rem; }
+.inv-name { font-weight: 700; font-size: 0.9rem; color: var(--fg); }
+.mini-btn.inv-on { background: #F6C945; border-color: #E0A82E; color: #6B4508; }
+
 /* Star Shop pets are previewed on their own in the shop */
 .avatar.shop-avatar.shop-pet { background: #FBE3E6; }
 .avatar.shop-avatar.shop-pet svg { width: 70%; height: 70%; margin: auto; overflow: visible; }

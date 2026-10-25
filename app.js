@@ -2202,8 +2202,56 @@
   $('shop-close').addEventListener('click', closeShop);
   shopDialog.addEventListener('click', function (e) { if (e.target === shopDialog) closeShop(); });
 
-  // The customizer has two tabs: Character (everything without a 4th entry above) and Pets.
-  var PIC_TABS = [['character', 'Character'], ['pets', 'Pets']];
+  // Taking an item off goes back to what your saved character had there, or to "none" for
+  // headwear, frames and pets (other spots use the starting look).
+  var NONE_VALUE = { headwear: 0, frame: 0, pet: 0, glasses: 0 };
+  function takeOffValue(item) {
+    var p = current();
+    var saved = p && p.avatar ? normalizeCharacter(p.avatar.character)[item.key] : null;
+    if (saved !== null && saved !== item.index) return saved;
+    return item.key in NONE_VALUE ? NONE_VALUE[item.key] : DEFAULT_CHAR[item.key];
+  }
+  // The Inventory tab of the customizer: every Star Shop item you own, with Wear / Take off.
+  function inventoryGrid() {
+    var owned = SHOP.filter(ownsItem);
+    var box = make('div', 'inv-tab');
+    if (!owned.length) {
+      box.appendChild(make('p', 'followers-empty', 'Nothing here yet. Buy items in the Star Shop with your stars and they’ll show up here.'));
+      var go = make('button', 'mini-btn', 'Open the Star Shop');
+      go.type = 'button';
+      go.addEventListener('click', openShop);
+      box.appendChild(go);
+      return box;
+    }
+    var list = make('ul', 'inv-grid');
+    owned.forEach(function (item) {
+      var wearing = picDraft.character[item.key] === item.index;
+      var li = make('li', 'inv-card' + (wearing ? ' wearing' : ''));
+      var look = normalizeCharacter(picDraft.character);
+      look[item.key] = item.index;
+      var pic = make('span', 'avatar inv-pic' + (item.key === 'pet' ? ' shop-pet' : ''));
+      pic.appendChild(item.key === 'pet' ? renderPet(look) : pictureNode({ mode: 'character', character: look }, item.name));
+      li.appendChild(pic);
+      li.appendChild(make('span', 'shop-kind', item.kind));
+      li.appendChild(make('span', 'inv-name', item.name));
+      var b = make('button', 'mini-btn' + (wearing ? ' inv-on' : ''), wearing ? 'Wearing ✓ · Take off' : 'Wear');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', wearing ? 'true' : 'false');
+      b.setAttribute('aria-label', (wearing ? 'Take off the ' : 'Wear the ') + item.name.toLowerCase());
+      b.addEventListener('click', function () {
+        picDraft.character[item.key] = wearing ? takeOffValue(item) : item.index;
+        buildPicForm('inv-' + item.id);
+      });
+      b.id = 'inv-' + item.id;
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  // The customizer has tabs: Character (everything without a 4th entry above), Pets, and Inventory.
+  var PIC_TABS = [['character', 'Character'], ['pets', 'Pets'], ['inventory', 'Inventory']];
   var picTab = 'character';
   function groupTab(g) { return g[3] || 'character'; }
 
@@ -2249,8 +2297,9 @@
     var tabs = make('div', 'card-tabs pic-tabs');
     tabs.setAttribute('role', 'tablist');
     tabs.setAttribute('aria-label', 'Customize');
+    var ownedCount = SHOP.filter(ownsItem).length;
     PIC_TABS.forEach(function (t) {
-      var b = make('button', 'card-tab', t[1]);
+      var b = make('button', 'card-tab', t[0] === 'inventory' && ownedCount ? t[1] + ' (' + ownedCount + ')' : t[1]);
       b.type = 'button';
       b.id = 'pic-tab-' + t[0];
       b.setAttribute('role', 'tab');
@@ -2263,7 +2312,9 @@
       });
       b.addEventListener('keydown', function (e) {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-        picTab = picTab === 'pets' ? 'character' : 'pets';
+        var at = PIC_TABS.map(function (x) { return x[0]; }).indexOf(picTab);
+        var step = e.key === 'ArrowRight' ? 1 : PIC_TABS.length - 1;
+        picTab = PIC_TABS[(at + step) % PIC_TABS.length][0];
         buildPicForm('pic-tab-' + picTab);
       });
       tabs.appendChild(b);
@@ -2286,8 +2337,11 @@
     top.appendChild(preview);
     top.appendChild(make('p', 'pic-note', onPets
       ? 'Pick a pet. It sits beside your character on your portfolio.'
-      : 'Build your character. Everyone who visits the site can see it.'));
+      : picTab === 'inventory'
+        ? 'Everything you’ve bought from the Star Shop. Wear anything, then save.'
+        : 'Build your character. Everyone who visits the site can see it.'));
     picForm.appendChild(top);
+    if (picTab === 'inventory') picForm.appendChild(inventoryGrid());
 
     var statusEl = statusLine('');
     PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
@@ -2354,6 +2408,7 @@
     });
     if (onPets) picForm.appendChild(petGoalsList(p));
     var shuffle = make('button', 'mini-btn add-source', 'Shuffle');
+    shuffle.hidden = picTab === 'inventory';
     shuffle.type = 'button';
     shuffle.id = 'pic-shuffle';
     shuffle.style.justifySelf = 'start';

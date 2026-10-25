@@ -203,6 +203,11 @@ img { max-width: 100%; }
   .avatar { overflow: hidden; }
   .profile-name { font-size: 1.35rem; font-weight: 600; overflow-wrap: anywhere; }
   .profile-name .dollar { color: var(--accent); }
+  /* Gold star after the site owner's name */
+  .owner-star {
+    display: inline-block; width: 0.8em; height: 0.8em; vertical-align: 0.02em;
+    fill: #F6C945; stroke: #E0A82E; stroke-width: 7; stroke-linejoin: round; overflow: visible;
+  }
   .profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
   #profile-filter { justify-self: start; }
 

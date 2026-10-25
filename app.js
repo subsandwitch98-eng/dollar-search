@@ -212,6 +212,24 @@
     }
   }
 
+  // A gold star after the site owner's portfolio name.
+  function addOwnerStar(el, p) {
+    if (!p || !cfg.ownerProfileId || p.id !== cfg.ownerProfileId) return;
+    var star = document.createElementNS(SVG_NS, 'svg');
+    star.setAttribute('viewBox', '0 0 100 100');
+    star.setAttribute('class', 'owner-star');
+    star.setAttribute('role', 'img');
+    star.setAttribute('aria-label', 'Site owner');
+    var title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = 'Site owner';
+    star.appendChild(title);
+    var shape = document.createElementNS(SVG_NS, 'polygon');
+    shape.setAttribute('points', '50,8 61.8,35.8 91.8,38.4 69,58.2 75.9,87.6 50,72 24.1,87.6 31,58.2 8.2,38.4 38.2,35.8');
+    star.appendChild(shape);
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(star);
+  }
+
   function findProfile(id) {
     for (var i = 0; i < state.profiles.length; i++) {
       if (state.profiles[i].id === id) return state.profiles[i];
@@ -938,6 +956,7 @@
     who.style.minWidth = '0';
     var name = make('h3', 'profile-name');
     paintName(name, p.name);
+    addOwnerStar(name, p);
     who.appendChild(name);
     var meta = make('p', 'profile-meta');
     meta.appendChild(make('span', null, plural(p.projects.length, 'research project')));
@@ -1071,6 +1090,7 @@
     if (!p) return;
     document.title = p.name + ' · ' + state.hubName;
     paintName(siteName, p.name);
+    addOwnerStar(siteName, p);
     lede.textContent = p.description;
     var editorOpen = !form.hidden || !picForm.hidden;
     editBtn.hidden = !canEdit(p) || editorOpen;

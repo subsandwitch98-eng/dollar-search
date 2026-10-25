@@ -20,7 +20,7 @@
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones'],
     glasses: ['None', 'Glasses', 'Shades'],
-    face: ['Smile', 'Grin', 'Cool'],
+    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
   };
   var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg'];
@@ -448,13 +448,63 @@
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
-    if (c.glasses !== 2) {
-      add('circle', { cx: 51, cy: 58, r: 2.6, fill: ink });
-      add('circle', { cx: 69, cy: 58, r: 2.6, fill: ink });
+    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry.
+    // Eyes sit at (51,58) and (69,58); shades (glasses 2) cover them, so the eyes are skipped then.
+    var f = c.face;
+    var mouthRed = '#7A2E3E';
+    function eyeDots(r) {
+      add('circle', { cx: 51, cy: 58, r: r, fill: ink });
+      add('circle', { cx: 69, cy: 58, r: r, fill: ink });
     }
-    if (c.face === 0) add('path', line('M52 67 Q60 74 68 67'));
-    if (c.face === 1) add('path', { d: 'M51 66 Q60 77 69 66 Z', fill: '#FFFFFF', stroke: ink, 'stroke-width': 2, 'stroke-linejoin': 'round' });
-    if (c.face === 2) add('path', line('M53 69 Q61 71 68 66'));
+    function eyeArcs(d1, d2) {
+      add('path', line(d1));
+      add('path', line(d2));
+    }
+    function eyeStar(cx, cy) {
+      var pts = [];
+      for (var i = 0; i < 10; i++) {
+        var rad = i % 2 ? 1.9 : 4.4;
+        var ang = Math.PI / 5 * i - Math.PI / 2;
+        pts.push((cx + Math.cos(ang) * rad).toFixed(1) + ',' + (cy + Math.sin(ang) * rad).toFixed(1));
+      }
+      add('polygon', { points: pts.join(' '), fill: '#F6C945', stroke: ink, 'stroke-width': 0.8, 'stroke-linejoin': 'round' });
+    }
+    if (c.glasses !== 2) {
+      if (f === 3) { // Wink: left eye open, right eye closed
+        add('circle', { cx: 51, cy: 58, r: 2.6, fill: ink });
+        add('path', line('M65.5 58.5 Q69 55.5 72.5 58.5'));
+      } else if (f === 4 || f === 5) { // Happy and Laugh: eyes squeezed into happy arcs
+        eyeArcs('M47.5 59 Q51 55 54.5 59', 'M65.5 59 Q69 55 72.5 59');
+      } else if (f === 8) { // Sleepy: closed eyes
+        eyeArcs('M47.5 58 Q51 61 54.5 58', 'M65.5 58 Q69 61 72.5 58');
+      } else if (f === 9) { // Starry: star-shaped eyes
+        eyeStar(51, 58);
+        eyeStar(69, 58);
+      } else {
+        eyeDots(f === 6 ? 3.2 : 2.6);
+      }
+    }
+    if (f === 6) { // Surprised: raised eyebrows
+      add('path', { d: 'M47 50 Q51 47 55 50', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+      add('path', { d: 'M65 50 Q69 47 73 50', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+    }
+    if (f === 0 || f === 4) add('path', line('M52 67 Q60 74 68 67'));
+    if (f === 1 || f === 9) add('path', { d: 'M51 66 Q60 77 69 66 Z', fill: '#FFFFFF', stroke: ink, 'stroke-width': 2, 'stroke-linejoin': 'round' });
+    if (f === 2 || f === 3) add('path', line('M53 69 Q61 71 68 66'));
+    if (f === 5) { // Laugh: big open mouth with a tongue
+      add('path', { d: 'M50 65 Q60 80 70 65 Z', fill: mouthRed, stroke: ink, 'stroke-width': 2, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M54.5 71 Q60 68.5 65.5 71 Q60 76 54.5 71 Z', fill: '#F28CA6' });
+    }
+    if (f === 6) add('ellipse', { cx: 60, cy: 69, rx: 3.2, ry: 4, fill: mouthRed, stroke: ink, 'stroke-width': 1.8 });
+    if (f === 7) { // Tongue: smile with the tongue poking out
+      add('path', { d: 'M57 69 Q57 76.5 60.5 76.5 Q64 76.5 64 69 Z', fill: '#F28CA6', stroke: ink, 'stroke-width': 1.5, 'stroke-linejoin': 'round' });
+      add('path', line('M52 67 Q60 72.5 68 67'));
+    }
+    if (f === 8) { // Sleepy: small mouth and a couple of z's
+      add('path', line('M57 68.5 Q60 70.5 63 68.5'));
+      add('path', { d: 'M80 33 h5 l-5 6 h5', fill: 'none', stroke: ink, 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+      add('path', { d: 'M88 25 h3.5 l-3.5 4.2 h3.5', fill: 'none', stroke: ink, 'stroke-width': 1.3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    }
     if (c.glasses === 1) {
       add('circle', { cx: 51, cy: 58, r: 6.5, fill: 'none', stroke: ink, 'stroke-width': 2 });
       add('circle', { cx: 69, cy: 58, r: 6.5, fill: 'none', stroke: ink, 'stroke-width': 2 });

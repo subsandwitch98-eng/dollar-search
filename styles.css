@@ -187,7 +187,7 @@ img { max-width: 100%; }
   .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 1.25rem; margin-top: 2rem; }
   .empty-note { color: var(--muted); margin-top: 1rem; }
 
-  /* Home: Upload tips, under the profiles */
+  /* Home: Get started tips, under the profiles */
   .tips-band { padding-block: 4rem; }
   .section-sub { color: var(--muted); }
   .tip-grid {

@@ -423,3 +423,70 @@ img { max-width: 100%; }
 .link-btn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font-family: var(--body); font-weight: 700; font-size: 0.9rem; justify-self: start; }
 .link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
 .load-note { color: var(--muted); padding-block: 2rem; text-align: center; }
+
+/* Homepage art: a magnifying glass searching a stack of research papers.
+   Lines on the front page light up as the lens passes over them. */
+.search-art .paper {
+  position: absolute; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 9%;
+  padding: 9% 10%; border-radius: 1.1rem;
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 8px 20px rgba(142, 53, 83, 0.12);
+}
+.search-art .paper span { display: block; height: 5%; min-height: 4px; border-radius: 999px; background: var(--pink); }
+.search-art .paper span:nth-child(3) { width: 82%; }
+.search-art .paper span:nth-child(5) { width: 64%; }
+.search-art .paper .paper-title { width: 58%; height: 8%; min-height: 6px; background: var(--accent); opacity: 0.75; }
+.search-art .paper-back { left: 10%; top: 14%; width: 46%; height: 56%; transform: rotate(-9deg); opacity: 0.75; }
+.search-art .paper-mid { left: 44%; top: 18%; width: 46%; height: 56%; transform: rotate(7deg); opacity: 0.9; }
+.search-art .paper-front { left: 25%; top: 28%; width: 50%; height: 60%; transform: rotate(-1.5deg); }
+
+.search-art .lens { position: absolute; left: 20%; top: 30%; width: 34%; aspect-ratio: 1; }
+.search-art .lens-glass {
+  position: absolute; inset: 0; border-radius: 50%; box-sizing: border-box;
+  display: grid; place-items: center;
+  border: 0.55rem solid var(--accent);
+  background: rgba(255, 252, 247, 0.55);
+  box-shadow: inset 0 0 0 0.3rem rgba(255, 255, 255, 0.6), 0 10px 24px rgba(142, 53, 83, 0.22);
+  font-family: var(--display); font-weight: 700; font-size: clamp(1.4rem, 4.5vw, 2.6rem); color: var(--accent);
+}
+.search-art .lens-handle {
+  position: absolute; right: -30%; bottom: -6%; width: 48%; height: 15%;
+  border-radius: 999px; background: var(--button-fg);
+  transform: rotate(45deg); transform-origin: left center;
+}
+.search-art .spark {
+  position: absolute; width: 5%; aspect-ratio: 1; background: var(--accent);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+.search-art .k1 { left: 12%; top: 76%; }
+.search-art .k2 { left: 82%; top: 12%; width: 6%; }
+.search-art .k3 { left: 84%; top: 78%; width: 4%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .search-art .lens { animation: lens-search 10s ease-in-out infinite; }
+  .search-art .scan { animation: line-found 10s ease-in-out infinite; }
+  .search-art .l1 { animation-delay: 0.6s; }
+  .search-art .l2 { animation-delay: 2.4s; }
+  .search-art .l3 { animation-delay: 4.6s; }
+  .search-art .l4 { animation-delay: 6.4s; }
+  .search-art .l5 { animation-delay: 8.2s; }
+  .search-art .spark { animation: twinkle 3.2s ease-in-out infinite; }
+  .search-art .k2 { animation-delay: -1.1s; }
+  .search-art .k3 { animation-delay: -2.2s; }
+}
+@keyframes lens-search {
+  0%, 100% { left: 20%; top: 30%; transform: rotate(0deg); }
+  22% { left: 48%; top: 34%; transform: rotate(6deg); }
+  45% { left: 28%; top: 46%; transform: rotate(-4deg); }
+  68% { left: 50%; top: 54%; transform: rotate(5deg); }
+  85% { left: 34%; top: 40%; transform: rotate(-2deg); }
+}
+@keyframes line-found {
+  0%, 14%, 100% { background: var(--pink); }
+  5%, 9% { background: var(--accent); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.8) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(20deg); }
+}

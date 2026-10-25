@@ -43,7 +43,8 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [] };
+  var collabsReady = true; // false until the collab_requests table exists in Supabase
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -72,9 +73,10 @@
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
       client.from('project_likes').select('user_id, project_id'),
-      client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at')
+      client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at'),
+      client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at')
     ]).then(function (res) {
-      // Research likes and comments are optional: if their tables aren't set up yet, the rest of the site still loads.
+      // Research likes, comments and collabs are optional: if their tables aren't set up yet, the rest of the site still loads.
       res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
       if (res[0].data) {
         state.hubName = res[0].data.hub_name || 'Dollar Search';
@@ -100,6 +102,14 @@
         return {
           id: c.id, projectId: c.project_id, userId: c.user_id, kind: c.kind === 'tip' ? 'tip' : 'comment',
           body: c.body || '', createdAt: Date.parse(c.created_at) || 0
+        };
+      });
+      collabsReady = !res[7].error;
+      state.collabs = res[7].error ? [] : res[7].data.map(function (c) {
+        return {
+          id: c.id, projectId: c.project_id, fromUser: c.from_user, toProfile: c.to_profile,
+          message: c.message || '', status: c.status,
+          createdAt: Date.parse(c.created_at) || 0, respondedAt: Date.parse(c.responded_at) || 0
         };
       });
       if (!me) { isAdmin = false; seenAt = 0; return; }
@@ -209,6 +219,45 @@
     return null;
   }
   function canEdit(p) { return !!me && p.ownerId === me.id; }
+  function myProfile() {
+    if (!me) return null;
+    return state.profiles.filter(function (p) { return p.ownerId === me.id; })[0] || null;
+  }
+  function findProject(id) {
+    for (var i = 0; i < state.profiles.length; i++) {
+      var q = state.profiles[i].projects.filter(function (x) { return x.id === id; })[0];
+      if (q) return q;
+    }
+    return null;
+  }
+
+  // ---- Collabs: you invite another portfolio to work on one of your research cards ----
+  function acceptedCollabs(projectId) {
+    return state.collabs.filter(function (c) { return c.projectId === projectId && c.status === 'accepted'; });
+  }
+  // Is the signed-in person an accepted collaborator on this research card?
+  function isCollaborator(q) {
+    return !!me && acceptedCollabs(q.id).some(function (c) {
+      var to = findProfile(c.toProfile);
+      return to && to.ownerId === me.id;
+    });
+  }
+  // The card's owner and its collaborators can edit it; only the owner can delete it.
+  function canEditProject(q) {
+    var owner = findProfile(q.profileId);
+    return (!!owner && canEdit(owner)) || isCollaborator(q);
+  }
+  // Research from other portfolios that this portfolio collaborates on.
+  function collabProjectsFor(p) {
+    var seen = {};
+    return state.collabs.filter(function (c) { return c.status === 'accepted' && c.toProfile === p.id; })
+      .map(function (c) { return findProject(c.projectId); })
+      .filter(function (q) {
+        if (!q || seen[q.id]) return false;
+        seen[q.id] = true;
+        return true;
+      });
+  }
   function canRemove(p) { return canEdit(p) || isAdmin; }
   // Everyone, admins included, gets one portfolio; it can hold any number of research projects.
   function canCreate() {
@@ -793,7 +842,7 @@
   }
   function showProfile(id, push) {
     if (!findProfile(id)) { showHome(push); return; }
-    if (id !== currentId) followersOpen = false;
+    if (id !== currentId) { followersOpen = false; collabOpen = false; collabNote = ''; }
     currentId = id;
     if (push) history.pushState(null, '', location.pathname + '?p=' + encodeURIComponent(id));
     editingId = null;
@@ -1283,6 +1332,9 @@
       title.textContent = p.title;
     }
     card.appendChild(title);
+    var collabLine = collabNames(p);
+    if (collabLine) card.appendChild(collabLine);
+    var mineToEdit = canEditProject(p); // owner or accepted collaborator
 
     var about = make('div', 'tab-panel');
     about.appendChild(make('p', 'project-desc', p.description));
@@ -1299,7 +1351,7 @@
     }
 
     // Visitors only get the tabs when there are sources to show; whoever can edit always does.
-    if (p.sources.length || editable) {
+    if (p.sources.length || mineToEdit) {
       var sources = make('div', 'tab-panel');
       if (p.sources.length) {
         var list = make('ul', 'source-list');
@@ -1376,7 +1428,7 @@
     heart.setAttribute('aria-hidden', 'true');
     like.appendChild(heart);
     like.appendChild(make('span', null, String(likes.length)));
-    if (editable) {
+    if (mineToEdit) {
       like.disabled = true;
       like.classList.add('own');
       like.title = "You can't like your own research";
@@ -1405,7 +1457,7 @@
     });
     tools.appendChild(talk);
 
-    if (editable) {
+    if (mineToEdit) {
       var edit = make('button', 'mini-btn', 'Edit');
       edit.type = 'button';
       edit.addEventListener('click', function () { openProject(p.id); });
@@ -1414,6 +1466,28 @@
     card.appendChild(tools);
     if (open) card.appendChild(commentsPanel(p, comments, editable));
     return card;
+  }
+
+  // "Collab with …" under a card's title: everyone working on it except the portfolio you're looking at.
+  function collabNames(q) {
+    var collabs = acceptedCollabs(q.id);
+    if (!collabs.length) return null;
+    var here = current();
+    var people = [findProfile(q.profileId)].concat(collabs.map(function (c) { return findProfile(c.toProfile); }))
+      .filter(function (x) { return x && (!here || x.id !== here.id); });
+    if (!people.length) return null;
+    var line = make('p', 'project-collab');
+    line.appendChild(make('span', 'project-collab-tag', 'Collab'));
+    line.appendChild(document.createTextNode(' with '));
+    people.forEach(function (x, i) {
+      if (i) line.appendChild(document.createTextNode(i === people.length - 1 ? ' and ' : ', '));
+      var b = make('button', 'link-btn project-collab-name');
+      b.type = 'button';
+      paintName(b, x.name);
+      b.addEventListener('click', function () { showProfile(x.id, true); });
+      line.appendChild(b);
+    });
+    return line;
   }
 
   // ---- Comments and tips on research ----
@@ -1645,7 +1719,7 @@
   var likingProject = null; // the research project whose like is being saved
   function toggleProjectLike(q) {
     if (!me) { openAuth('signin', 'Sign in to like research.'); return; }
-    if (likingProject || canEdit(current())) return;
+    if (likingProject || canEditProject(q)) return;
     var mineIndex = -1;
     state.projectLikes.forEach(function (l, i) { if (l.userId === me.id && l.projectId === q.id) mineIndex = i; });
     var before = state.projectLikes.slice();
@@ -1730,7 +1804,9 @@
     actions.appendChild(cancel);
     var buttons = [save, cancel];
     var del = null;
-    if (!isNew) {
+    var owner = isNew ? null : findProfile(p.profileId);
+    // Collaborators can edit a card but only its owner can delete it.
+    if (!isNew && owner && canEdit(owner)) {
       del = make('button', 'btn btn-ghost', 'Delete');
       del.type = 'button';
       actions.appendChild(del);
@@ -1822,14 +1898,19 @@
   function renderProjects() {
     var p = current();
     var editable = canEdit(p);
-    if (!editable) editingId = null;
+    // Research shared with this portfolio through an accepted collab shows after its own research.
+    var cards = p.projects.concat(collabProjectsFor(p));
+    if (editingId === 'new' ? !editable : editingId !== null && !cards.some(function (q) {
+      return q.id === editingId && canEditProject(q);
+    })) editingId = null;
     projectsEl.textContent = '';
-    p.projects.forEach(function (q) {
-      projectsEl.appendChild(editingId === q.id ? projectForm(q) : projectCard(q, editable));
+    cards.forEach(function (q) {
+      var owner = findProfile(q.profileId);
+      projectsEl.appendChild(editingId === q.id ? projectForm(q) : projectCard(q, !!owner && canEdit(owner)));
     });
     if (editable) projectsEl.appendChild(editingId === 'new' ? projectForm(null) : addProjectCard());
-    projectsEl.hidden = !p.projects.length && !editable;
-    emptyEl.hidden = p.projects.length > 0 || editable;
+    projectsEl.hidden = !cards.length && !editable;
+    emptyEl.hidden = cards.length > 0 || editable;
   }
 
   // ---- Likes and followers ----
@@ -1880,6 +1961,7 @@
       reactNote.hidden = true;
     }
     renderFollowers(p);
+    renderCollabs(p, own);
   }
   // The follow row where `userId` follows any portfolio owned by `ownerId`, or undefined.
   function followOfOwner(userId, ownerId) {
@@ -1980,10 +2062,280 @@
     var p = current();
     if (p && canEdit(p)) {
       followersOpen = !followersOpen;
+      if (followersOpen) collabOpen = false;
       renderProfileReactions();
       return;
     }
     toggleReaction('follows');
+  });
+
+  // ---- Collab requests ----
+  // On someone else's portfolio: invite them to work on one of your research cards (or a new one).
+  // On your own: answer requests, see your collabs and the requests you've sent.
+  var collabBtn = $('collab-btn');
+  var collabPanel = $('collab-panel');
+  var collabOpen = false;
+  var collabNote = '';       // a status line shown in the panel
+  var collabWorking = false;
+  var collabDraft = { card: '', title: '', message: '' }; // card: a research id or 'new'
+  var armedCollabEnd = null; // collab id waiting for a second click to end it
+
+  function collabTitle(c) {
+    var q = findProject(c.projectId);
+    return q ? q.title : 'a research card';
+  }
+  function collabRow(person, lines, buttons) {
+    var li = make('li', 'collab-item');
+    if (person) {
+      var pic = pictureNode(person.avatar, person.name);
+      var avatar = make('span', 'avatar follower-avatar', pic ? null : person.name.charAt(0).toUpperCase());
+      if (pic) avatar.appendChild(pic);
+      avatar.setAttribute('aria-hidden', 'true');
+      li.appendChild(avatar);
+    }
+    var text = make('div', 'collab-text');
+    lines.forEach(function (l) { if (l) text.appendChild(l); });
+    if (buttons.length) {
+      var row = make('div', 'collab-actions');
+      buttons.forEach(function (b) { row.appendChild(b); });
+      text.appendChild(row);
+    }
+    li.appendChild(text);
+    return li;
+  }
+  function personLine(person, rest) {
+    var line = make('p', 'collab-line');
+    var name = make('button', 'link-btn project-collab-name');
+    name.type = 'button';
+    paintName(name, person ? person.name : 'Someone');
+    if (person) name.addEventListener('click', function () { showProfile(person.id, true); });
+    line.appendChild(name);
+    line.appendChild(document.createTextNode(' ' + rest));
+    return line;
+  }
+  function collabButton(label, cls, onClick) {
+    var b = make('button', 'mini-btn' + (cls ? ' ' + cls : ''), label);
+    b.type = 'button';
+    b.disabled = collabWorking;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  // Runs a request, then shows `done` (or the error) in the panel and reloads.
+  function collabWrite(request, done) {
+    collabWorking = true;
+    collabNote = 'Saving…';
+    renderProfileReactions();
+    return request.then(function (res) {
+      collabWorking = false;
+      if (res.error) {
+        collabNote = res.error.code === '23505' ? "You've already invited them to that research card." : dbMessage(res.error);
+        renderProfileReactions();
+        return false;
+      }
+      collabNote = done;
+      armedCollabEnd = null;
+      refresh();
+      return true;
+    });
+  }
+  function respond(c, status) {
+    collabWrite(client.from('collab_requests').update({ status: status, responded_at: new Date().toISOString() }).eq('id', c.id),
+      status === 'accepted' ? 'Accepted. You can now edit “' + collabTitle(c) + '”, and it shows on your portfolio.' : 'Request declined.');
+  }
+  function removeCollab(c, done) {
+    collabWrite(client.from('collab_requests').delete().eq('id', c.id), done);
+  }
+
+  function renderCollabs(p, own) {
+    collabBtn.hidden = !client || !collabsReady;
+    if (collabBtn.hidden) { collabPanel.hidden = true; return; }
+    var incoming = state.collabs.filter(function (c) { return c.toProfile === p.id && c.status === 'pending'; });
+    if (own) {
+      var active = state.collabs.filter(function (c) {
+        var q = findProject(c.projectId);
+        return c.status === 'accepted' && (c.toProfile === p.id || (q && q.profileId === p.id));
+      });
+      setReactButton(collabBtn, collabOpen, '⇄', 'Collabs',
+        incoming.length ? plural(incoming.length, 'request') : String(active.length));
+    } else {
+      setReactButton(collabBtn, collabOpen, '⇄', 'Request collab', '');
+    }
+    collabBtn.setAttribute('aria-expanded', collabOpen ? 'true' : 'false');
+    collabPanel.hidden = !collabOpen;
+    collabPanel.textContent = '';
+    if (!collabOpen) return;
+    if (own) fillCollabInbox(p, incoming, active); else fillCollabRequest(p);
+    if (collabNote) collabPanel.appendChild(make('p', 'edit-status collab-note', collabNote));
+  }
+
+  function fillCollabInbox(p, incoming, active) {
+    var sent = me ? state.collabs.filter(function (c) { return c.fromUser === me.id && c.status !== 'accepted'; }) : [];
+    if (!incoming.length && !active.length && !sent.length) {
+      collabPanel.appendChild(make('p', 'followers-head', 'Collabs'));
+      collabPanel.appendChild(make('p', 'followers-empty',
+        "No collabs yet. Open someone else's portfolio and click Request collab to invite them to work on one of your research cards."));
+      return;
+    }
+    if (incoming.length) {
+      collabPanel.appendChild(make('p', 'followers-head', 'Requests for you · ' + incoming.length));
+      var inList = make('ul', 'followers-list collab-list');
+      incoming.forEach(function (c) {
+        var from = state.profiles.filter(function (x) { return x.ownerId === c.fromUser; })[0];
+        inList.appendChild(collabRow(from, [
+          personLine(from, 'wants to collaborate on “' + collabTitle(c) + '”'),
+          c.message ? make('p', 'collab-message', '“' + c.message + '”') : null,
+          make('p', 'follower-when', timeAgo(c.createdAt))
+        ], [
+          collabButton('Accept', 'collab-accept', function () { respond(c, 'accepted'); }),
+          collabButton('Decline', '', function () { respond(c, 'declined'); })
+        ]));
+      });
+      collabPanel.appendChild(inList);
+    }
+    if (active.length) {
+      collabPanel.appendChild(make('p', 'followers-head', 'Your collabs · ' + active.length));
+      var activeList = make('ul', 'followers-list collab-list');
+      active.forEach(function (c) {
+        var q = findProject(c.projectId);
+        // The other person: the card's owner if it was shared with you, otherwise who you shared it with.
+        var other = q && q.profileId === p.id ? findProfile(c.toProfile) : findProfile(q ? q.profileId : null);
+        var end = collabButton(armedCollabEnd === c.id ? 'Click again to end' : 'End collab', armedCollabEnd === c.id ? 'armed' : '', function () {
+          if (armedCollabEnd !== c.id) { armedCollabEnd = c.id; collabNote = 'Ending a collab takes away their access to the card.'; renderProfileReactions(); return; }
+          removeCollab(c, 'Collab ended.');
+        });
+        activeList.appendChild(collabRow(other, [
+          personLine(other, 'and you on “' + collabTitle(c) + '”'),
+          c.respondedAt ? make('p', 'follower-when', 'Started ' + timeAgo(c.respondedAt).toLowerCase()) : null
+        ], [end]));
+      });
+      collabPanel.appendChild(activeList);
+    }
+    if (sent.length) {
+      collabPanel.appendChild(make('p', 'followers-head', 'Requests you sent'));
+      var sentList = make('ul', 'followers-list collab-list');
+      sent.forEach(function (c) {
+        var to = findProfile(c.toProfile);
+        sentList.appendChild(collabRow(to, [
+          personLine(to, c.status === 'declined' ? 'declined “' + collabTitle(c) + '”' : 'hasn’t answered about “' + collabTitle(c) + '” yet')
+        ], [
+          collabButton(c.status === 'declined' ? 'Remove' : 'Cancel request', '', function () {
+            removeCollab(c, c.status === 'declined' ? 'Removed.' : 'Request cancelled.');
+          })
+        ]));
+      });
+      collabPanel.appendChild(sentList);
+    }
+  }
+
+  function fillCollabRequest(p) {
+    var mp = myProfile();
+    collabPanel.appendChild(make('p', 'followers-head', 'Collab with ' + p.name));
+    if (!mp) {
+      collabPanel.appendChild(make('p', 'followers-empty',
+        'Make your own portfolio first. Then you can invite people to work on one of your research cards.'));
+      return;
+    }
+    var withThem = state.collabs.filter(function (c) { return c.toProfile === p.id && c.fromUser === me.id; });
+    var taken = {};
+    withThem.forEach(function (c) { taken[c.projectId] = true; });
+    var choices = mp.projects.filter(function (q) { return !taken[q.id]; });
+
+    var f = make('form', 'collab-form');
+    f.appendChild(make('p', 'collab-intro',
+      'Invite ' + p.name + ' to work on one of your research cards. If they accept, they can edit it, and it shows on their portfolio too.'));
+    var select = make('select');
+    choices.forEach(function (q) {
+      var o = make('option', null, q.title);
+      o.value = q.id;
+      select.appendChild(o);
+    });
+    var fresh = make('option', null, '+ Start a new research card');
+    fresh.value = 'new';
+    select.appendChild(fresh);
+    if (!collabDraft.card || (collabDraft.card !== 'new' && !choices.some(function (q) { return q.id === collabDraft.card; }))) {
+      collabDraft.card = choices.length ? choices[0].id : 'new';
+    }
+    select.value = collabDraft.card;
+    field('Research card', select, 'collab-card').forEach(function (n) { f.appendChild(n); });
+
+    var titleIn = textInput(80, collabDraft.title);
+    titleIn.placeholder = 'What will you research together?';
+    var titleBits = field('Title for the new card', titleIn, 'collab-title');
+    titleBits.forEach(function (n) { n.hidden = collabDraft.card !== 'new'; f.appendChild(n); });
+    select.addEventListener('change', function () {
+      collabDraft.card = select.value;
+      titleBits.forEach(function (n) { n.hidden = collabDraft.card !== 'new'; });
+    });
+    titleIn.addEventListener('input', function () { collabDraft.title = titleIn.value; });
+
+    var msgIn = textArea(300, collabDraft.message);
+    msgIn.rows = 3;
+    msgIn.placeholder = 'Say hi and what you have in mind';
+    msgIn.addEventListener('input', function () { collabDraft.message = msgIn.value; });
+    field('Message (optional)', msgIn, 'collab-message').forEach(function (n) { f.appendChild(n); });
+
+    var actions = make('div', 'edit-actions');
+    var send = make('button', 'btn btn-solid', 'Send request');
+    send.type = 'submit';
+    send.disabled = collabWorking;
+    var cancel = make('button', 'btn btn-ghost', 'Close');
+    cancel.type = 'button';
+    cancel.addEventListener('click', function () { collabOpen = false; collabNote = ''; renderProfileReactions(); });
+    actions.appendChild(send);
+    actions.appendChild(cancel);
+    f.appendChild(actions);
+
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (collabWorking) return;
+      var message = collabDraft.message.trim();
+      var sendFor = function (projectId) {
+        return collabWrite(client.from('collab_requests').insert({ project_id: projectId, to_profile: p.id, message: message }),
+          'Request sent. You’ll get a notification when ' + p.name + ' accepts.').then(function (ok) {
+          if (ok) collabDraft = { card: '', title: '', message: '' };
+        });
+      };
+      if (collabDraft.card !== 'new') { sendFor(collabDraft.card); return; }
+      var title = collabDraft.title.trim();
+      if (!title) { collabNote = 'Give the new research card a title.'; renderProfileReactions(); $('collab-title').focus(); return; }
+      collabWorking = true;
+      collabNote = 'Saving…';
+      renderProfileReactions();
+      client.from('projects').insert({ profile_id: mp.id, title: title, link: '', description: '', sources: [] })
+        .select('id').single().then(function (res) {
+          collabWorking = false;
+          if (res.error) { collabNote = dbMessage(res.error); renderProfileReactions(); return; }
+          sendFor(res.data.id);
+        });
+    });
+    collabPanel.appendChild(f);
+
+    if (withThem.length) {
+      collabPanel.appendChild(make('p', 'followers-head', 'Already with ' + p.name));
+      var list = make('ul', 'followers-list collab-list');
+      withThem.forEach(function (c) {
+        var status = c.status === 'accepted' ? 'Collaborating' : c.status === 'declined' ? 'Declined' : 'Waiting for an answer';
+        list.appendChild(collabRow(null, [
+          make('p', 'collab-line', '“' + collabTitle(c) + '”'),
+          make('p', 'follower-when', status)
+        ], [
+          collabButton(c.status === 'pending' ? 'Cancel request' : c.status === 'declined' ? 'Remove' : 'End collab', '', function () {
+            removeCollab(c, c.status === 'pending' ? 'Request cancelled.' : c.status === 'declined' ? 'Removed.' : 'Collab ended.');
+          })
+        ]));
+      });
+      collabPanel.appendChild(list);
+    }
+  }
+
+  collabBtn.addEventListener('click', function () {
+    if (!me) { openAuth('signin', 'Sign in to collaborate on research.'); return; }
+    collabOpen = !collabOpen;
+    collabNote = '';
+    armedCollabEnd = null;
+    if (collabOpen) followersOpen = false;
+    renderProfileReactions();
+    if (collabOpen && $('collab-card')) $('collab-card').focus();
   });
 
   // ---- Notification bell: new research from profiles you follow ----
@@ -2021,6 +2373,21 @@
         what: label + target.project.title + ': “' + snippet(c.body) + '”'
       });
     });
+    // Collab requests sent to you, and your requests that someone accepted.
+    var mp = myProfile();
+    state.collabs.forEach(function (c) {
+      var q = findProject(c.projectId);
+      var to = findProfile(c.toProfile);
+      if (!q || !to || !mp) return;
+      if (c.status === 'pending' && to.ownerId === me.id) {
+        items.push({
+          time: c.createdAt, profile: mp, project: q, collab: true, who: authorName(c.fromUser),
+          what: 'wants to collaborate on ' + q.title + (c.message ? ': “' + snippet(c.message) + '”' : '')
+        });
+      } else if (c.status === 'accepted' && c.fromUser === me.id) {
+        items.push({ time: c.respondedAt || c.createdAt, profile: mp, project: q, collab: true, who: to.name, what: 'accepted your collab on ' + q.title });
+      }
+    });
     items.sort(function (a, b) { return b.time - a.time; });
     return items.slice(0, 30);
   }
@@ -2053,13 +2420,22 @@
       return;
     }
     items.forEach(function (n) {
-      var b = make('button', 'notif-item' + (n.comment ? ' notif-comment' : '') + (n.time > lastSeen ? ' unread' : ''));
+      var b = make('button', 'notif-item' + (n.comment || n.collab ? ' notif-comment' : '') + (n.time > lastSeen ? ' unread' : ''));
       b.type = 'button';
       b.appendChild(make('span', 'notif-who', n.who));
       b.appendChild(make('span', 'notif-what', n.what));
       b.appendChild(make('span', 'notif-when', timeAgo(n.time)));
       b.addEventListener('click', function () {
         closeNotifs();
+        // A collab notification opens the Collabs list on your own portfolio.
+        if (n.collab) {
+          showProfile(n.profile.id, true);
+          collabOpen = true;
+          followersOpen = false;
+          renderProfileReactions();
+          collabPanel.scrollIntoView({ block: 'center' });
+          return;
+        }
         // A comment notification opens that card's comments; research opens the Research section.
         if (n.comment) commentsOpen[n.project.id] = true;
         showProfile(n.profile.id, true);
@@ -2268,7 +2644,8 @@
   // ---- Putting it together ----
   function busy() {
     var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; });
-    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment;
+    var typingCollab = !collabPanel.hidden && collabPanel.contains(document.activeElement);
+    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab;
   }
   var routed = false;
   function renderAll() {

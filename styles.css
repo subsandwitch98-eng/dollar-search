@@ -241,6 +241,39 @@ img { max-width: 100%; }
   .follower-name .dollar { color: var(--accent); }
   .follower-when, .follower-more, .followers-empty { font-size: 0.85rem; color: var(--muted); }
   .follower-more { padding: 0.35rem 0.7rem; }
+
+  /* Collabs: requests, your collabs, and the request form */
+  .collab-panel { max-width: 30rem; }
+  .collab-item { display: flex; align-items: flex-start; gap: 0.8rem; padding: 0.6rem 0.7rem; }
+  .collab-item .follower-avatar { margin-top: 0.15rem; }
+  .collab-text { display: grid; gap: 0.15rem; min-width: 0; }
+  .collab-line { overflow-wrap: anywhere; }
+  .collab-message { font-size: 0.9rem; color: var(--muted); overflow-wrap: anywhere; }
+  .collab-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem; }
+  .mini-btn.collab-accept { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .mini-btn.collab-accept:hover { background: var(--button-fg); }
+  .mini-btn.armed { background: var(--button-fg); border-color: var(--button-fg); color: var(--surface); }
+  .mini-btn:disabled { opacity: 0.6; cursor: default; }
+  .collab-note { margin: 0.35rem 0.65rem 0; }
+  .collab-form { display: grid; gap: 0.35rem; padding: 0 0.65rem 0.4rem; }
+  .collab-intro { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.35rem; }
+  .collab-form select, .collab-form input, .collab-form textarea {
+    font-family: var(--body); font-size: 1rem; line-height: 1.5; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--pink); border-radius: 0.9rem;
+    padding: 0.6rem 0.8rem; width: 100%; box-sizing: border-box; margin-bottom: 0.35rem;
+  }
+  .collab-form textarea { resize: vertical; min-height: 4.5rem; }
+  .collab-form [hidden] { display: none; }
+  .collab-form .edit-actions { margin-top: 0.2rem; }
+
+  /* "Collab with …" under a research card's title */
+  .project-collab { font-size: 0.9rem; color: var(--muted); margin-top: -0.35rem; overflow-wrap: anywhere; }
+  .project-collab-tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--blush); color: var(--button-fg); border-radius: 999px; padding: 0.1rem 0.55rem; margin-right: 0.15rem;
+  }
+  .link-btn.project-collab-name { font-size: inherit; display: inline; }
+  .project-collab-name .dollar { color: var(--accent); }
   .followers-empty { margin: 0 0.65rem 0.35rem; }
   .you-badge { background: var(--blush); color: var(--button-fg); border-radius: 999px; padding: 0.05rem 0.55rem; }
   .profile-desc { color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }

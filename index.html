@@ -26,6 +26,10 @@
         <a href="#achievements" id="nav-achievements" hidden>Achievements</a>
         <a href="#contact" id="nav-contact" hidden>Contact</a>
       </nav>
+      <button class="cart-btn" id="cart-btn" type="button" aria-label="Star Shop" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.2a1.6 1.6 0 0 0 1.6-1.2L21 7.5H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.6" cy="19.6" r="1.6" fill="currentColor"/><circle cx="17.2" cy="19.6" r="1.6" fill="currentColor"/></svg>
+        <span class="cart-stars" id="cart-stars">★ 0</span>
+      </button>
       <button class="bell-btn" id="bell-btn" type="button" aria-expanded="false" aria-controls="notif-panel" aria-label="Notifications" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.4 15.5h15.2L18 12.6V9a6 6 0 0 0-6-6Z" fill="currentColor"/><path d="M9.5 17.5a2.5 2.5 0 0 0 5 0Z" fill="currentColor"/></svg>
         <span class="bell-badge" id="bell-badge" hidden></span>
@@ -337,6 +341,20 @@
 <footer>
   <div class="wrap" id="footer-name">© 2026 Dollar Search</div>
 </footer>
+
+<!-- Star Shop pop-up, opened from the cart by the bell -->
+<div class="dialog-backdrop" id="shop-dialog" hidden>
+  <div class="dialog shop-dialog" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+    <div class="achievements-head">
+      <h2 id="shop-title">Star Shop</h2>
+      <button class="dialog-close" id="shop-close" type="button" aria-label="Close the Star Shop">×</button>
+    </div>
+    <p class="shop-balance"><span class="shop-balance-stars" id="shop-balance">★ 0</span> <span id="shop-balance-note">to spend</span></p>
+    <p class="shop-how">You earn 1 star for every like your portfolio or your research gets. Spend them on items for your character, then pick them in Edit character.</p>
+    <ul class="shop-grid" id="shop-list"></ul>
+    <p class="edit-status shop-status" id="shop-status" aria-live="polite"></p>
+  </div>
+</div>
 
 <!-- Achievements pop-up, opened from the Achievements link on a portfolio -->
 <div class="dialog-backdrop" id="achievements" hidden>

@@ -15,15 +15,15 @@
     // New styles and colors go on the end of each list so characters people already saved keep their look.
     hairStyle: ['Short', 'Spiky', 'Long', 'Bun', 'Curly', 'Bob', 'Ponytail', 'Pigtails', 'Wavy', 'Afro', 'Buzz', 'Mohawk'],
     bangs: ['None', 'Straight', 'Side', 'Wispy', 'Curtain', 'Blunt', 'Swoop', 'Choppy', 'Baby', 'Wavy', 'Clipped'],
-    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
+    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#C9CCD6'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
-      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C'],
+      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#E8B93A'],
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Halo', 'Cat ears', 'Wizard hat'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Gold', 'Moon'],
     pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish'],
     petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
   };
@@ -45,8 +45,9 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
+  var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -114,13 +115,17 @@
           createdAt: Date.parse(c.created_at) || 0, respondedAt: Date.parse(c.responded_at) || 0
         };
       });
-      if (!me) { isAdmin = false; seenAt = 0; return; }
+      if (!me) { isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; return; }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
-        client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle()
+        client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
+        client.from('shop_purchases').select('item, price').eq('user_id', me.id)
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
+        // The Star Shop is optional: until its table exists, the cart stays hidden.
+        shopReady = !extra[2].error;
+        state.purchases = extra[2].error ? [] : extra[2].data.map(function (r) { return { item: r.item, price: r.price }; });
       });
     });
   }
@@ -426,6 +431,24 @@
         ['M60 110 C68 102 78 104 76 111 C74 117 66 115 60 110 Z', '#E26D8E']
       ].forEach(function (b) { add('path', { d: b[0], fill: b[1], transform: bow }); });
       add('circle', { cx: 60, cy: 110, r: 3.4, fill: '#C25F7E', transform: bow });
+    } else if (kind === 8) { // Star Shop: gold ring set with little gems
+      ring(M, '#F6C945', FRAME_WIDTH);
+      ring(FRAME_INNER + 0.7, '#E0A82E', 1.4);
+      ring(59.3, '#E0A82E', 1.4);
+      var gems = ['#F29BB2', '#8EC5E8', '#9BD3AE', '#B9A6E8'];
+      around(8, M, 0, function (x, y, deg, i) {
+        add('path', { d: 'M' + fx(x) + ' ' + fx(y - 3.6) + ' L' + fx(x + 3) + ' ' + fx(y) + ' L' + fx(x) + ' ' + fx(y + 3.6) + ' L' + fx(x - 3) + ' ' + fx(y) + ' Z',
+          fill: gems[i % 4], stroke: '#FFFDF2', 'stroke-width': 0.8, transform: 'rotate(' + deg + ' ' + fx(x) + ' ' + fx(y) + ')' });
+      });
+      around(8, M, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.1, fill: '#FFFDF2' }); });
+    } else if (kind === 9) { // Star Shop: night-sky ring with a crescent moon at the top
+      ring(M, '#2F3A6E', FRAME_WIDTH);
+      around(14, M, 12, function (x, y, deg, i) {
+        if (i % 2) add('circle', { cx: fx(x), cy: fx(y), r: 0.9, fill: '#FFFDF2' });
+        else add('polygon', { points: starPoints(x, y, i % 4 ? 2.4 : 3.2), fill: '#F6E08E' });
+      });
+      add('circle', { cx: 60, cy: 60 - M, r: 5, fill: '#F6E08E' });
+      add('circle', { cx: 62.6, cy: 60 - M - 1.6, r: 4.3, fill: '#2F3A6E' });
     }
   }
 
@@ -879,6 +902,27 @@
         }
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
+    }
+    // Star Shop headwear: 11 Halo, 12 Cat ears, 13 Wizard hat.
+    if (c.headwear === 11) { // A glowing gold halo floating above the head
+      add('ellipse', { cx: 60, cy: 19, rx: 17, ry: 4.8, fill: 'none', stroke: '#FFF3C4', 'stroke-width': 6, opacity: 0.7 });
+      add('ellipse', { cx: 60, cy: 19, rx: 17, ry: 4.8, fill: 'none', stroke: '#F6C945', 'stroke-width': 3 });
+      add('path', { d: 'M48 16.5 Q54 14.6 60 14.4', fill: 'none', stroke: '#FFFDF2', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 12) { // Cat ears on a headband, in the clothing color
+      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: shade(top, -0.15), 'stroke-width': 3.4, 'stroke-linecap': 'round' });
+      add('path', { d: 'M37 37 L40 17 L53 30 Z', fill: top, stroke: shade(top, -0.3), 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M83 37 L80 17 L67 30 Z', fill: top, stroke: shade(top, -0.3), 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M40.5 33 L42 22 L49 29.5 Z', fill: '#F7A8C0' });
+      add('path', { d: 'M79.5 33 L78 22 L71 29.5 Z', fill: '#F7A8C0' });
+    }
+    if (c.headwear === 13) { // A tall, slightly bent wizard hat with gold stars
+      add('ellipse', { cx: 60, cy: 34, rx: 31, ry: 6.5, fill: '#3F3A8F' });
+      add('path', { d: 'M43 33 Q52 18 58 9 Q61 3 69 1 Q64 8 66 16 Q70 26 77 33 Z', fill: '#5547B5' });
+      add('path', { d: 'M44.5 30.5 Q60 26 75.5 30.5 L77 33 Q60 28.5 43 33 Z', fill: '#F6C945' });
+      add('polygon', { points: starPoints(56, 20, 3.4), fill: '#F6C945' });
+      add('polygon', { points: starPoints(65, 12, 2.4), fill: '#FFF3C4' });
+      add('circle', { cx: 61, cy: 25.5, r: 1.1, fill: '#FFF3C4' });
     }
     return svg;
   }
@@ -1840,6 +1884,120 @@
     openAchievements();
   });
 
+  // ---- Star Shop: stars come from likes, and buy items for your character ----
+  // Prices must match buy_shop_item() in supabase/star-shop.sql, which is what actually checks them.
+  var SHOP = [
+    { id: 'gold-top', name: 'Gold outfit color', kind: 'Clothing color', key: 'top', index: 17, price: 1 },
+    { id: 'silver-hair', name: 'Silver hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1 },
+    { id: 'cat-ears', name: 'Cat ears', kind: 'Headwear', key: 'headwear', index: 12, price: 2 },
+    { id: 'halo', name: 'Halo', kind: 'Headwear', key: 'headwear', index: 11, price: 2 },
+    { id: 'wizard-hat', name: 'Wizard hat', kind: 'Headwear', key: 'headwear', index: 13, price: 4 },
+    { id: 'moon-frame', name: 'Moon frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
+    { id: 'gold-frame', name: 'Gold frame', kind: 'Frame', key: 'frame', index: 8, price: 5 }
+  ];
+  function shopItemFor(key, index) {
+    return SHOP.filter(function (s) { return s.key === key && s.index === index; })[0] || null;
+  }
+  function ownsItem(item) {
+    return state.purchases.some(function (p) { return p.item === item.id; });
+  }
+  // Stars earned: one per like on your portfolio and on your research.
+  function starsEarned() {
+    if (!me) return 0;
+    var mine = state.profiles.filter(function (p) { return p.ownerId === me.id; });
+    var profileIds = mine.map(function (p) { return p.id; });
+    var projectIds = [];
+    mine.forEach(function (p) { p.projects.forEach(function (q) { projectIds.push(q.id); }); });
+    return state.likes.filter(function (l) { return profileIds.indexOf(l.profileId) >= 0; }).length +
+      state.projectLikes.filter(function (l) { return projectIds.indexOf(l.projectId) >= 0; }).length;
+  }
+  function starBalance() {
+    var spent = state.purchases.reduce(function (sum, p) { return sum + p.price; }, 0);
+    return Math.max(0, starsEarned() - spent);
+  }
+  var cartBtn = $('cart-btn');
+  var shopDialog = $('shop-dialog');
+  var shopOpener = null;
+  var buying = null; // the item being bought
+  function renderCart() {
+    var show = !!client && !!me && loaded && !loadError && shopReady;
+    cartBtn.hidden = !show;
+    if (!show) { shopDialog.hidden = true; return; }
+    var stars = starBalance();
+    $('cart-stars').textContent = '★ ' + stars;
+    cartBtn.setAttribute('aria-label', 'Star Shop, ' + plural(stars, 'star') + ' to spend');
+    if (!shopDialog.hidden) renderShop();
+  }
+  function renderShop() {
+    var stars = starBalance();
+    $('shop-balance').textContent = '★ ' + stars;
+    $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
+    var list = $('shop-list');
+    list.textContent = '';
+    var mp = myProfile();
+    var base = normalizeCharacter(mp && mp.avatar ? mp.avatar.character : DEFAULT_CHAR);
+    SHOP.forEach(function (item) {
+      var owned = ownsItem(item);
+      var li = make('li', 'shop-item' + (owned ? ' owned' : ''));
+      // A preview of your own character wearing the item.
+      var look = normalizeCharacter(base);
+      look[item.key] = item.index;
+      var pic = make('span', 'avatar shop-avatar');
+      pic.appendChild(pictureNode({ mode: 'character', character: look }, item.name));
+      li.appendChild(pic);
+      li.appendChild(make('span', 'shop-kind', item.kind));
+      li.appendChild(make('h3', 'shop-name', item.name));
+      var b = make('button', 'btn ' + (owned ? 'btn-ghost' : 'btn-solid') + ' shop-buy');
+      b.type = 'button';
+      if (owned) {
+        b.textContent = 'Owned';
+        b.disabled = true;
+      } else {
+        b.textContent = '★ ' + item.price + ' · Buy';
+        b.disabled = !!buying || stars < item.price;
+        if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
+        b.addEventListener('click', function () { buyItem(item); });
+      }
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+  function buyItem(item) {
+    if (buying || starBalance() < item.price) return;
+    buying = item.id;
+    $('shop-status').textContent = 'Buying ' + item.name + '…';
+    renderShop();
+    client.rpc('buy_shop_item', { item_id: item.id }).then(function (res) {
+      buying = null;
+      if (res.error) {
+        $('shop-status').textContent = res.error.message || dbMessage(res.error);
+        renderShop();
+        return;
+      }
+      state.purchases.push({ item: item.id, price: item.price });
+      $('shop-status').textContent = 'You bought the ' + item.name.toLowerCase() + '! Pick it in Edit character.';
+      renderCart();
+      renderShop();
+      if (!picForm.hidden) buildPicForm(null);
+      refresh();
+    });
+  }
+  function openShop() {
+    shopOpener = document.activeElement;
+    closeNotifs();
+    $('shop-status').textContent = '';
+    renderShop();
+    shopDialog.hidden = false;
+    $('shop-close').focus();
+  }
+  function closeShop() {
+    shopDialog.hidden = true;
+    if (shopOpener && shopOpener.focus) shopOpener.focus();
+  }
+  cartBtn.addEventListener('click', openShop);
+  $('shop-close').addEventListener('click', closeShop);
+  shopDialog.addEventListener('click', function (e) { if (e.target === shopDialog) closeShop(); });
+
   // The customizer has two tabs: Character (everything without a 4th entry above) and Pets.
   var PIC_TABS = [['character', 'Character'], ['pets', 'Pets']];
   var picTab = 'character';
@@ -1952,6 +2110,20 @@
           b.title = 'Locked: ' + goal.task;
           b.setAttribute('aria-label', value + ', locked. ' + goal.task + '.');
         }
+        // Star Shop items stay locked until bought (one you're already wearing stays picked).
+        var shopItem = shopItemFor(key, i);
+        if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i) {
+          b.disabled = true;
+          b.classList.add('locked', 'shop-locked');
+          if (g[2] === 'chip') {
+            b.insertBefore(lockIcon(), b.firstChild);
+            b.appendChild(make('span', 'chip-price', '★' + shopItem.price));
+          } else {
+            b.appendChild(lockIcon());
+          }
+          b.title = 'Buy in the Star Shop for ' + plural(shopItem.price, 'star');
+          b.setAttribute('aria-label', shopItem.name + ', locked. Buy it in the Star Shop for ' + plural(shopItem.price, 'star') + '.');
+        }
         b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
         b.addEventListener('click', function () {
           picDraft.character[key] = i;
@@ -1976,6 +2148,7 @@
       PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
         var choices = CHAR[g[1]].map(function (_, i) { return i; });
         if (g[1] === 'pet') choices = choices.filter(function (i) { return !i || petProgress(p, i).unlocked; });
+        choices = choices.filter(function (i) { var s = shopItemFor(g[1], i); return !s || ownsItem(s); });
         picDraft.character[g[1]] = choices[Math.floor(Math.random() * choices.length)];
       });
       buildPicForm('pic-shuffle');
@@ -3263,6 +3436,7 @@
     if (e.key !== 'Escape') return;
     if (!authDialog.hidden) { closeAuth(); return; }
     if (!achievementsDialog.hidden) { closeAchievements(); return; }
+    if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
     if (!accountMenu.hidden) { closeAccountMenu(); accountBtn.focus(); }
   });
@@ -3443,6 +3617,7 @@
   function renderAll() {
     renderHeader();
     renderBell();
+    renderCart();
     if (!routed && loaded) { routed = true; route(); return; }
     if (busy()) return;
     if (currentId) {

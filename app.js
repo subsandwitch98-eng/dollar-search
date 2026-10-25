@@ -1088,6 +1088,12 @@
   var filterFriends = $('filter-friends');
   var profileSearch = $('profile-search');
   profileSearch.addEventListener('input', function () { renderHome(); });
+  // "My portfolio" on the home screen takes you to your own portfolio once you have one.
+  var myPortfolioBtn = $('my-portfolio-btn');
+  myPortfolioBtn.addEventListener('click', function () {
+    var mp = myProfile();
+    if (mp) showProfile(mp.id, true);
+  });
   var homeFilter = 'all'; // 'all', 'following' or 'friends'
   var addingProfile = false;
 
@@ -1313,6 +1319,7 @@
   function renderHome() {
     var list = state.profiles;
     renderRecent();
+    myPortfolioBtn.hidden = !myProfile();
     paintName(hubNameEl, state.hubName);
     hubIntroEl.textContent = state.hubIntro;
     hubCount.textContent = plural(list.length, 'profile');

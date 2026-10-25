@@ -1920,11 +1920,12 @@
   var shopOpener = null;
   var buying = null; // the item being bought
   function renderCart() {
-    var show = !!client && !!me && loaded && !loadError && shopReady;
+    // Everyone signed in gets the cart; until the shop's database setup is run, buying is switched off.
+    var show = !!client && !!me && loaded && !loadError;
     cartBtn.hidden = !show;
     if (!show) { shopDialog.hidden = true; return; }
     var stars = starBalance();
-    $('cart-stars').textContent = '★ ' + stars;
+    $('cart-stars').textContent = '★' + stars;
     cartBtn.setAttribute('aria-label', 'Star Shop, ' + plural(stars, 'star') + ' to spend');
     if (!shopDialog.hidden) renderShop();
   }
@@ -1954,7 +1955,7 @@
         b.disabled = true;
       } else {
         b.textContent = '★ ' + item.price + ' · Buy';
-        b.disabled = !!buying || stars < item.price;
+        b.disabled = !shopReady || !!buying || stars < item.price;
         if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
         b.addEventListener('click', function () { buyItem(item); });
       }
@@ -1963,7 +1964,7 @@
     });
   }
   function buyItem(item) {
-    if (buying || starBalance() < item.price) return;
+    if (!shopReady || buying || starBalance() < item.price) return;
     buying = item.id;
     $('shop-status').textContent = 'Buying ' + item.name + '…';
     renderShop();
@@ -1985,7 +1986,7 @@
   function openShop() {
     shopOpener = document.activeElement;
     closeNotifs();
-    $('shop-status').textContent = '';
+    $('shop-status').textContent = shopReady ? '' : 'The Star Shop is opening soon. You can look around, and buying will switch on shortly.';
     renderShop();
     shopDialog.hidden = false;
     $('shop-close').focus();

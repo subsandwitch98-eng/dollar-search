@@ -384,14 +384,21 @@ img { max-width: 100%; }
   }
   #profile-filter { justify-self: start; }
   /* Star Shop: the cart by the bell, the shop pop-up, and locked items in Edit character */
+  /* Round icon button, like the bell, with your stars in a gold badge */
   .cart-btn {
-    display: inline-flex; align-items: center; gap: 0.35rem; flex: none; height: 2.5rem; padding: 0 0.85rem 0 0.7rem;
-    border-radius: 999px; border: 0; cursor: pointer; background: var(--blush); color: var(--button-fg);
-    font-family: var(--body); font-weight: 700; font-size: 0.85rem;
+    position: relative; display: grid; place-items: center; flex: none;
+    width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--blush); color: var(--button-fg);
   }
   .cart-btn:hover { background: var(--pink); }
-  .cart-btn svg { width: 1.25rem; height: 1.25rem; }
-  .cart-stars { color: #A9760F; font-variant-numeric: tabular-nums; }
+  .cart-btn svg { width: 1.3rem; height: 1.3rem; }
+  .cart-badge {
+    position: absolute; top: -0.25rem; right: -0.45rem; box-sizing: border-box;
+    min-width: 1.25rem; height: 1.25rem; padding: 0 0.3rem; border-radius: 999px;
+    background: #F6C945; color: #6B4508; box-shadow: 0 0 0 2px var(--bg);
+    font-family: var(--body); font-weight: 700; font-size: 0.68rem; line-height: 1.25rem; text-align: center;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
   .dialog.shop-dialog { width: min(46rem, 100%); padding: 1.5rem 1.5rem 1.75rem; gap: 0.45rem; }
   .dialog .shop-balance { display: flex; align-items: baseline; gap: 0.4rem; color: var(--fg); font-weight: 700; }
   .shop-balance-stars { font-family: var(--display); font-size: 1.7rem; color: #C8901A; }

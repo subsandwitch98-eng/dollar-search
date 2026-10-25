@@ -23,10 +23,12 @@
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow']
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow'],
+    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish'],
+    petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
   };
-  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame'];
-  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0 };
+  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame', 'pet', 'petColor'];
+  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0, pet: 0, petColor: 0 };
   function normalizeCharacter(src) {
     var c = {};
     src = src && typeof src === 'object' ? src : {};
@@ -878,7 +880,110 @@
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
     }
+    // A pet sitting in the bottom-right corner, in front of the shoulder.
+    if (c.pet) {
+      var petGroup = document.createElementNS(SVG_NS, 'g');
+      petGroup.setAttribute('transform', 'translate(87 93) scale(1.3)');
+      layer.appendChild(petGroup);
+      drawPet(function (tag, attrs) {
+        var n = document.createElementNS(SVG_NS, tag);
+        for (var k in attrs) n.setAttribute(k, attrs[k]);
+        petGroup.appendChild(n);
+      }, c.pet, CHAR.petColor[c.petColor]);
+    }
     return svg;
+  }
+
+  // Pets, drawn around (0, 0) and about 30 wide, feet on y = 14.
+  // Kinds: 1 Cat, 2 Dog, 3 Bunny, 4 Hamster, 5 Bird, 6 Fish (in a bowl).
+  function drawPet(add, kind, color) {
+    var line = shade(color, -0.4);
+    var light = shade(color, 0.5);
+    var n = parseInt(color.slice(1), 16);
+    var dark = ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) < 90;
+    var ink = dark ? '#FFF6F0' : '#3A2A30';
+    var pink = '#F29BB2';
+    function body(attrs) {
+      attrs.fill = attrs.fill || color;
+      attrs.stroke = line;
+      attrs['stroke-width'] = 1.2;
+      add(attrs.d ? 'path' : attrs.rx ? 'ellipse' : 'circle', attrs);
+    }
+    function eyes(y, gap) {
+      add('circle', { cx: -gap, cy: y, r: 1.4, fill: ink });
+      add('circle', { cx: gap, cy: y, r: 1.4, fill: ink });
+    }
+    function cheeks(y) {
+      add('circle', { cx: -5.5, cy: y, r: 1.6, fill: pink, opacity: 0.6 });
+      add('circle', { cx: 5.5, cy: y, r: 1.6, fill: pink, opacity: 0.6 });
+    }
+    if (kind === 1) { // Cat
+      add('path', { d: 'M9 10 Q19 8 16 -2', fill: 'none', stroke: line, 'stroke-width': 4.6, 'stroke-linecap': 'round' });
+      add('path', { d: 'M9 10 Q19 8 16 -2', fill: 'none', stroke: color, 'stroke-width': 2.8, 'stroke-linecap': 'round' });
+      body({ cx: 0, cy: 7, rx: 10.5, ry: 8 });
+      body({ d: 'M-8.5 -8 L-7 -18 L-1.5 -13 Z' });
+      body({ d: 'M8.5 -8 L7 -18 L1.5 -13 Z' });
+      body({ cx: 0, cy: -5, r: 9 });
+      add('path', { d: 'M-7 -11 L-6.3 -15.5 L-3.6 -13 Z', fill: pink, opacity: 0.8 });
+      add('path', { d: 'M7 -11 L6.3 -15.5 L3.6 -13 Z', fill: pink, opacity: 0.8 });
+      eyes(-6, 3.6);
+      add('path', { d: 'M-1.2 -2.6 L1.2 -2.6 L0 -1.2 Z', fill: pink });
+      add('path', { d: 'M-2 -0.6 Q-1 0.4 0 -0.6 Q1 0.4 2 -0.6', fill: 'none', stroke: ink, 'stroke-width': 0.8, 'stroke-linecap': 'round' });
+      add('path', { d: 'M-4 -2.5 L-10 -3.5 M-4 -1.2 L-10 -0.6 M4 -2.5 L10 -3.5 M4 -1.2 L10 -0.6', stroke: ink, 'stroke-width': 0.6, opacity: 0.6 });
+    } else if (kind === 2) { // Dog
+      add('path', { d: 'M9 6 Q17 3 15 -4', fill: 'none', stroke: line, 'stroke-width': 4.4, 'stroke-linecap': 'round' });
+      add('path', { d: 'M9 6 Q17 3 15 -4', fill: 'none', stroke: color, 'stroke-width': 2.6, 'stroke-linecap': 'round' });
+      body({ cx: 0, cy: 7, rx: 10.5, ry: 8 });
+      body({ cx: 0, cy: -5, r: 9 });
+      body({ cx: -8.2, cy: -5, rx: 3.2, ry: 6.5, fill: shade(color, -0.22), transform: 'rotate(18 -8.2 -5)' });
+      body({ cx: 8.2, cy: -5, rx: 3.2, ry: 6.5, fill: shade(color, -0.22), transform: 'rotate(-18 8.2 -5)' });
+      add('ellipse', { cx: 0, cy: -1.8, rx: 4.6, ry: 3.6, fill: light });
+      add('ellipse', { cx: 0, cy: -3.4, rx: 1.7, ry: 1.2, fill: dark ? '#FFF6F0' : '#3A2A30' });
+      eyes(-7, 3.4);
+      add('path', { d: 'M-1.2 0 Q0 3.2 1.2 0 Z', fill: '#E26D8E' });
+    } else if (kind === 3) { // Bunny
+      body({ cx: -3.6, cy: -17, rx: 2.8, ry: 8, transform: 'rotate(-8 -3.6 -17)' });
+      body({ cx: 3.6, cy: -17, rx: 2.8, ry: 8, transform: 'rotate(8 3.6 -17)' });
+      add('ellipse', { cx: -3.6, cy: -17, rx: 1.2, ry: 5.5, fill: pink, opacity: 0.75, transform: 'rotate(-8 -3.6 -17)' });
+      add('ellipse', { cx: 3.6, cy: -17, rx: 1.2, ry: 5.5, fill: pink, opacity: 0.75, transform: 'rotate(8 3.6 -17)' });
+      body({ cx: 10, cy: 10, r: 3.2, fill: light });
+      body({ cx: 0, cy: 7, rx: 10, ry: 8 });
+      body({ cx: 0, cy: -5, r: 8.5 });
+      eyes(-6, 3.4);
+      cheeks(-2.5);
+      add('path', { d: 'M-1 -3.2 L1 -3.2 L0 -2 Z', fill: pink });
+      add('path', { d: 'M0 -2 L0 -0.8 M-1.4 -0.4 Q0 0.6 1.4 -0.4', fill: 'none', stroke: ink, 'stroke-width': 0.7, 'stroke-linecap': 'round' });
+    } else if (kind === 4) { // Hamster: one round ball with tiny ears
+      body({ cx: -7, cy: -8, r: 3.2 });
+      body({ cx: 7, cy: -8, r: 3.2 });
+      add('circle', { cx: -7, cy: -8, r: 1.5, fill: pink, opacity: 0.8 });
+      add('circle', { cx: 7, cy: -8, r: 1.5, fill: pink, opacity: 0.8 });
+      body({ cx: 0, cy: 2, rx: 12, ry: 11.5 });
+      add('ellipse', { cx: 0, cy: 7, rx: 7.5, ry: 5.5, fill: light });
+      eyes(-1.5, 4.2);
+      cheeks(2);
+      add('circle', { cx: 0, cy: 1, r: 0.9, fill: pink });
+      add('path', { d: 'M-4 13 L-4 14.5 M4 13 L4 14.5', stroke: line, 'stroke-width': 1.6, 'stroke-linecap': 'round' });
+    } else if (kind === 5) { // Bird
+      add('path', { d: 'M-2 11 L-2 14.5 M3 11 L3 14.5', stroke: '#E0A82E', 'stroke-width': 1.4, 'stroke-linecap': 'round' });
+      add('path', { d: 'M8 4 L15 1 L13 7 Z', fill: shade(color, -0.2), stroke: line, 'stroke-width': 1 });
+      body({ cx: 0, cy: 2, rx: 10, ry: 9.5 });
+      add('path', { d: 'M-1 -8 Q1 -13 4 -10 Q2 -9 1 -7.5', fill: color, stroke: line, 'stroke-width': 1 });
+      body({ cx: 3, cy: 4.5, rx: 6, ry: 4.2, fill: shade(color, -0.18), transform: 'rotate(-20 3 4.5)' });
+      add('path', { d: 'M-9.5 0 L-14.5 2 L-9.5 3.6 Z', fill: '#F2A541', stroke: '#C77F1E', 'stroke-width': 0.6 });
+      add('circle', { cx: -4.5, cy: -1.5, r: 1.4, fill: ink });
+      add('circle', { cx: -4, cy: 2.5, r: 1.5, fill: pink, opacity: 0.6 });
+    } else if (kind === 6) { // Fish in a round bowl
+      add('circle', { cx: 0, cy: 2, r: 12.5, fill: '#DDF0FA', stroke: '#8EC5E8', 'stroke-width': 1.2 });
+      add('path', { d: 'M-11 -2 Q0 1 11 -2 L11 2 A12.5 12.5 0 0 1 -11 2 Z', fill: '#BDE3F5', opacity: 0.7 });
+      add('rect', { x: -8, y: -11.5, width: 16, height: 3, rx: 1.5, fill: '#EAF6FC', stroke: '#8EC5E8', 'stroke-width': 1 });
+      add('path', { d: 'M4 4 L9 0.5 L9 7.5 Z', fill: shade(color, -0.15), stroke: line, 'stroke-width': 0.8 });
+      body({ cx: -1, cy: 4, rx: 6, ry: 4.2 });
+      add('circle', { cx: -4, cy: 3.2, r: 1, fill: ink });
+      add('circle', { cx: 2, cy: -5, r: 1.2, fill: '#FFFFFF', stroke: '#8EC5E8', 'stroke-width': 0.5 });
+      add('circle', { cx: 4.5, cy: -7.5, r: 0.8, fill: '#FFFFFF', stroke: '#8EC5E8', 'stroke-width': 0.5 });
+      add('path', { d: 'M-8 -4 Q-9 0 -8 4', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 1.4, 'stroke-linecap': 'round', opacity: 0.8 });
+    }
   }
   // The frame is its own picture, laid over the character and sized (in styles.css) to sit just outside its circle.
   function renderFrame(kind) {
@@ -1510,7 +1615,8 @@
   var PIC_GROUPS = [
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
     ['Clothing', 'outfit', 'chip'], ['Clothing color', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
-    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip']
+    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip'],
+    ['Pet', 'pet', 'chip'], ['Pet color', 'petColor', 'swatch']
   ];
 
   function paintPortrait(avatar, name) {

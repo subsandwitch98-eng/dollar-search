@@ -1619,8 +1619,12 @@
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
     ['Clothing', 'outfit', 'chip'], ['Clothing color', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
     ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip'],
-    ['Pet', 'pet', 'chip'], ['Pet color', 'petColor', 'swatch']
+    ['Pet', 'pet', 'chip', 'pets'], ['Pet color', 'petColor', 'swatch', 'pets']
   ];
+  // The customizer has two tabs: Character (everything without a 4th entry above) and Pets.
+  var PIC_TABS = [['character', 'Character'], ['pets', 'Pets']];
+  var picTab = 'character';
+  function groupTab(g) { return g[3] || 'character'; }
 
   function paintPortrait(avatar, name) {
     portrait.textContent = '';
@@ -1646,6 +1650,7 @@
     picDraft = { character: normalizeCharacter(a ? a.character : DEFAULT_CHAR) };
     editBtn.hidden = true;
     picBtn.hidden = true;
+    picTab = 'character';
     buildPicForm(null);
     picForm.hidden = false;
   });
@@ -1654,19 +1659,54 @@
   function buildPicForm(focusId) {
     var p = current();
     picForm.textContent = '';
+    var onPets = picTab === 'pets';
+
+    // Tabs: Character, then Pets.
+    var tabs = make('div', 'card-tabs pic-tabs');
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Customize');
+    PIC_TABS.forEach(function (t) {
+      var b = make('button', 'card-tab', t[1]);
+      b.type = 'button';
+      b.id = 'pic-tab-' + t[0];
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', picTab === t[0] ? 'true' : 'false');
+      b.tabIndex = picTab === t[0] ? 0 : -1;
+      b.addEventListener('click', function () {
+        if (picTab === t[0]) return;
+        picTab = t[0];
+        buildPicForm('pic-tab-' + t[0]);
+      });
+      b.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        picTab = picTab === 'pets' ? 'character' : 'pets';
+        buildPicForm('pic-tab-' + picTab);
+      });
+      tabs.appendChild(b);
+    });
+    picForm.appendChild(tabs);
+
     var top = make('div', 'pic-top');
-    var preview = make('div', 'pic-preview');
+    var preview = make('div', 'pic-preview' + (onPets ? ' pet-preview' : ''));
     function updatePreview() {
       preview.textContent = '';
-      preview.appendChild(pictureNode(draftAvatar(), p.name));
+      if (onPets) {
+        // The Pets tab previews the pet on its own; the portfolio scene shows it beside the character.
+        if (picDraft.character.pet) preview.appendChild(renderPet(picDraft.character));
+        else preview.appendChild(make('span', 'pet-none', 'No pet'));
+      } else {
+        preview.appendChild(pictureNode(draftAvatar(), p.name));
+      }
       paintPortrait(draftAvatar(), p.name);
     }
     top.appendChild(preview);
-    top.appendChild(make('p', 'pic-note', 'Build your character. Everyone who visits the site can see it.'));
+    top.appendChild(make('p', 'pic-note', onPets
+      ? 'Pick a pet. It sits beside your character on your portfolio.'
+      : 'Build your character. Everyone who visits the site can see it.'));
     picForm.appendChild(top);
 
     var statusEl = statusLine('');
-    PIC_GROUPS.forEach(function (g) {
+    PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
       var key = g[1];
       var group = make('div', 'option-group');
       var label = make('span', 'edit-label', g[0]);
@@ -1699,8 +1739,11 @@
     shuffle.type = 'button';
     shuffle.id = 'pic-shuffle';
     shuffle.style.justifySelf = 'start';
+    // Shuffle only what's on this tab.
     shuffle.addEventListener('click', function () {
-      CHAR_KEYS.forEach(function (k) { picDraft.character[k] = Math.floor(Math.random() * CHAR[k].length); });
+      PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
+        picDraft.character[g[1]] = Math.floor(Math.random() * CHAR[g[1]].length);
+      });
       buildPicForm('pic-shuffle');
     });
     picForm.appendChild(shuffle);

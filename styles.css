@@ -530,6 +530,12 @@ img { max-width: 100%; }
   .edit-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .edit-row:not(:has(> :not([hidden]))) { display: none; }
   .pic-top { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+  /* Customizer tabs: Character, Pets */
+  .pic-tabs { justify-self: start; }
+  .pic-tabs .card-tab { font-size: 0.95rem; padding: 0.45rem 1.2rem; }
+  .pic-preview.pet-preview { background: #FBE3E6; }
+  .pic-preview.pet-preview svg { width: 64%; height: 64%; overflow: visible; }
+  .pet-none { font-weight: 700; color: var(--muted); }
   .pic-preview {
     flex: none; width: 6.5rem; aspect-ratio: 1; border-radius: 50%; overflow: hidden;
     border: 4px solid var(--blush); background: var(--bg);

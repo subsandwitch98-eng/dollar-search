@@ -1644,6 +1644,7 @@
     picForm.hidden = true;
     picForm.textContent = '';
     picDraft = null;
+    profileArt.classList.remove('pet-mode');
   }
   picBtn.addEventListener('click', function () {
     var a = current().avatar;
@@ -1660,6 +1661,8 @@
     var p = current();
     picForm.textContent = '';
     var onPets = picTab === 'pets';
+    // On the Pets tab the portfolio scene shows just the pet, bigger, in its bed.
+    profileArt.classList.toggle('pet-mode', onPets);
 
     // Tabs: Character, then Pets.
     var tabs = make('div', 'card-tabs pic-tabs');

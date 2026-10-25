@@ -162,6 +162,14 @@ img { max-width: 100%; }
   @media (prefers-reduced-motion: no-preference) {
     .art .portfolio-pet { animation: pet-bob 2.6s ease-in-out infinite; }
   }
+  /* While the Pets tab is open: only the pet, bigger, in a pet bed instead of on the books */
+  .art .pet-bed { display: none; position: absolute; left: 15%; bottom: 4%; width: 70%; height: auto; aspect-ratio: 200 / 80; }
+  .art.pet-mode .pet-bed { display: block; }
+  .art.pet-mode .pet-bed-back { z-index: 1; }
+  .art.pet-mode .pet-bed-front { z-index: 3; }
+  .art.pet-mode .portrait,
+  .art.pet-mode .book-scene .books { display: none; }
+  .art.pet-mode .portfolio-pet { z-index: 2; left: 30%; right: auto; bottom: 11%; width: 40%; }
   @keyframes pet-bob {
     0%, 100% { transform: translateY(0) scale(1, 1); }
     50% { transform: translateY(-4%) scale(1.02, 0.98); }

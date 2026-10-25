@@ -18,7 +18,7 @@
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69'],
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
     glasses: ['None', 'Glasses', 'Shades'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
@@ -531,6 +531,51 @@
       add('path', { d: 'M33 60 C33 22 87 22 87 60', fill: 'none', stroke: ink, 'stroke-width': 5, 'stroke-linecap': 'round' });
       add('rect', { x: 27, y: 51, width: 11, height: 18, rx: 5, fill: top });
       add('rect', { x: 82, y: 51, width: 11, height: 18, rx: 5, fill: top });
+    }
+    var topDark = shade(top, -0.25);
+    if (c.headwear === 4) { // Crown, in gold with jewels
+      add('path', { d: 'M41 41 L43 22 L52 31 L60 17 L68 31 L77 22 L79 41 Z', fill: '#F6C945', stroke: '#E0A82E', 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      add('rect', { x: 41, y: 37, width: 38, height: 5, rx: 1.5, fill: '#E0A82E' });
+      add('circle', { cx: 60, cy: 32, r: 2.6, fill: top, stroke: topDark, 'stroke-width': 0.8 });
+      add('circle', { cx: 49, cy: 34, r: 1.6, fill: '#FFFFFF' });
+      add('circle', { cx: 71, cy: 34, r: 1.6, fill: '#FFFFFF' });
+    }
+    if (c.headwear === 5) { // Bow, perched on the right side of the head
+      add('path', { d: 'M74 33 C66 23 57 29 62 37 C65 41 71 38 74 33 Z', fill: top, stroke: topDark, 'stroke-width': 1 });
+      add('path', { d: 'M74 33 C82 23 91 29 86 37 C83 41 77 38 74 33 Z', fill: top, stroke: topDark, 'stroke-width': 1 });
+      add('circle', { cx: 74, cy: 33, r: 3.6, fill: topDark });
+    }
+    if (c.headwear === 6) { // Beret, tilted, with a little stalk
+      add('path', { d: 'M33 45 Q34 26 62 24 Q89 25 87 40 Q81 47 60 46 Q41 47 33 45 Z', fill: top });
+      add('path', { d: 'M38 44 Q60 49 84 41', fill: 'none', stroke: topDark, 'stroke-width': 1.5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M61 24 L62 19', stroke: topDark, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 7) { // Bucket hat
+      add('path', { d: 'M40 46 Q40 25 60 25 Q80 25 80 46 Z', fill: top });
+      add('path', { d: 'M41 42 Q60 38 79 42', fill: 'none', stroke: topDark, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M29 49 Q60 39 91 49 L88 55 Q60 46 32 55 Z', fill: shade(top, -0.12) });
+    }
+    if (c.headwear === 8) { // Top hat, with a band in the clothing color
+      add('rect', { x: 45, y: 9, width: 30, height: 31, rx: 3, fill: '#2E2226' });
+      add('rect', { x: 45, y: 32, width: 30, height: 5, fill: top });
+      add('rect', { x: 35, y: 38, width: 50, height: 6, rx: 3, fill: '#2E2226' });
+    }
+    if (c.headwear === 9) { // Headband over the hair
+      add('path', { d: 'M35 50 Q37 32 60 31 Q83 32 85 50', fill: 'none', stroke: top, 'stroke-width': 5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M40 42 Q46 34 56 32.5', fill: 'none', stroke: shade(top, 0.45), 'stroke-width': 1.5, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 10) { // Flower crown: a vine with leaves and five flowers
+      add('path', { d: 'M35 47 Q60 28 85 47', fill: 'none', stroke: '#6E9F5C', 'stroke-width': 2, 'stroke-linecap': 'round' });
+      [[43, 39, -30], [66, 34, 20], [79, 41, 40]].forEach(function (l) {
+        add('ellipse', { cx: l[0], cy: l[1], rx: 3.4, ry: 1.6, fill: '#7BB37A', transform: 'rotate(' + l[2] + ' ' + l[0] + ' ' + l[1] + ')' });
+      });
+      [[38, 44, '#F7C8D4'], [48, 37, '#FFFFFF'], [60, 34, top], [72, 37, '#FFFFFF'], [82, 44, '#F7C8D4']].forEach(function (fl) {
+        for (var p = 0; p < 5; p++) {
+          var a = (Math.PI * 2 / 5) * p - Math.PI / 2;
+          add('circle', { cx: fl[0] + Math.cos(a) * 2.6, cy: fl[1] + Math.sin(a) * 2.6, r: 2.4, fill: fl[2], stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 0.5 });
+        }
+        add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
+      });
     }
     return svg;
   }

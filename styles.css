@@ -377,6 +377,11 @@ img { max-width: 100%; }
   .tester-wand { display: inline-block; width: 0.75em; height: 0.75em; vertical-align: 0; overflow: visible; }
   .profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
   .friends-tab { background: #ECE6FA; color: #6E58B0; border-radius: 999px; padding: 0.05rem 0.55rem; }
+  /* Your own friends count, next to Followers on your profile (only you see it) */
+  .friends-tab.own-friends {
+    display: inline-flex; align-items: center; font-weight: 700; font-size: 0.9rem;
+    padding: 0.4rem 1rem; border: 1.5px solid #D9CCF5;
+  }
   #profile-filter { justify-self: start; }
 
   /* Likes and followers */

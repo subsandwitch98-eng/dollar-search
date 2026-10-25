@@ -1370,9 +1370,6 @@
     meta.appendChild(make('span', null, plural(p.projects.length, 'research project')));
     meta.appendChild(make('span', null, '♥ ' + countFor(state.likes, p.id)));
     meta.appendChild(make('span', null, plural(countFor(state.follows, p.id), 'follower')));
-    var friendTab = make('span', 'friends-tab', plural(friendCount(p.ownerId), 'friend'));
-    friendTab.title = 'People who follow each other with this portfolio';
-    meta.appendChild(friendTab);
     if (canEdit(p)) meta.appendChild(make('span', 'you-badge', 'Your profile'));
     who.appendChild(meta);
     top.appendChild(avatar);
@@ -2616,6 +2613,10 @@
     } else if (reactNote.textContent === OWN_NOTE) {
       reactNote.hidden = true;
     }
+    // Your friends count is private: it shows only on your own profile, to you.
+    var ownFriends = $('own-friends');
+    ownFriends.hidden = !own;
+    if (own) ownFriends.textContent = plural(friendCount(p.ownerId), 'friend');
     renderFollowers(p);
     renderCollabs(p, own);
   }

@@ -892,6 +892,8 @@
   function showProfile(id, push) {
     if (!findProfile(id)) { showHome(push); return; }
     if (id !== currentId) { followersOpen = false; collabOpen = false; collabNote = ''; }
+    // Close comments opened in Recent research, so the portfolio's own comment boxes are the only ones on the page.
+    if (Object.keys(recentCommentsOpen).length) { recentCommentsOpen = {}; renderRecent(); }
     currentId = id;
     if (push) history.pushState(null, '', location.pathname + '?p=' + encodeURIComponent(id));
     editingId = null;
@@ -944,12 +946,17 @@
   var recentEmpty = $('recent-empty');
   var RECENT_LIMIT = 20;
 
+  var recentCommentsOpen = {}; // research id -> its comments are open in the strip
+
   function recentCard(p, q) {
     var li = make('li', 'recent-item');
-    var b = make('button', 'recent-card');
+    var card = make('article', 'recent-card');
+    // The top of the card opens the portfolio; the like and comment buttons below work right here.
+    var b = make('button', 'recent-open');
     b.type = 'button';
     var fresh = Date.now() - q.createdAt < 24 * 3600000;
     var when = make('span', 'recent-when' + (fresh ? ' fresh' : ''), fresh ? 'New · ' + timeAgo(q.createdAt) : timeAgo(q.createdAt));
+    when.title = 'Published ' + exactTime(q.createdAt);
     b.appendChild(when);
     b.appendChild(make('span', 'recent-title', q.title));
     if (q.description) b.appendChild(make('span', 'recent-desc', q.description));
@@ -962,10 +969,8 @@
     paintName(name, p.name);
     by.appendChild(avatar);
     by.appendChild(name);
-    var likes = state.projectLikes.filter(function (l) { return l.projectId === q.id; }).length;
-    by.appendChild(make('span', 'recent-likes', '♥ ' + likes));
     b.appendChild(by);
-    b.setAttribute('aria-label', q.title + ', by ' + p.name + ', ' + timeAgo(q.createdAt).toLowerCase());
+    b.setAttribute('aria-label', 'Open ' + q.title + ', by ' + p.name + ', ' + timeAgo(q.createdAt).toLowerCase());
     // Opens the portfolio and scrolls to this research card.
     b.addEventListener('click', function () {
       showProfile(p.id, true);
@@ -975,7 +980,25 @@
       target.classList.add('flash');
       setTimeout(function () { target.classList.remove('flash'); }, 1600);
     });
-    li.appendChild(b);
+    card.appendChild(b);
+
+    // Like and comment without leaving the home screen.
+    var comments = state.comments.filter(function (c) { return c.projectId === q.id; });
+    var open = !!recentCommentsOpen[q.id];
+    var tools = make('div', 'project-tools recent-tools');
+    tools.appendChild(researchLikeButton(q));
+    tools.appendChild(researchCommentButton(q, comments.length, open, function () {
+      recentCommentsOpen[q.id] = !recentCommentsOpen[q.id];
+      renderRecent();
+      var box = $('comment-input-' + q.id);
+      if (recentCommentsOpen[q.id] && box) box.focus();
+    }));
+    card.appendChild(tools);
+    if (open) {
+      var owner = findProfile(q.profileId);
+      card.appendChild(commentsPanel(q, comments, !!owner && canEdit(owner)));
+    }
+    li.appendChild(card);
     return li;
   }
   function renderRecent() {
@@ -1554,44 +1577,17 @@
 
     // Footer: research likes for everyone to see; only other people's research can be liked.
     var tools = make('div', 'project-tools');
-    var likes = state.projectLikes.filter(function (l) { return l.projectId === p.id; });
-    var liked = !!me && likes.some(function (l) { return l.userId === me.id; });
-    var like = make('button', 'card-like');
-    like.type = 'button';
-    like.setAttribute('aria-pressed', liked ? 'true' : 'false');
-    like.setAttribute('aria-label', (liked ? 'Unlike ' : 'Like ') + p.title + ', ' + plural(likes.length, 'like'));
-    var heart = make('span', 'card-like-heart', '♥');
-    heart.setAttribute('aria-hidden', 'true');
-    like.appendChild(heart);
-    like.appendChild(make('span', null, String(likes.length)));
-    if (mineToEdit) {
-      like.disabled = true;
-      like.classList.add('own');
-      like.title = "You can't like your own research";
-      like.setAttribute('aria-label', plural(likes.length, 'like') + '. You can’t like your own research.');
-    } else {
-      like.disabled = likingProject === p.id;
-      like.addEventListener('click', function () { toggleProjectLike(p); });
-    }
-    tools.appendChild(like);
+    tools.appendChild(researchLikeButton(p));
 
     // Comments and tips: open a panel under the card.
     var comments = state.comments.filter(function (c) { return c.projectId === p.id; });
     var open = !!commentsOpen[p.id];
-    var talk = make('button', 'card-like card-comment');
-    talk.type = 'button';
-    talk.setAttribute('aria-expanded', open ? 'true' : 'false');
-    talk.setAttribute('aria-controls', 'comments-' + p.id);
-    talk.setAttribute('aria-label', plural(comments.length, 'comment') + ' on ' + p.title);
-    talk.appendChild(bubbleIcon());
-    talk.appendChild(make('span', null, String(comments.length)));
-    talk.addEventListener('click', function () {
+    tools.appendChild(researchCommentButton(p, comments.length, open, function () {
       commentsOpen[p.id] = !commentsOpen[p.id];
       renderProjects();
       var box = $('comment-input-' + p.id);
       if (commentsOpen[p.id] && box) box.focus();
-    });
-    tools.appendChild(talk);
+    }));
 
     if (mineToEdit) {
       var edit = make('button', 'mini-btn', 'Edit');
@@ -1602,6 +1598,48 @@
     card.appendChild(tools);
     if (open) card.appendChild(commentsPanel(p, comments, editable));
     return card;
+  }
+
+  // The ♥ like button on a research card (on portfolios and in Recent research).
+  // Only other people's research can be liked.
+  function researchLikeButton(q) {
+    var likes = state.projectLikes.filter(function (l) { return l.projectId === q.id; });
+    var liked = !!me && likes.some(function (l) { return l.userId === me.id; });
+    var like = make('button', 'card-like');
+    like.type = 'button';
+    like.setAttribute('aria-pressed', liked ? 'true' : 'false');
+    like.setAttribute('aria-label', (liked ? 'Unlike ' : 'Like ') + q.title + ', ' + plural(likes.length, 'like'));
+    var heart = make('span', 'card-like-heart', '♥');
+    heart.setAttribute('aria-hidden', 'true');
+    like.appendChild(heart);
+    like.appendChild(make('span', null, String(likes.length)));
+    if (canEditProject(q)) {
+      like.disabled = true;
+      like.classList.add('own');
+      like.title = "You can't like your own research";
+      like.setAttribute('aria-label', plural(likes.length, 'like') + '. You can’t like your own research.');
+    } else {
+      like.disabled = likingProject === q.id;
+      like.addEventListener('click', function () { toggleProjectLike(q); });
+    }
+    return like;
+  }
+  // The speech-bubble button that opens a research card's comments and tips.
+  function researchCommentButton(q, count, open, onClick) {
+    var talk = make('button', 'card-like card-comment');
+    talk.type = 'button';
+    talk.setAttribute('aria-expanded', open ? 'true' : 'false');
+    talk.setAttribute('aria-controls', 'comments-' + q.id);
+    talk.setAttribute('aria-label', plural(count, 'comment') + ' on ' + q.title);
+    talk.appendChild(bubbleIcon());
+    talk.appendChild(make('span', null, String(count)));
+    talk.addEventListener('click', onClick);
+    return talk;
+  }
+  // Likes and comments can change from a portfolio or from Recent research: redraw whichever is showing.
+  function rerenderResearch() {
+    if (!profileView.hidden && current()) renderProjects();
+    if (!homeView.hidden) renderRecent();
   }
 
   // "Collab with …" under a card's title: everyone working on it except the portfolio you're looking at.
@@ -1754,7 +1792,7 @@
           var del = make('button', 'link-btn comment-delete', armedDelete === c.id ? 'Click again to delete' : 'Delete');
           del.type = 'button';
           del.addEventListener('click', function () {
-            if (armedDelete !== c.id) { armedDelete = c.id; renderProjects(); return; }
+            if (armedDelete !== c.id) { armedDelete = c.id; rerenderResearch(); return; }
             armedDelete = null;
             del.disabled = true;
             // The wand works its magic while the delete is saved; the list updates once both are done.
@@ -1772,7 +1810,7 @@
                 return;
               }
               state.comments = state.comments.filter(function (x) { return x.id !== c.id; });
-              renderProjects();
+              rerenderResearch();
               refresh();
             });
           });
@@ -1863,7 +1901,7 @@
     if (mineIndex >= 0) state.projectLikes.splice(mineIndex, 1);
     else state.projectLikes.push({ userId: me.id, projectId: q.id });
     likingProject = q.id;
-    renderProjects();
+    rerenderResearch();
     var request = mineIndex >= 0
       ? client.from('project_likes').delete().eq('user_id', me.id).eq('project_id', q.id)
       : client.from('project_likes').insert({ project_id: q.id });
@@ -1871,10 +1909,14 @@
       likingProject = null;
       if (res.error) {
         state.projectLikes = before;
-        reactNote.textContent = dbMessage(res.error);
-        reactNote.hidden = false;
+        if (profileView.hidden) {
+          showToast(dbMessage(res.error));
+        } else {
+          reactNote.textContent = dbMessage(res.error);
+          reactNote.hidden = false;
+        }
       }
-      renderProjects();
+      rerenderResearch();
       if (!res.error) refresh();
     });
   }
@@ -2536,13 +2578,23 @@
     items.sort(function (a, b) { return b.time - a.time; });
     return items.slice(0, 30);
   }
+  // How long ago, always rounded down: 3 days and 20 hours is "3 days ago", not 4.
   function timeAgo(t) {
-    var mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+    var mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
     if (mins < 1) return 'Just now';
     if (mins < 60) return plural(mins, 'minute') + ' ago';
-    var hours = Math.round(mins / 60);
+    var hours = Math.floor(mins / 60);
     if (hours < 24) return plural(hours, 'hour') + ' ago';
-    return plural(Math.round(hours / 24), 'day') + ' ago';
+    var days = Math.floor(hours / 24);
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return plural(days, 'day') + ' ago';
+    if (days < 30) return plural(Math.floor(days / 7), 'week') + ' ago';
+    if (days < 365) return plural(Math.floor(days / 30), 'month') + ' ago';
+    return plural(Math.floor(days / 365), 'year') + ' ago';
+  }
+  // The exact date and time, for hover text.
+  function exactTime(t) {
+    return new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   }
   function renderBell() {
     var show = !!client && !!me && loaded && !loadError;
@@ -2796,12 +2848,14 @@
     // Leftover joiners and emoji-style markers from emoji sequences.
     return out === text ? text : out.replace(/[‍️⃣]/g, '');
   }
-  function showEmojiNote() {
+  // A short note that pops up at the bottom of the screen for a moment.
+  function showToast(text) {
     if (!emojiNote) {
-      emojiNote = make('p', 'emoji-note', "Emojis can't be used on Dollar Search.");
+      emojiNote = make('p', 'emoji-note');
       emojiNote.setAttribute('role', 'status');
       document.body.appendChild(emojiNote);
     }
+    emojiNote.textContent = text;
     emojiNote.classList.add('show');
     clearTimeout(emojiNoteTimer);
     emojiNoteTimer = setTimeout(function () { emojiNote.classList.remove('show'); }, 2600);
@@ -2820,7 +2874,7 @@
       var at = Math.max(0, caret - removed);
       el.setSelectionRange(at, at);
     }
-    showEmojiNote();
+    showToast("Emojis can't be used on Dollar Search.");
   }, true);
 
   // ---- Putting it together ----

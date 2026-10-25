@@ -204,14 +204,22 @@ img { max-width: 100%; }
     scroll-snap-type: x proximity; scroll-padding-inline: 0.25rem;
     scrollbar-color: var(--pink) transparent;
   }
+  .recent-strip { align-items: flex-start; }
   .recent-item { flex: 0 0 min(17rem, 80vw); scroll-snap-align: start; display: flex; }
   .recent-card {
-    display: flex; flex-direction: column; gap: 0.45rem; width: 100%; text-align: left; cursor: pointer;
-    font: inherit; color: var(--fg);
+    display: flex; flex-direction: column; gap: 0.75rem; width: 100%; min-height: 15rem;
     background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem;
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: box-shadow 0.15s;
   }
-  .recent-card:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(142, 53, 83, 0.12); }
+  .recent-card:hover { box-shadow: 0 10px 22px rgba(142, 53, 83, 0.12); }
+  /* The top of the card: opens the portfolio */
+  .recent-open {
+    display: flex; flex-direction: column; gap: 0.45rem; flex: 1; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; color: var(--fg); background: none; border: 0; padding: 0; border-radius: 0.9rem;
+  }
+  .recent-open:hover .recent-title { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .recent-tools { margin-top: 0; }
+  .recent-card .comments { margin-top: 0; }
   .recent-when { align-self: flex-start; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
   .recent-when.fresh { background: #F6C945; color: #6B4508; border-radius: 999px; padding: 0.1rem 0.55rem; }
   .recent-title {
@@ -226,7 +234,6 @@ img { max-width: 100%; }
   .avatar.recent-avatar { width: 1.9rem; font-size: 0.85rem; border-width: 2px; --ring: 2px; }
   .recent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--button-fg); }
   .recent-name .dollar { color: var(--accent); }
-  .recent-likes { color: var(--muted); flex: none; }
   /* A research card briefly glows when you arrive from Recent research */
   .project.flash { box-shadow: 0 0 0 3px #F6C945, 0 10px 24px rgba(224, 168, 46, 0.25); transition: box-shadow 0.3s; }
 

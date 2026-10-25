@@ -199,8 +199,9 @@
   }
   function canEdit(p) { return !!me && p.ownerId === me.id; }
   function canRemove(p) { return canEdit(p) || isAdmin; }
+  // Everyone, admins included, gets one portfolio; it can hold any number of research projects.
   function canCreate() {
-    return !!me && (isAdmin || !state.profiles.some(function (p) { return p.ownerId === me.id; }));
+    return !!me && !state.profiles.some(function (p) { return p.ownerId === me.id; });
   }
   function countFor(list, profileId) {
     return list.filter(function (r) { return r.profileId === profileId; }).length;

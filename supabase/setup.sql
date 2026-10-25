@@ -98,7 +98,7 @@ create policy "admins edit settings" on public.site_settings for update to authe
 drop policy if exists "see own admin row" on public.site_admins;
 create policy "see own admin row" on public.site_admins for select to authenticated using (user_id = auth.uid());
 
--- Profiles: everyone reads; you create profiles as yourself (one each, admins any number);
+-- Profiles: everyone reads; you create one profile as yourself (admins too);
 -- you edit only your own; you or an admin can delete.
 drop policy if exists "profiles readable" on public.profiles;
 create policy "profiles readable" on public.profiles for select to anon, authenticated using (true);
@@ -106,7 +106,7 @@ drop policy if exists "create own profile" on public.profiles;
 create policy "create own profile" on public.profiles for insert to authenticated
   with check (
     owner_id = auth.uid()
-    and (public.is_admin() or not exists (select 1 from public.profiles p where p.owner_id = auth.uid()))
+    and not exists (select 1 from public.profiles p where p.owner_id = auth.uid())
   );
 drop policy if exists "edit own profile" on public.profiles;
 create policy "edit own profile" on public.profiles for update to authenticated

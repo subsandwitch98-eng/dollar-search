@@ -319,14 +319,16 @@
       strands(['M44 28 L47 40', 'M60 22 L60 38', 'M76 27 L72 40']);
       shine('M50 33 L56 28');
     }
+    // Side locks for Long, Bob and Wavy start up inside the hair cap (at 33,50 and 46,46 on the left)
+    // so they join it with no gap at the temples.
     if (style === 2 || style === 8) { // Long and Wavy: cap plus locks falling past the ears
       add('path', { d: CAP, fill: hair });
       if (style === 2) {
-        add('path', { d: 'M34 56 Q31 72 35 88 L42 88 Q39 71 41 57 Z', fill: hair });
-        add('path', { d: 'M86 56 Q89 72 85 88 L78 88 Q81 71 79 57 Z', fill: hair });
+        add('path', { d: 'M33 50 Q29 72 35 88 L42 88 Q39 70 41 60 Q42 52 46 46 Z', fill: hair });
+        add('path', { d: 'M87 50 Q91 72 85 88 L78 88 Q81 70 79 60 Q78 52 74 46 Z', fill: hair });
       } else {
-        add('path', { d: 'M34 56 Q29 64 34 72 Q30 80 35 90 L42 90 Q38 80 41 72 Q37 64 41 57 Z', fill: hair });
-        add('path', { d: 'M86 56 Q91 64 86 72 Q90 80 85 90 L78 90 Q82 80 79 72 Q83 64 79 57 Z', fill: hair });
+        add('path', { d: 'M33 50 Q28 62 34 72 Q30 80 35 90 L42 90 Q38 80 41 72 Q38 64 41 58 Q42 51 46 46 Z', fill: hair });
+        add('path', { d: 'M87 50 Q92 62 86 72 Q90 80 85 90 L78 90 Q82 80 79 72 Q82 64 79 58 Q78 51 74 46 Z', fill: hair });
       }
       strands(['M50 35 Q46 42 47 50', 'M70 35 Q74 42 73 50']);
       shine('M42 42 Q50 34 59 33');
@@ -349,8 +351,8 @@
     }
     if (style === 5) { // Bob: chin-length sides
       add('path', { d: CAP, fill: hair });
-      add('path', { d: 'M34 56 Q32 70 37 80 L44 80 Q40 68 42 57 Z', fill: hair });
-      add('path', { d: 'M86 56 Q88 70 83 80 L76 80 Q80 68 78 57 Z', fill: hair });
+      add('path', { d: 'M33 50 Q31 70 37 80 L44 80 Q40 68 41 60 Q42 52 46 46 Z', fill: hair });
+      add('path', { d: 'M87 50 Q89 70 83 80 L76 80 Q80 68 79 60 Q78 52 74 46 Z', fill: hair });
       strands(['M48 36 Q45 44 46 52', 'M72 36 Q75 44 74 52']);
       shine('M42 42 Q50 34 59 33');
     }

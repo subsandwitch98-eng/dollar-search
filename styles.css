@@ -429,6 +429,21 @@ img { max-width: 100%; }
   .shop-buy:disabled { opacity: 0.55; cursor: default; }
   .shop-status { margin-top: 0.4rem; }
   .chip-price { margin-left: 0.25rem; color: #A9760F; font-size: 0.8em; }
+  /* Your inventory in the shop, and bought items in Edit character */
+  .shop-inventory { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.2rem; padding: 0.75rem 0.85rem; background: #FFF8E1; border: 1.5px solid #F6C945; border-radius: 1rem; }
+  .inventory-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .inventory-item {
+    display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.35rem 0.3rem 0.75rem;
+    background: var(--surface); border: 1px solid #F1D98A; border-radius: 999px; font-weight: 700; font-size: 0.88rem; color: var(--fg);
+  }
+  .inventory-dot { width: 1rem; height: 1rem; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
+  .chip.shop-owned { display: inline-flex; align-items: center; gap: 0.3rem; border-color: #E0A82E; }
+  .owned-mark { color: #E0A82E; font-size: 0.85em; line-height: 1; }
+  .swatch.shop-owned { position: relative; box-shadow: 0 0 0 2px #F6C945; }
+  .swatch.shop-owned[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+  .swatch.shop-owned .owned-mark {
+    position: absolute; right: -0.35rem; top: -0.4rem; font-size: 0.8rem; text-shadow: 0 0 2px #fff, 0 0 2px #fff;
+  }
   .swatch.shop-locked { position: relative; opacity: 0.55; cursor: not-allowed; }
   .swatch.shop-locked .lock-icon {
     position: absolute; right: -0.3rem; bottom: -0.3rem; width: 0.95rem; height: 0.95rem; padding: 0.1rem;

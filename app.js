@@ -123,9 +123,15 @@
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
-        // The Star Shop is optional: until its table exists, the cart stays hidden.
-        shopReady = !extra[2].error;
-        state.purchases = extra[2].error ? [] : extra[2].data.map(function (r) { return { item: r.item, price: r.price }; });
+        // The Star Shop is optional: until its table exists, buying stays off.
+        // If reloading purchases fails after they've loaded once, keep the ones we already know about
+        // so bought items never disappear from the page.
+        if (!extra[2].error) {
+          shopReady = true;
+          state.purchases = extra[2].data.map(function (r) { return { item: r.item, price: r.price }; });
+        } else if (!state.purchases.length) {
+          shopReady = false;
+        }
       });
     });
   }
@@ -1962,6 +1968,7 @@
     $('shop-balance').textContent = '★ ' + stars;
     $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
     var open = shopOpen();
+    renderInventory();
     $('shop-limited').classList.toggle('ended', !open);
     $('shop-limited-text').textContent = open
       ? 'The Halloween items leave the shop on October 31, 2026. ' + shopTimeLeft()
@@ -1985,8 +1992,8 @@
       var b = make('button', 'btn ' + (owned ? 'btn-ghost' : 'btn-solid') + ' shop-buy');
       b.type = 'button';
       if (owned) {
-        b.textContent = 'Owned';
-        b.disabled = true;
+        b.textContent = 'Owned · Wear it';
+        b.addEventListener('click', function () { wearItem(item); });
       } else {
         b.textContent = '★ ' + item.price + ' · Buy';
         b.disabled = !shopReady || !open || !!buying || stars < item.price;
@@ -1996,6 +2003,43 @@
       li.appendChild(b);
       list.appendChild(li);
     });
+  }
+  // Your inventory at the top of the shop: everything you've bought, each with a Wear it button.
+  function renderInventory() {
+    var box = $('shop-inventory');
+    var list = $('shop-inventory-list');
+    var owned = SHOP.filter(ownsItem);
+    box.hidden = !owned.length;
+    list.textContent = '';
+    owned.forEach(function (item) {
+      var li = make('li', 'inventory-item');
+      if (item.key === 'hairColor' || item.key === 'top') {
+        var dot = make('span', 'inventory-dot');
+        dot.style.background = CHAR[item.key][item.index];
+        li.appendChild(dot);
+      }
+      li.appendChild(make('span', 'inventory-name', item.name));
+      var wear = make('button', 'mini-btn', 'Wear it');
+      wear.type = 'button';
+      wear.setAttribute('aria-label', 'Wear the ' + item.name.toLowerCase());
+      wear.addEventListener('click', function () { wearItem(item); });
+      li.appendChild(wear);
+      list.appendChild(li);
+    });
+  }
+  // Opens Edit character on your portfolio with the item already picked, ready to save.
+  function wearItem(item) {
+    var mp = myProfile();
+    if (!mp) { showToast('Make your portfolio first, then you can wear your items.'); return; }
+    closeShop();
+    if (currentId !== mp.id) showProfile(mp.id, true);
+    if (picForm.hidden) picBtn.click();
+    picDraft.character[item.key] = item.index;
+    picTab = 'character';
+    buildPicForm(null);
+    var label = $('pic-label-' + item.key);
+    if (label) label.parentNode.scrollIntoView({ block: 'center' });
+    showToast('Wearing the ' + item.name.toLowerCase() + '. Click Save character to keep it.');
   }
   function buyItem(item) {
     if (!shopReady || !shopOpen() || buying || starBalance() < item.price) return;
@@ -2009,8 +2053,8 @@
         renderShop();
         return;
       }
-      state.purchases.push({ item: item.id, price: item.price });
-      $('shop-status').textContent = 'You bought the ' + item.name.toLowerCase() + '! Pick it in Edit character.';
+      if (!ownsItem(item)) state.purchases.push({ item: item.id, price: item.price });
+      $('shop-status').textContent = 'You bought the ' + item.name.toLowerCase() + '! It’s in Your items at the top. Click Wear it to put it on.';
       renderCart();
       renderShop();
       if (!picForm.hidden) buildPicForm(null);
@@ -2160,6 +2204,12 @@
           }
           b.title = 'Buy in the Star Shop for ' + plural(shopItem.price, 'star');
           b.setAttribute('aria-label', shopItem.name + ', locked. Buy it in the Star Shop for ' + plural(shopItem.price, 'star') + '.');
+        } else if (shopItem && ownsItem(shopItem)) {
+          // Bought from the Star Shop: marked with a gold star so it's easy to find.
+          b.classList.add('shop-owned');
+          b.appendChild(make('span', 'owned-mark', '★'));
+          b.title = shopItem.name + ' (from the Star Shop)';
+          b.setAttribute('aria-label', shopItem.name + ', from the Star Shop');
         }
         b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
         b.dataset.option = i; // the option's number (some options can be left out, so it isn't always the button's position)

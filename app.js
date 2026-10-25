@@ -20,7 +20,7 @@
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
-    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry'],
+    face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
   };
   var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg'];
@@ -448,7 +448,7 @@
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
-    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry.
+    // Faces: 0 Smile, 1 Grin, 2 Cool, 3 Wink, 4 Happy, 5 Laugh, 6 Surprised, 7 Tongue, 8 Sleepy, 9 Starry, 10 Smirk.
     // Eyes sit at (51,58) and (69,58). Tinted lenses (Shades, Hearts, Stars, Aviators) cover them, so the eyes are skipped then.
     var tinted = c.glasses === 2 || c.glasses === 5 || c.glasses === 6 || c.glasses === 7;
     var f = c.face;
@@ -484,6 +484,16 @@
       } else {
         eyeDots(f === 6 ? 3.2 : 2.6);
       }
+      if (f === 10) { // Smirk: heavy lids for a knowing look
+        add('path', { d: 'M47.5 56.2 Q51 55 54.5 56.2', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+        add('path', { d: 'M65.5 56.2 Q69 55 72.5 56.2', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+      }
+    }
+    if (f === 10) { // Smirk: one eyebrow raised, a lopsided half-smile with a dimple
+      add('path', { d: 'M47 51.5 L55 50.8', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+      add('path', { d: 'M65 50.5 Q69 46.8 73 49.2', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+      add('path', line('M53.5 69 Q60 70.2 66.5 66.2'));
+      add('path', { d: 'M66.8 64.4 Q68.6 65.6 67.8 67.6', fill: 'none', stroke: ink, 'stroke-width': 1.4, 'stroke-linecap': 'round' });
     }
     if (f === 6) { // Surprised: raised eyebrows
       add('path', { d: 'M47 50 Q51 47 55 50', fill: 'none', stroke: ink, 'stroke-width': 1.8, 'stroke-linecap': 'round' });

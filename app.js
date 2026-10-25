@@ -1086,6 +1086,8 @@
   var filterAll = $('filter-all');
   var filterFollowing = $('filter-following');
   var filterFriends = $('filter-friends');
+  var profileSearch = $('profile-search');
+  profileSearch.addEventListener('input', function () { renderHome(); });
   var homeFilter = 'all'; // 'all', 'following' or 'friends'
   var addingProfile = false;
 
@@ -1336,12 +1338,22 @@
     filterFollowing.textContent = 'Following (' + followed.length + ')';
     filterFriends.textContent = 'Friends (' + friendList.length + ')';
     var shown = homeFilter === 'following' ? followed : homeFilter === 'friends' ? friendList : list;
+    // The search box narrows the list to names or descriptions that contain what you typed.
+    var query = profileSearch.value.trim().toLowerCase();
+    if (query) {
+      shown = shown.filter(function (p) {
+        return (p.name + ' ' + p.description).toLowerCase().indexOf(query) >= 0;
+      });
+    }
+    profilesEmpty.textContent = query
+      ? 'No profiles match “' + profileSearch.value.trim() + '”.'
+      : 'No profiles yet. Be the first to create one.';
 
     profileList.textContent = '';
     if (!loaded || loadError || !client) { profilesEmpty.hidden = true; return; }
     shown.forEach(function (p) { profileList.appendChild(profileCard(p)); });
     var addCard = null;
-    if (homeFilter === 'all') {
+    if (homeFilter === 'all' && !query) {
       if (canCreate()) addCard = addingProfile ? newProfileForm() : addProfileCard('+ Create my profile', false);
       else if (!me) addCard = addProfileCard('+ Create your profile', true);
     }

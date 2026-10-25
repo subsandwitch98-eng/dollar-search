@@ -107,6 +107,11 @@
       <div class="wrap">
         <div class="section-head">
           <h2>Profiles</h2>
+          <div class="profile-search" role="search">
+            <svg class="profile-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            <label class="sr-only" for="profile-search">Search profiles</label>
+            <input id="profile-search" type="search" placeholder="Search profiles by name or description" maxlength="60" autocomplete="off">
+          </div>
           <div class="card-tabs" id="profile-filter" role="group" aria-label="Show profiles" hidden>
             <button class="card-tab" id="filter-all" type="button" aria-pressed="true">All</button>
             <button class="card-tab" id="filter-following" type="button" aria-pressed="false">Following</button>

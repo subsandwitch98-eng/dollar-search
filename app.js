@@ -1648,7 +1648,8 @@
   function petProgress(p, kind) {
     var u = PET_UNLOCKS[kind];
     if (!u) return null;
-    var have = Math.min(u[1](p), u[2]);
+    // The site owner's portfolio has every pet unlocked.
+    var have = cfg.ownerProfileId && p.id === cfg.ownerProfileId ? u[2] : Math.min(u[1](p), u[2]);
     return { task: u[0], have: have, goal: u[2], unlocked: have >= u[2] };
   }
   function lockIcon() {

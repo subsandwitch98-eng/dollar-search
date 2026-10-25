@@ -903,7 +903,8 @@
   var filterEl = $('profile-filter');
   var filterAll = $('filter-all');
   var filterFollowing = $('filter-following');
-  var homeFilter = 'all';
+  var filterFriends = $('filter-friends');
+  var homeFilter = 'all'; // 'all', 'following' or 'friends'
   var addingProfile = false;
 
   function renderHome() {
@@ -921,14 +922,18 @@
       loadNote.hidden = loaded && !loadError;
     }
 
-    // "Following" shows up once you follow at least one profile.
+    // "Following" shows up once you follow at least one profile; "Friends" once someone follows you back.
     var followed = list.filter(function (p) { return mine(state.follows, p.id); });
+    var friendList = followed.filter(function (p) { return areFriends(me.id, p.ownerId); });
     filterEl.hidden = !followed.length;
-    if (!followed.length) homeFilter = 'all';
+    filterFriends.hidden = !friendList.length;
+    if (!followed.length || (homeFilter === 'friends' && !friendList.length)) homeFilter = 'all';
     filterAll.setAttribute('aria-pressed', homeFilter === 'all' ? 'true' : 'false');
     filterFollowing.setAttribute('aria-pressed', homeFilter === 'following' ? 'true' : 'false');
+    filterFriends.setAttribute('aria-pressed', homeFilter === 'friends' ? 'true' : 'false');
     filterFollowing.textContent = 'Following (' + followed.length + ')';
-    var shown = homeFilter === 'following' ? followed : list;
+    filterFriends.textContent = 'Friends (' + friendList.length + ')';
+    var shown = homeFilter === 'following' ? followed : homeFilter === 'friends' ? friendList : list;
 
     profileList.textContent = '';
     if (!loaded || loadError || !client) { profilesEmpty.hidden = true; return; }
@@ -944,6 +949,7 @@
   }
   filterAll.addEventListener('click', function () { homeFilter = 'all'; renderHome(); });
   filterFollowing.addEventListener('click', function () { homeFilter = 'following'; renderHome(); });
+  filterFriends.addEventListener('click', function () { homeFilter = 'friends'; renderHome(); });
 
   function profileCard(p) {
     var card = make('article', 'profile-card');

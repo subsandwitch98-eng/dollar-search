@@ -525,3 +525,6 @@ img { max-width: 100%; }
 .write-art .k1 { left: 12%; top: 78%; }
 .write-art .k2 { left: 84%; top: 10%; width: 6%; }
 .write-art .k3 { left: 85%; top: 80%; width: 4%; }
+
+/* On your own portfolio the like and follow buttons only show counts */
+.react-btn.own { opacity: 0.6; }

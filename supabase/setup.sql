@@ -129,18 +129,27 @@ drop policy if exists "owner deletes projects" on public.projects;
 create policy "owner deletes projects" on public.projects for delete to authenticated
   using (exists (select 1 from public.profiles p where p.id = profile_id and p.owner_id = auth.uid()));
 
--- Likes and follows: everyone reads the counts; you like or follow only as yourself, and undo only your own.
+-- Likes and follows: everyone reads the counts; you like or follow only as yourself, never your own
+-- portfolio, and undo only your own.
 drop policy if exists "likes readable" on public.likes;
 create policy "likes readable" on public.likes for select to anon, authenticated using (true);
 drop policy if exists "like as yourself" on public.likes;
-create policy "like as yourself" on public.likes for insert to authenticated with check (user_id = auth.uid());
+create policy "like as yourself" on public.likes for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and not exists (select 1 from public.profiles p where p.id = profile_id and p.owner_id = auth.uid())
+  );
 drop policy if exists "unlike your own" on public.likes;
 create policy "unlike your own" on public.likes for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "follows readable" on public.follows;
 create policy "follows readable" on public.follows for select to anon, authenticated using (true);
 drop policy if exists "follow as yourself" on public.follows;
-create policy "follow as yourself" on public.follows for insert to authenticated with check (user_id = auth.uid());
+create policy "follow as yourself" on public.follows for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and not exists (select 1 from public.profiles p where p.id = profile_id and p.owner_id = auth.uid())
+  );
 drop policy if exists "unfollow your own" on public.follows;
 create policy "unfollow your own" on public.follows for delete to authenticated using (user_id = auth.uid());
 

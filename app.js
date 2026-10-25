@@ -1165,13 +1165,23 @@
     setReactButton(likeBtn, liked, '♥', liked ? 'Liked' : 'Like', String(countFor(state.likes, p.id)));
     setReactButton(followBtn, following, following ? '✓' : '+', following ? 'Following' : 'Follow',
       plural(countFor(state.follows, p.id), 'follower'));
-    likeBtn.disabled = writingReaction;
-    followBtn.disabled = writingReaction;
+    // You see the counts on your own portfolio but can't like or follow it.
+    var own = canEdit(p);
+    likeBtn.disabled = own || writingReaction;
+    followBtn.disabled = own || writingReaction;
+    likeBtn.classList.toggle('own', own);
+    followBtn.classList.toggle('own', own);
+    if (own) {
+      reactNote.textContent = "You can't like or follow your own portfolio.";
+      reactNote.hidden = false;
+    } else if (reactNote.textContent === "You can't like or follow your own portfolio.") {
+      reactNote.hidden = true;
+    }
   }
   function toggleReaction(table) {
     if (!me) { openAuth('signin', 'Sign in to like and follow profiles.'); return; }
     var p = current();
-    if (!p || writingReaction) return;
+    if (!p || writingReaction || canEdit(p)) return;
     var list = table === 'likes' ? state.likes : state.follows;
     var had = !!mine(list, p.id);
     writingReaction = true;

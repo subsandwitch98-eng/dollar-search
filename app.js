@@ -15,15 +15,15 @@
     // New styles and colors go on the end of each list so characters people already saved keep their look.
     hairStyle: ['Short', 'Spiky', 'Long', 'Bun', 'Curly', 'Bob', 'Ponytail', 'Pigtails', 'Wavy', 'Afro', 'Buzz', 'Mohawk'],
     bangs: ['None', 'Straight', 'Side', 'Wispy', 'Curtain', 'Blunt', 'Swoop', 'Choppy', 'Baby', 'Wavy', 'Clipped'],
-    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#C9CCD6'],
+    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#7B4FA0'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
-      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#E8B93A'],
+      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#F28C28'],
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Halo', 'Cat ears', 'Wizard hat'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Gold', 'Moon'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts'],
     pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish'],
     petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
   };
@@ -431,24 +431,31 @@
         ['M60 110 C68 102 78 104 76 111 C74 117 66 115 60 110 Z', '#E26D8E']
       ].forEach(function (b) { add('path', { d: b[0], fill: b[1], transform: bow }); });
       add('circle', { cx: 60, cy: 110, r: 3.4, fill: '#C25F7E', transform: bow });
-    } else if (kind === 8) { // Star Shop: gold ring set with little gems
-      ring(M, '#F6C945', FRAME_WIDTH);
-      ring(FRAME_INNER + 0.7, '#E0A82E', 1.4);
-      ring(59.3, '#E0A82E', 1.4);
-      var gems = ['#F29BB2', '#8EC5E8', '#9BD3AE', '#B9A6E8'];
-      around(8, M, 0, function (x, y, deg, i) {
-        add('path', { d: 'M' + fx(x) + ' ' + fx(y - 3.6) + ' L' + fx(x + 3) + ' ' + fx(y) + ' L' + fx(x) + ' ' + fx(y + 3.6) + ' L' + fx(x - 3) + ' ' + fx(y) + ' Z',
-          fill: gems[i % 4], stroke: '#FFFDF2', 'stroke-width': 0.8, transform: 'rotate(' + deg + ' ' + fx(x) + ' ' + fx(y) + ')' });
+    } else if (kind === 8) { // Star Shop Halloween: a soft orange ring of smiling jack-o'-lanterns
+      ring(M, '#F7B267', FRAME_WIDTH);
+      around(8, M, 22.5, function (x, y) {
+        add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#8BBF4A' });
       });
-      around(8, M, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.1, fill: '#FFFDF2' }); });
-    } else if (kind === 9) { // Star Shop: night-sky ring with a crescent moon at the top
-      ring(M, '#2F3A6E', FRAME_WIDTH);
-      around(14, M, 12, function (x, y, deg, i) {
-        if (i % 2) add('circle', { cx: fx(x), cy: fx(y), r: 0.9, fill: '#FFFDF2' });
-        else add('polygon', { points: starPoints(x, y, i % 4 ? 2.4 : 3.2), fill: '#F6E08E' });
+      around(8, M, 0, function (x, y) {
+        add('rect', { x: fx(x - 0.7), y: fx(y - 6.4), width: 1.4, height: 2.6, rx: 0.5, fill: '#6B8E3A' });
+        add('ellipse', { cx: fx(x), cy: fx(y), rx: 4.8, ry: 4.2, fill: '#F28C28', stroke: '#C9661A', 'stroke-width': 0.7 });
+        add('path', { d: 'M' + fx(x - 2.4) + ' ' + fx(y - 0.4) + ' l1 -1.6 l1 1.6 Z M' + fx(x + 0.4) + ' ' + fx(y - 0.4) + ' l1 -1.6 l1 1.6 Z', fill: '#5A2E0E' });
+        add('path', { d: 'M' + fx(x - 2.2) + ' ' + fx(y + 1.2) + ' Q' + fx(x) + ' ' + fx(y + 3.2) + ' ' + fx(x + 2.2) + ' ' + fx(y + 1.2), fill: 'none', stroke: '#5A2E0E', 'stroke-width': 0.8, 'stroke-linecap': 'round' });
       });
-      add('circle', { cx: 60, cy: 60 - M, r: 5, fill: '#F6E08E' });
-      add('circle', { cx: 62.6, cy: 60 - M - 1.6, r: 4.3, fill: '#2F3A6E' });
+    } else if (kind === 9) { // Star Shop Halloween: a purple night ring with little ghosts and stars
+      ring(M, '#4A3560', FRAME_WIDTH);
+      around(12, M, 15, function (x, y, deg, i) {
+        if (i % 2) add('circle', { cx: fx(x), cy: fx(y), r: 0.9, fill: '#F7B267' });
+        else add('polygon', { points: starPoints(x, y, 2.2), fill: '#F6E08E' });
+      });
+      around(6, M, 0, function (x, y) {
+        add('path', { d: 'M' + fx(x - 3.8) + ' ' + fx(y + 4) + ' V' + fx(y - 0.8) + ' A3.8 3.8 0 0 1 ' + fx(x + 3.8) + ' ' + fx(y - 0.8) +
+          ' V' + fx(y + 4) + ' L' + fx(x + 2.5) + ' ' + fx(y + 2.8) + ' L' + fx(x + 1.3) + ' ' + fx(y + 4) + ' L' + fx(x) + ' ' + fx(y + 2.8) +
+          ' L' + fx(x - 1.3) + ' ' + fx(y + 4) + ' L' + fx(x - 2.5) + ' ' + fx(y + 2.8) + ' Z', fill: '#FFFDF7' });
+        add('circle', { cx: fx(x - 1.3), cy: fx(y - 0.6), r: 0.6, fill: '#3A2A30' });
+        add('circle', { cx: fx(x + 1.3), cy: fx(y - 0.6), r: 0.6, fill: '#3A2A30' });
+        add('ellipse', { cx: fx(x), cy: fx(y + 1), rx: 0.7, ry: 0.9, fill: '#3A2A30' });
+      });
     }
   }
 
@@ -903,26 +910,33 @@
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
     }
-    // Star Shop headwear: 11 Halo, 12 Cat ears, 13 Wizard hat.
-    if (c.headwear === 11) { // A glowing gold halo floating above the head
-      add('ellipse', { cx: 60, cy: 19, rx: 17, ry: 4.8, fill: 'none', stroke: '#FFF3C4', 'stroke-width': 6, opacity: 0.7 });
-      add('ellipse', { cx: 60, cy: 19, rx: 17, ry: 4.8, fill: 'none', stroke: '#F6C945', 'stroke-width': 3 });
-      add('path', { d: 'M48 16.5 Q54 14.6 60 14.4', fill: 'none', stroke: '#FFFDF2', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+    // Star Shop Halloween headwear: 11 Witch hat, 12 Pumpkin hat, 13 Bat headband.
+    if (c.headwear === 11) { // A bent witch hat with an orange band and a gold buckle
+      add('ellipse', { cx: 60, cy: 34, rx: 31, ry: 6.5, fill: '#2E2440' });
+      add('path', { d: 'M43 33 Q52 18 58 9 Q61 3 69 1 Q64 8 66 16 Q70 26 77 33 Z', fill: '#463461' });
+      add('path', { d: 'M44.5 30.5 Q60 26 75.5 30.5 L77 33 Q60 28.5 43 33 Z', fill: '#F28C28' });
+      add('rect', { x: 56.2, y: 27.6, width: 7.6, height: 4.6, rx: 1, fill: 'none', stroke: '#F6C945', 'stroke-width': 1.4 });
+      add('circle', { cx: 63, cy: 14, r: 1.2, fill: '#B9A6E8' });
+      add('circle', { cx: 57, cy: 21, r: 0.9, fill: '#B9A6E8' });
     }
-    if (c.headwear === 12) { // Cat ears on a headband, in the clothing color
-      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: shade(top, -0.15), 'stroke-width': 3.4, 'stroke-linecap': 'round' });
-      add('path', { d: 'M37 37 L40 17 L53 30 Z', fill: top, stroke: shade(top, -0.3), 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
-      add('path', { d: 'M83 37 L80 17 L67 30 Z', fill: top, stroke: shade(top, -0.3), 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
-      add('path', { d: 'M40.5 33 L42 22 L49 29.5 Z', fill: '#F7A8C0' });
-      add('path', { d: 'M79.5 33 L78 22 L71 29.5 Z', fill: '#F7A8C0' });
+    if (c.headwear === 12) { // A little smiling pumpkin sitting on top of the head (drawn small, then scaled up from its base)
+      var pk = 'translate(60 34) scale(1.4) translate(-60 -34)';
+      add('ellipse', { cx: 52.5, cy: 27, rx: 6.5, ry: 7, fill: '#E07A1F', transform: pk });
+      add('ellipse', { cx: 67.5, cy: 27, rx: 6.5, ry: 7, fill: '#E07A1F', transform: pk });
+      add('ellipse', { cx: 60, cy: 26.5, rx: 8.5, ry: 8, fill: '#F28C28', transform: pk });
+      add('path', { d: 'M55 20 Q53.5 26.5 55 33 M65 20 Q66.5 26.5 65 33', fill: 'none', stroke: '#C9661A', 'stroke-width': 1, 'stroke-linecap': 'round', transform: pk });
+      add('rect', { x: 58.6, y: 15, width: 2.8, height: 5, rx: 1, fill: '#6B8E3A', transform: pk });
+      add('ellipse', { cx: 64.5, cy: 17, rx: 3.6, ry: 1.8, fill: '#8BBF4A', transform: pk + ' rotate(-25 64.5 17)' });
+      add('path', { d: 'M55.6 25.6 L57.2 22.8 L58.8 25.6 Z M61.2 25.6 L62.8 22.8 L64.4 25.6 Z', fill: '#5A2E0E', transform: pk });
+      add('path', { d: 'M55.5 28.4 Q60 31.6 64.5 28.4', fill: 'none', stroke: '#5A2E0E', 'stroke-width': 1.3, 'stroke-linecap': 'round', transform: pk });
     }
-    if (c.headwear === 13) { // A tall, slightly bent wizard hat with gold stars
-      add('ellipse', { cx: 60, cy: 34, rx: 31, ry: 6.5, fill: '#3F3A8F' });
-      add('path', { d: 'M43 33 Q52 18 58 9 Q61 3 69 1 Q64 8 66 16 Q70 26 77 33 Z', fill: '#5547B5' });
-      add('path', { d: 'M44.5 30.5 Q60 26 75.5 30.5 L77 33 Q60 28.5 43 33 Z', fill: '#F6C945' });
-      add('polygon', { points: starPoints(56, 20, 3.4), fill: '#F6C945' });
-      add('polygon', { points: starPoints(65, 12, 2.4), fill: '#FFF3C4' });
-      add('circle', { cx: 61, cy: 25.5, r: 1.1, fill: '#FFF3C4' });
+    if (c.headwear === 13) { // A headband with two little bat wings
+      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#2E2440', 'stroke-width': 3.4, 'stroke-linecap': 'round' });
+      add('path', { d: 'M51 31 Q45 21 35 23 Q38.5 26.5 37.5 30 Q41 28.8 43 32.5 Q46.5 29.8 51 31 Z', fill: '#3A2E4F' });
+      add('path', { d: 'M69 31 Q75 21 85 23 Q81.5 26.5 82.5 30 Q79 28.8 77 32.5 Q73.5 29.8 69 31 Z', fill: '#3A2E4F' });
+      add('circle', { cx: 60, cy: 28, r: 2.6, fill: '#3A2E4F' });
+      add('circle', { cx: 59, cy: 27.6, r: 0.6, fill: '#F6C945' });
+      add('circle', { cx: 61, cy: 27.6, r: 0.6, fill: '#F6C945' });
     }
     return svg;
   }
@@ -1886,14 +1900,15 @@
 
   // ---- Star Shop: stars come from likes, and buy items for your character ----
   // Prices must match buy_shop_item() in supabase/star-shop.sql, which is what actually checks them.
+  // The Halloween collection.
   var SHOP = [
-    { id: 'gold-top', name: 'Gold outfit color', kind: 'Clothing color', key: 'top', index: 17, price: 1 },
-    { id: 'silver-hair', name: 'Silver hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1 },
-    { id: 'cat-ears', name: 'Cat ears', kind: 'Headwear', key: 'headwear', index: 12, price: 2 },
-    { id: 'halo', name: 'Halo', kind: 'Headwear', key: 'headwear', index: 11, price: 2 },
-    { id: 'wizard-hat', name: 'Wizard hat', kind: 'Headwear', key: 'headwear', index: 13, price: 4 },
-    { id: 'moon-frame', name: 'Moon frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
-    { id: 'gold-frame', name: 'Gold frame', kind: 'Frame', key: 'frame', index: 8, price: 5 }
+    { id: 'pumpkin-top', name: 'Pumpkin orange outfit', kind: 'Clothing color', key: 'top', index: 17, price: 1 },
+    { id: 'witchy-hair', name: 'Witchy purple hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1 },
+    { id: 'bat-headband', name: 'Bat headband', kind: 'Headwear', key: 'headwear', index: 13, price: 2 },
+    { id: 'pumpkin-hat', name: 'Pumpkin hat', kind: 'Headwear', key: 'headwear', index: 12, price: 3 },
+    { id: 'witch-hat', name: 'Witch hat', kind: 'Headwear', key: 'headwear', index: 11, price: 4 },
+    { id: 'ghost-frame', name: 'Ghost frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
+    { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 }
   ];
   function shopItemFor(key, index) {
     return SHOP.filter(function (s) { return s.key === key && s.index === index; })[0] || null;

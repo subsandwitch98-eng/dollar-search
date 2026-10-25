@@ -378,13 +378,13 @@ begin
   end if;
   -- Prices live here so the website can't change them. Keep in step with SHOP in app.js.
   cost := case item_id
-    when 'gold-top' then 1
-    when 'silver-hair' then 1
-    when 'cat-ears' then 2
-    when 'halo' then 2
-    when 'wizard-hat' then 4
-    when 'moon-frame' then 4
-    when 'gold-frame' then 5
+    when 'pumpkin-top' then 1
+    when 'witchy-hair' then 1
+    when 'bat-headband' then 2
+    when 'pumpkin-hat' then 3
+    when 'witch-hat' then 4
+    when 'ghost-frame' then 4
+    when 'pumpkin-frame' then 5
     else null
   end;
   if cost is null then

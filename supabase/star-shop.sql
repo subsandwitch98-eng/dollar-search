@@ -4,6 +4,8 @@
 -- buy_shop_item(), which checks the price and that you have enough stars, so nobody can give
 -- themselves items for free.
 -- Run once in Supabase: SQL Editor -> New query -> paste this whole file -> Run. Safe to run again.
+-- Note: supabase/more-features.sql replaces buy_shop_item() with a newer version (Fall and Winter items,
+-- gifts and daily stars). If you ever run this file again, run more-features.sql right after it.
 
 create table if not exists public.shop_purchases (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,

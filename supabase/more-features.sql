@@ -361,3 +361,55 @@ end;
 $$;
 revoke all on function public.gift_stars(uuid, int) from public;
 grant execute on function public.gift_stars(uuid, int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Reports: anyone signed in can report a comment, a portfolio or a research card. Only the site owner sees them all.
+-- ---------------------------------------------------------------------------
+create table if not exists public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  kind text not null check (kind in ('comment', 'profile', 'project')),
+  target_id uuid not null,
+  reason text not null default '' check (char_length(reason) <= 300),
+  created_at timestamptz not null default now(),
+  unique (reporter, kind, target_id)
+);
+alter table public.reports enable row level security;
+drop policy if exists "send reports" on public.reports;
+create policy "send reports" on public.reports for insert to authenticated with check (reporter = auth.uid());
+drop policy if exists "see your reports or all as owner" on public.reports;
+create policy "see your reports or all as owner" on public.reports for select to authenticated
+  using (reporter = auth.uid() or public.is_admin());
+drop policy if exists "owner clears reports" on public.reports;
+create policy "owner clears reports" on public.reports for delete to authenticated using (public.is_admin());
+grant select, insert, delete on public.reports to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Owner tools: delete spam research, gift stars, and see who has signed up.
+-- ---------------------------------------------------------------------------
+drop policy if exists "owner deletes any research" on public.projects;
+create policy "owner deletes any research" on public.projects for delete to authenticated using (public.is_admin());
+
+drop policy if exists "owner gives stars" on public.star_gifts;
+create policy "owner gives stars" on public.star_gifts for insert to authenticated
+  with check (public.is_admin() and from_user is null);
+grant insert (user_id, reason, stars) on public.star_gifts to authenticated;
+
+-- Everyone who has made an account, newest first. Only the site owner can call this.
+create or replace function public.admin_users()
+returns table (id uuid, email text, created_at timestamptz, last_sign_in_at timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only the site owner can see this.';
+  end if;
+  return query
+    select u.id, u.email::text, u.created_at, u.last_sign_in_at from auth.users u order by u.created_at desc;
+end;
+$$;
+revoke all on function public.admin_users() from public, anon;
+grant execute on function public.admin_users() to authenticated;

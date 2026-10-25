@@ -55,7 +55,7 @@
 
   // ---- State, loaded from the database ----
   var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
-    reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [] };
+    reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [], reports: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
@@ -63,6 +63,7 @@
   var reactionsReady = false; // true once research reactions (Inspiring, Smart, Well-sourced) have loaded
   var messagesReady = false;  // true once messages with friends have loaded
   var notesReady = false;     // true once team notes have loaded
+  var reportsReady = false;   // true once reports can be sent (and, for the site owner, read)
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -171,6 +172,7 @@
         isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = [];
         messagesReady = false; notesReady = false; state.messages = []; state.notes = {};
         giftingReady = false; state.starsGiven = 0; state.giftsReceived = [];
+        reportsReady = false; state.reports = [];
         return;
       }
       return Promise.all([
@@ -184,7 +186,8 @@
         client.from('star_claims').select('day').eq('user_id', me.id),
         client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false }),
         client.from('messages').select('id, from_user, to_user, body, created_at, read_at').order('created_at'),
-        client.from('collab_notes').select('project_id, body, updated_by, updated_at')
+        client.from('collab_notes').select('project_id, body, updated_by, updated_at'),
+        client.from('reports').select('id, reporter, kind, target_id, reason, created_at').order('created_at', { ascending: false })
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -221,6 +224,13 @@
         if (!extra[6].error) {
           state.messages = extra[6].data.map(function (m) {
             return { id: m.id, from: m.from_user, to: m.to_user, body: m.body || '', at: Date.parse(m.created_at) || 0, readAt: Date.parse(m.read_at) || 0 };
+          });
+        }
+        // Reports: your own, or every report for the site owner.
+        reportsReady = !extra[8].error;
+        if (!extra[8].error) {
+          state.reports = extra[8].data.map(function (r) {
+            return { id: r.id, reporter: r.reporter, kind: r.kind, targetId: r.target_id, reason: r.reason || '', at: Date.parse(r.created_at) || 0 };
           });
         }
         notesReady = !extra[7].error;
@@ -2121,6 +2131,11 @@
     picBtn.hidden = !canEdit(p) || editorOpen;
     // An admin can take down someone else's profile but not edit it.
     removeBtn.hidden = !(isAdmin && !canEdit(p));
+    // Anyone signed in can report someone else's portfolio.
+    var reported = alreadyReported('profile', p.id);
+    $('report-profile').hidden = !me || !reportsReady || canEdit(p);
+    $('report-profile').textContent = reported ? 'Reported' : 'Report';
+    $('report-profile').disabled = reported;
     paintPortrait(p.avatar, p.name);
     renderProfileReactions();
     addr.textContent = p.email;
@@ -3894,6 +3909,15 @@
           });
           li.appendChild(del);
         }
+        // Other people's comments can be reported to the site owner.
+        if (me && reportsReady && c.userId !== me.id) {
+          var rep = make('button', 'link-btn comment-report', alreadyReported('comment', c.id) ? 'Reported' : 'Report');
+          rep.type = 'button';
+          rep.disabled = alreadyReported('comment', c.id);
+          rep.setAttribute('aria-label', 'Report this comment by ' + authorName(c.userId));
+          rep.addEventListener('click', function () { openReport('comment', c.id, 'this comment by ' + authorName(c.userId)); });
+          li.appendChild(rep);
+        }
         list.appendChild(li);
       });
       panel.appendChild(list);
@@ -4952,6 +4976,273 @@
     if (p) openMessages(p.ownerId);
   });
 
+  // ---- Reports: tell the site owner about a comment, portfolio or research card ----
+  var reportDialog = $('report-dialog');
+  var reportTarget = null; // { kind, id }
+  var reportOpener = null;
+  function alreadyReported(kind, id) {
+    return !!me && state.reports.some(function (r) { return r.kind === kind && r.targetId === id && r.reporter === me.id; });
+  }
+  function openReport(kind, id, what) {
+    if (!me || !reportsReady) return;
+    reportTarget = { kind: kind, id: id };
+    reportOpener = document.activeElement;
+    $('report-title').textContent = 'Report ' + what;
+    $('report-reason').value = '';
+    $('report-status').textContent = '';
+    $('report-send').disabled = false;
+    reportDialog.hidden = false;
+    $('report-reason').focus();
+  }
+  function closeReport() {
+    reportDialog.hidden = true;
+    reportTarget = null;
+    if (reportOpener && reportOpener.focus) reportOpener.focus();
+  }
+  $('report-cancel').addEventListener('click', closeReport);
+  reportDialog.addEventListener('click', function (e) { if (e.target === reportDialog) closeReport(); });
+  $('report-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!reportTarget) return;
+    var t = reportTarget;
+    var reason = $('report-reason').value.trim();
+    $('report-send').disabled = true;
+    $('report-status').textContent = 'Sending…';
+    client.from('reports').insert({ kind: t.kind, target_id: t.id, reason: reason }).then(function (res) {
+      if (res.error && res.error.code !== '23505') {
+        $('report-send').disabled = false;
+        $('report-status').textContent = dbMessage(res.error);
+        return;
+      }
+      state.reports.unshift({ id: 'new-' + Date.now(), reporter: me.id, kind: t.kind, targetId: t.id, reason: reason, at: Date.now() });
+      closeReport();
+      showToast('Thanks for telling us. The site owner will take a look.');
+      if (currentId) renderProfile();
+      rerenderResearch();
+    });
+  });
+  $('report-profile').addEventListener('click', function () {
+    var p = current();
+    if (p) openReport('profile', p.id, p.name);
+  });
+
+  // ---- Share: send a portfolio's link to someone ----
+  $('share-btn').addEventListener('click', function () {
+    var p = current();
+    if (!p) return;
+    var url = SITE_URL + '?p=' + encodeURIComponent(p.id);
+    var title = p.name + ' on ' + state.hubName;
+    if (navigator.share) {
+      navigator.share({ title: title, text: 'Check out ' + p.name + '’s research portfolio!', url: url }).catch(function () {});
+      return;
+    }
+    var copied = navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject();
+    copied.then(function () {
+      showToast('Link copied! Paste it anywhere to share this portfolio.');
+    }, function () {
+      window.prompt('Copy this link to share the portfolio:', url);
+    });
+  });
+
+  // ---- Dark mode: a night-purple look, remembered on this device ----
+  var themeBtn = $('theme-btn');
+  function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+  function paintThemeButton() {
+    themeBtn.setAttribute('aria-pressed', isDark() ? 'true' : 'false');
+    themeBtn.title = isDark() ? 'Light mode' : 'Dark mode';
+    themeBtn.setAttribute('aria-label', 'Dark mode');
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', isDark() ? '#1E1A2E' : '#FFF9F0');
+  }
+  themeBtn.addEventListener('click', function () {
+    var dark = !isDark();
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('ds-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    paintThemeButton();
+  });
+  paintThemeButton();
+
+  // ---- Owner tools: reports, sign-ups and gifting stars. Only the site owner (an admin) sees these. ----
+  var adminDialog = $('admin-dialog');
+  var adminBtn = $('admin-btn');
+  var adminTab = 'reports';
+  var adminUsers = null;   // sign-ups, loaded when the tab opens
+  var adminBusy = false;
+  var ADMIN_TABS = [['reports', 'Reports'], ['signups', 'Sign-ups'], ['stars', 'Gift stars']];
+  function reportedThing(r) {
+    if (r.kind === 'comment') {
+      var c = state.comments.filter(function (x) { return x.id === r.targetId; })[0];
+      return c ? { label: 'Comment by ' + authorName(c.userId), text: c.body, projectId: c.projectId } : null;
+    }
+    if (r.kind === 'profile') {
+      var p = findProfile(r.targetId);
+      return p ? { label: 'Portfolio', text: p.name, profileId: p.id } : null;
+    }
+    var q = findProject(r.targetId);
+    return q ? { label: 'Research', text: q.title, projectId: q.id } : null;
+  }
+  function renderAdmin() {
+    var tabs = $('admin-tabs');
+    tabs.textContent = '';
+    var open = state.reports.filter(function (r) { return reportedThing(r); });
+    ADMIN_TABS.forEach(function (t) {
+      var b = make('button', 'card-tab', t[0] === 'reports' && open.length ? t[1] + ' (' + open.length + ')' : t[1]);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', adminTab === t[0] ? 'true' : 'false');
+      b.addEventListener('click', function () { adminTab = t[0]; $('admin-status').textContent = ''; renderAdmin(); });
+      tabs.appendChild(b);
+    });
+    var body = $('admin-body');
+    body.textContent = '';
+    if (adminTab === 'reports') adminReports(body, open);
+    else if (adminTab === 'signups') adminSignups(body);
+    else adminStars(body);
+  }
+  function adminReports(body, open) {
+    if (!reportsReady) { body.appendChild(make('p', 'followers-empty', 'Reports switch on once the database setup has been run.')); return; }
+    if (!open.length) { body.appendChild(make('p', 'followers-empty', 'No reports right now. All clear!')); return; }
+    var list = make('ul', 'admin-list');
+    open.forEach(function (r) {
+      var thing = reportedThing(r);
+      var li = make('li', 'admin-item');
+      li.appendChild(make('span', 'admin-kind', thing.label));
+      li.appendChild(make('p', 'admin-text', thing.text));
+      li.appendChild(make('p', 'admin-meta', 'Reported by ' + authorName(r.reporter) + ' · ' + timeAgo(r.at).toLowerCase() +
+        (r.reason ? ' · “' + r.reason + '”' : '')));
+      var actions = make('div', 'admin-actions');
+      var look = make('button', 'mini-btn', 'Open');
+      look.type = 'button';
+      look.addEventListener('click', function () {
+        closeAdmin();
+        if (thing.profileId) { showProfile(thing.profileId, true); return; }
+        var q = findProject(thing.projectId);
+        if (q) goToResearch(q.profileId, q.id);
+      });
+      var del = make('button', 'mini-btn admin-danger', r.kind === 'profile' ? 'Remove portfolio' : 'Delete it');
+      del.type = 'button';
+      del.disabled = adminBusy;
+      del.addEventListener('click', function () {
+        if (!window.confirm('Delete this ' + (r.kind === 'comment' ? 'comment' : r.kind === 'profile' ? 'portfolio and all its research' : 'research card') + '? This can’t be undone.')) return;
+        var table = r.kind === 'comment' ? 'project_comments' : r.kind === 'profile' ? 'profiles' : 'projects';
+        adminAction(client.from(table).delete().eq('id', r.targetId), 'Deleted.', function () { return clearReports(r); });
+      });
+      var dismiss = make('button', 'mini-btn', 'Dismiss');
+      dismiss.type = 'button';
+      dismiss.disabled = adminBusy;
+      dismiss.addEventListener('click', function () { adminAction(clearReports(r), 'Report dismissed.'); });
+      actions.appendChild(look);
+      actions.appendChild(del);
+      actions.appendChild(dismiss);
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+    body.appendChild(list);
+  }
+  // Removes every report about the same thing.
+  function clearReports(r) {
+    return client.from('reports').delete().eq('kind', r.kind).eq('target_id', r.targetId).then(function (res) {
+      if (!res.error) state.reports = state.reports.filter(function (x) { return !(x.kind === r.kind && x.targetId === r.targetId); });
+      return res;
+    });
+  }
+  function adminAction(request, done, then) {
+    adminBusy = true;
+    $('admin-status').textContent = 'Working…';
+    renderAdmin();
+    request.then(function (res) {
+      if (!res.error && then) return then();
+      return res;
+    }).then(function (res) {
+      adminBusy = false;
+      $('admin-status').textContent = res && res.error ? (res.error.message || dbMessage(res.error)) : done;
+      renderAdmin();
+      refresh();
+    });
+  }
+  function adminSignups(body) {
+    if (adminUsers === null) {
+      body.appendChild(make('p', 'followers-empty', 'Loading sign-ups…'));
+      client.rpc('admin_users').then(function (res) {
+        adminUsers = res.error ? { error: res.error.message || 'Could not load sign-ups.' } : res.data || [];
+        if (!adminDialog.hidden && adminTab === 'signups') renderAdmin();
+      });
+      return;
+    }
+    if (adminUsers.error) { body.appendChild(make('p', 'followers-empty', 'Sign-ups show up once the database setup has been run.')); return; }
+    var weekAgo = Date.now() - 7 * 86400000;
+    var newThisWeek = adminUsers.filter(function (u) { return Date.parse(u.created_at) >= weekAgo; }).length;
+    body.appendChild(make('p', 'admin-summary', plural(adminUsers.length, 'account') + ' · ' + newThisWeek + ' new this week'));
+    var list = make('ul', 'admin-list');
+    adminUsers.forEach(function (u) {
+      var li = make('li', 'admin-item admin-user');
+      var name = ownerName(u.id);
+      li.appendChild(make('span', 'admin-user-name', name || 'No portfolio yet'));
+      li.appendChild(make('span', 'admin-meta', u.email || ''));
+      li.appendChild(make('span', 'admin-meta', 'Joined ' + timeAgo(Date.parse(u.created_at)).toLowerCase() +
+        (u.last_sign_in_at ? ' · last seen ' + timeAgo(Date.parse(u.last_sign_in_at)).toLowerCase() : '')));
+      list.appendChild(li);
+    });
+    body.appendChild(list);
+  }
+  function adminStars(body) {
+    var people = {};
+    state.profiles.forEach(function (p) { if (!people[p.ownerId]) people[p.ownerId] = p.name; });
+    var form = make('form', 'admin-stars');
+    var whoLabel = make('label', 'edit-label', 'Who gets the stars');
+    whoLabel.htmlFor = 'admin-star-who';
+    var who = make('select', 'giftbox-select');
+    who.id = 'admin-star-who';
+    Object.keys(people).sort(function (a, b) { return people[a].localeCompare(people[b]); }).forEach(function (id) {
+      var o = make('option', null, people[id]);
+      o.value = id;
+      who.appendChild(o);
+    });
+    var amountLabel = make('label', 'edit-label', 'How many stars (1 to 100)');
+    amountLabel.htmlFor = 'admin-star-amount';
+    var amount = make('input', 'giftbox-amount');
+    amount.id = 'admin-star-amount';
+    amount.type = 'number';
+    amount.min = '1';
+    amount.max = '100';
+    amount.value = '10';
+    var send = make('button', 'btn btn-solid', 'Gift stars');
+    send.type = 'submit';
+    send.disabled = adminBusy;
+    form.appendChild(whoLabel);
+    form.appendChild(who);
+    form.appendChild(amountLabel);
+    form.appendChild(amount);
+    form.appendChild(send);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var n = Math.floor(Number(amount.value));
+      if (!(n >= 1 && n <= 100)) { $('admin-status').textContent = 'Pick 1 to 100 stars.'; return; }
+      var to = who.value;
+      adminAction(client.from('star_gifts').insert({ user_id: to, reason: 'owner-gift:' + Date.now(), stars: n }),
+        'Sent ' + plural(n, 'star') + ' to ' + people[to] + '!');
+    });
+    body.appendChild(make('p', 'admin-summary', 'Stars you gift show up in their Star Shop right away.'));
+    body.appendChild(form);
+  }
+  function openAdmin() {
+    if (!isAdmin) return;
+    closeAccountMenu();
+    adminUsers = null;
+    $('admin-status').textContent = '';
+    renderAdmin();
+    adminDialog.hidden = false;
+    $('admin-close').focus();
+  }
+  function closeAdmin() {
+    adminDialog.hidden = true;
+    accountBtn.focus();
+  }
+  adminBtn.addEventListener('click', openAdmin);
+  $('admin-close').addEventListener('click', closeAdmin);
+  adminDialog.addEventListener('click', function (e) { if (e.target === adminDialog) closeAdmin(); });
+
   // ---- Account: sign in, sign up, sign out ----
   var signinBtn = $('signin-btn');
   var account = $('account');
@@ -4969,10 +5260,15 @@
       accountBtn.textContent = (me.email || '?').charAt(0).toUpperCase();
       accountEmail.textContent = 'Signed in as ' + (me.email || 'your account');
       savedBtn.hidden = !bookmarksReady;
+      adminBtn.hidden = !isAdmin;
+      var openReports = state.reports.filter(function (r) { return isAdmin && reportedThing(r); }).length;
+      adminBtn.textContent = 'Owner tools' + (openReports ? ' (' + openReports + ' to review)' : '');
       savedBtn.textContent = 'Saved research' + (state.bookmarks.length ? ' (' + savedItems().length + ')' : '');
     } else {
       closeAccountMenu();
       savedDialog.hidden = true;
+      adminDialog.hidden = true;
+      reportDialog.hidden = true;
     }
   }
   function closeAccountMenu() {
@@ -5000,6 +5296,8 @@
     if (!achievementsDialog.hidden) { closeAchievements(); return; }
     if (!savedDialog.hidden) { closeSaved(); return; }
     if (!msgDialog.hidden) { closeMessages(); return; }
+    if (!reportDialog.hidden) { closeReport(); return; }
+    if (!adminDialog.hidden) { closeAdmin(); return; }
     if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
     if (!accountMenu.hidden) { closeAccountMenu(); accountBtn.focus(); }

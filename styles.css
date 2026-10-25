@@ -1252,3 +1252,60 @@ img { max-width: 100%; }
   .dialog .shop-giftbox .giftbox-amount { width: 5rem; flex: none; margin: 0; box-sizing: border-box; font-size: 0.9rem; padding: 0.3rem 0.7rem; border-radius: 999px; border-width: 1.5px; background: var(--surface); }
   .dialog .shop-giftbox .giftbox-select { width: auto; flex: 0 1 auto; margin: 0; }
   .dialog .shop-giftbox .giftbox-label { display: inline; margin: 0; }
+
+  /* Dark mode: a night-purple look, switched with the moon button in the header */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #1C1830;
+    --surface: #262040;
+    --blush: #342B52;
+    --pink: #4E4275;
+    --button: #7A5FA8;
+    --button-fg: #FBEFFF;
+    --accent: #F29BC4;
+    --fg: #F3DDEA;
+    --muted: #BBA6D0;
+    --line: #3A3157;
+  }
+  :root[data-theme="dark"] body { background: var(--bg); color: var(--fg); }
+  :root[data-theme="dark"] .dialog-backdrop { background: rgba(8, 5, 18, 0.6); }
+  :root[data-theme="dark"] .notes-panel { background: #2E2A3E; border-color: #4B4366; }
+  :root[data-theme="dark"] .notes-title { color: #F6E08E; }
+  :root[data-theme="dark"] .notes-who, :root[data-theme="dark"] .notes-when { color: var(--muted); }
+  :root[data-theme="dark"] .notes-input { background: var(--bg); border-color: var(--pink); }
+  :root[data-theme="dark"] .msg-bubble.mine { background: #5B4590; border-color: #5B4590; }
+  :root[data-theme="dark"] .msg-bubble.mine .msg-body { color: #FBEFFF; }
+  .theme-btn .theme-sun { display: none; }
+  :root[data-theme="dark"] .theme-btn .theme-moon { display: none; }
+  :root[data-theme="dark"] .theme-btn .theme-sun { display: inline; }
+
+  /* Report and share buttons, and the Owner tools pop-up */
+  .comment-report { font-size: 0.78rem; color: var(--muted); margin-left: 0.75rem; }
+  .comment-report:disabled { cursor: default; opacity: 0.7; }
+  .edit-btn.report-btn { color: var(--muted); background: transparent; }
+  .edit-btn:disabled { opacity: 0.6; cursor: default; }
+  .dialog textarea {
+    font-family: var(--body); font-size: 1rem; color: var(--fg); background: var(--bg); resize: vertical;
+    border: 1px solid var(--pink); border-radius: 0.9rem; padding: 0.7rem 0.9rem; width: 100%; box-sizing: border-box;
+  }
+  .dialog.admin-dialog { width: min(40rem, 100%); }
+  .admin-tabs { justify-self: start; margin-top: 0.3rem; }
+  .admin-body { display: grid; gap: 0.6rem; }
+  .admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+  .admin-item {
+    display: grid; gap: 0.25rem; padding: 0.8rem 1rem;
+    border: 1px solid var(--line); border-radius: 1rem; background: var(--surface);
+  }
+  .admin-kind {
+    justify-self: start; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--button-fg); background: var(--blush); border-radius: 999px; padding: 0.1rem 0.6rem;
+  }
+  .dialog .admin-text { color: var(--fg); font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+  .dialog .admin-meta, .admin-meta { font-size: 0.82rem; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+  .admin-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.25rem; }
+  .mini-btn.admin-danger { color: #fff; background: #D9534F; border-color: #D9534F; }
+  .mini-btn.admin-danger:hover { background: #B83B3B; }
+  .dialog .admin-summary { font-weight: 700; color: var(--fg); margin: 0; }
+  .admin-user-name { font-weight: 700; color: var(--fg); }
+  .admin-stars { display: grid; gap: 0.4rem; justify-items: start; }
+  .dialog .admin-stars .giftbox-amount { width: 6rem; }

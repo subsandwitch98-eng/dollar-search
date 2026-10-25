@@ -13,6 +13,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
 <link rel="stylesheet" href="styles.css">
+<!-- Dark mode is picked before the page draws, so it doesn't flash light first. -->
+<script>try { if (localStorage.getItem('ds-theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}</script>
 </head>
 <body>
 <header class="top">
@@ -39,12 +41,16 @@
         <span class="bell-badge" id="bell-badge" hidden></span>
       </button>
       <div class="notif-panel" id="notif-panel" role="region" aria-label="Notifications" hidden></div>
+      <button class="cart-btn theme-btn" id="theme-btn" type="button" aria-pressed="false" aria-label="Dark mode" title="Dark mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="theme-moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="currentColor"/><g class="theme-sun" fill="currentColor"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g></svg>
+      </button>
       <button class="auth-btn" id="signin-btn" type="button" hidden>Sign in</button>
       <div class="account" id="account" hidden>
         <button class="account-btn" id="account-btn" type="button" aria-expanded="false" aria-controls="account-menu" aria-label="Your account"></button>
         <div class="account-menu" id="account-menu" hidden>
           <span class="account-email" id="account-email"></span>
           <button class="btn btn-ghost" id="saved-btn" type="button" hidden>Saved research</button>
+          <button class="btn btn-ghost" id="admin-btn" type="button" hidden>Owner tools</button>
           <button class="btn btn-ghost" id="signout-btn" type="button">Sign out</button>
         </div>
       </div>
@@ -257,6 +263,8 @@
             <button class="edit-btn" id="edit-desc" type="button" hidden>Edit profile</button>
             <button class="edit-btn" id="edit-pic" type="button" hidden>Edit character</button>
             <button class="edit-btn" id="remove-profile" type="button" hidden>Remove this profile</button>
+            <button class="edit-btn share-btn" id="share-btn" type="button">Share</button>
+            <button class="edit-btn report-btn" id="report-profile" type="button" hidden>Report</button>
           </div>
           <form class="edit-form" id="pic-form" hidden></form>
           <form class="edit-form" id="edit-form" hidden>
@@ -420,6 +428,34 @@
       </form>
       <p class="edit-status" id="msg-status" aria-live="polite"></p>
     </div>
+  </div>
+</div>
+
+<!-- Report pop-up: report a comment, portfolio or research card to the site owner -->
+<div class="dialog-backdrop" id="report-dialog" hidden>
+  <form class="dialog" id="report-form" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <h2 id="report-title">Report</h2>
+    <p id="report-sub">Tell the site owner what's wrong. Only they will see this.</p>
+    <label class="edit-label" for="report-reason">What's wrong? (optional)</label>
+    <textarea id="report-reason" rows="3" maxlength="300" placeholder="For example: spam, mean, or not research"></textarea>
+    <div class="edit-actions">
+      <button class="btn btn-solid" id="report-send" type="submit">Send report</button>
+      <button class="btn btn-ghost" id="report-cancel" type="button">Cancel</button>
+    </div>
+    <p class="edit-status" id="report-status" aria-live="polite"></p>
+  </form>
+</div>
+
+<!-- Owner tools pop-up: reports, sign-ups and gifting stars. Only the site owner sees it. -->
+<div class="dialog-backdrop" id="admin-dialog" hidden>
+  <div class="dialog admin-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+    <div class="achievements-head">
+      <h2 id="admin-title">Owner tools</h2>
+      <button class="dialog-close" id="admin-close" type="button" aria-label="Close owner tools">×</button>
+    </div>
+    <div class="card-tabs admin-tabs" id="admin-tabs" role="tablist" aria-label="Owner tools"></div>
+    <div class="admin-body" id="admin-body"></div>
+    <p class="edit-status" id="admin-status" aria-live="polite"></p>
   </div>
 </div>
 

@@ -1035,6 +1035,130 @@
   recentStrip.addEventListener('scroll', updateRecentArrows);
   window.addEventListener('resize', updateRecentArrows);
 
+  // ---- Home: Research idea generator, a slot-machine lever that lands on a topic ----
+  var IDEAS = [
+    ['Science', 'How does the amount of sleep you get change how well you remember things?'],
+    ['Science', 'Why do some people remember their dreams and others don’t?'],
+    ['Science', 'Does listening to music while studying help or hurt focus?'],
+    ['Science', 'How does caffeine affect reaction time?'],
+    ['Technology', 'How do social media algorithms decide what you see?'],
+    ['Technology', 'Can AI tell the difference between real and fake photos?'],
+    ['Technology', 'How do self-driving cars make decisions in an emergency?'],
+    ['Technology', 'How has texting changed the way people write?'],
+    ['Health', 'Do standing desks really make people healthier?'],
+    ['Health', 'How does screen time before bed affect sleep?'],
+    ['Health', 'What happens to your body when you skip breakfast?'],
+    ['Health', 'Why do some foods make people feel full longer?'],
+    ['Environment', 'How much plastic does one family throw away in a week?'],
+    ['Environment', 'Do city trees really make neighborhoods cooler?'],
+    ['Environment', 'How does fast fashion affect the environment?'],
+    ['Environment', 'Which is better for the planet: paper, plastic or cloth bags?'],
+    ['Space', 'Could people ever grow food on Mars?'],
+    ['Space', 'Why is it so hard to see stars from big cities?'],
+    ['Space', 'How do astronauts’ bodies change after months in space?'],
+    ['Society', 'Why do some songs get stuck in your head?'],
+    ['Society', 'How do first impressions change the way we treat people?'],
+    ['Society', 'Why do people trust online reviews from strangers?'],
+    ['Society', 'How does a four-day school week affect students?'],
+    ['Money', 'Why do prices so often end in .99?'],
+    ['Money', 'Do loyalty cards and rewards apps make people spend more?'],
+    ['Money', 'How do small businesses compete with huge online stores?'],
+    ['Money', 'What makes a product go viral?'],
+    ['Sports', 'Does the home team really have an advantage?'],
+    ['Sports', 'How has data changed the way soccer teams pick players?'],
+    ['Sports', 'Why do some athletes perform better under pressure?'],
+    ['Food', 'Why does food taste different on airplanes?'],
+    ['Food', 'How do food colors change what people think tastes good?'],
+    ['Food', 'Is homemade bread really cheaper than store-bought?'],
+    ['Arts', 'How do movie soundtracks change how a scene feels?'],
+    ['Arts', 'Why are some colors seen as calm and others as energetic?'],
+    ['Arts', 'How has video game art changed over the last 30 years?'],
+    ['Animals', 'Can dogs really understand human emotions?'],
+    ['Animals', 'Why do cats knock things off tables?'],
+    ['Animals', 'How do bees find their way back to the hive?'],
+    ['Animals', 'Do pets help people feel less stressed?'],
+    ['Education', 'Do handwritten notes help you learn better than typed ones?'],
+    ['Education', 'How does the color of a classroom affect learning?'],
+    ['Education', 'Does learning a second language change how you think?'],
+    ['Psychology', 'Why do people procrastinate even when they know better?'],
+    ['Psychology', 'How does a messy room affect mood and focus?'],
+    ['Psychology', 'Why do people feel more tired on rainy days?'],
+    ['History', 'How did the printing press change the spread of ideas?'],
+    ['History', 'What can old maps tell us about how cities grew?'],
+    ['History', 'How did people keep food fresh before refrigerators?'],
+    ['History', 'Why did some ancient buildings last thousands of years?']
+  ];
+  var ideaMachine = $('idea-machine');
+  var ideaLever = $('idea-lever');
+  var ideaCategory = $('idea-category');
+  var ideaText = $('idea-text');
+  var ideaUse = $('idea-use');
+  var ideaDeck = [];      // shuffled idea numbers still to come, so ideas don't repeat until all are used
+  var ideaNow = null;     // the idea the machine landed on
+  var ideaSpinning = false;
+
+  function nextIdea() {
+    if (!ideaDeck.length) {
+      ideaDeck = IDEAS.map(function (_, i) { return i; }).filter(function (i) { return IDEAS[i] !== ideaNow; });
+      for (var i = ideaDeck.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = ideaDeck[i]; ideaDeck[i] = ideaDeck[j]; ideaDeck[j] = t;
+      }
+    }
+    return IDEAS[ideaDeck.pop()];
+  }
+  function showIdea(idea, blurred) {
+    ideaCategory.textContent = idea[0];
+    ideaText.textContent = idea[1];
+    ideaText.classList.toggle('spin', blurred);
+  }
+  function pullLever() {
+    if (ideaSpinning) return;
+    ideaSpinning = true;
+    ideaUse.hidden = true;
+    ideaLever.classList.remove('pulled');
+    void ideaLever.offsetWidth; // restart the pull animation
+    ideaLever.classList.add('pulled');
+    ideaMachine.classList.add('spinning');
+    ideaMachine.classList.remove('landed');
+    var landOn = nextIdea();
+    var steps = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 16;
+    var step = 0;
+    (function tick() {
+      if (step < steps) {
+        showIdea(IDEAS[Math.floor(Math.random() * IDEAS.length)], true);
+        step++;
+        setTimeout(tick, 40 + step * step * 1.1); // slows down like a reel
+        return;
+      }
+      showIdea(landOn, false);
+      ideaNow = landOn;
+      ideaMachine.classList.remove('spinning');
+      ideaMachine.classList.add('landed');
+      $('idea-live').textContent = landOn[0] + ' idea: ' + landOn[1];
+      ideaUse.hidden = false;
+      ideaSpinning = false;
+    })();
+  }
+  ideaLever.addEventListener('click', pullLever);
+  // "Start this research" opens a new research card on your portfolio with the idea as its title.
+  ideaUse.addEventListener('click', function () {
+    if (!ideaNow) return;
+    if (!me) { openAuth('signin', 'Sign in to start research on this idea.'); return; }
+    var mp = myProfile();
+    if (!mp) { showToast('Make your portfolio first, then you can start research on this idea.'); return; }
+    var title = ideaNow[1].slice(0, 80);
+    showProfile(mp.id, true);
+    openProject('new');
+    var titleIn = $('project-title-input');
+    if (titleIn) {
+      titleIn.value = title;
+      titleIn.closest('.project').scrollIntoView({ block: 'center' });
+      var desc = $('project-desc-input');
+      if (desc) desc.focus();
+    }
+  });
+
   function renderHome() {
     var list = state.profiles;
     renderRecent();

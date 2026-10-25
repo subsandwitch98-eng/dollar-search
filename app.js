@@ -308,10 +308,10 @@
     add('circle', { cx: 60, cy: 56, r: 24, fill: skin });
 
     // Hair on top of the head, with strand lines and a shine
-    if (style === 0) { // Short, with sideburns that start up inside the cap so the temples have no gap
+    if (style === 0) { // Short, with sideburns
       add('path', { d: CAP, fill: hair });
-      add('path', { d: 'M33 50 Q32 60 35 66 L39 66 Q39 58 44 48 Z', fill: hair });
-      add('path', { d: 'M87 50 Q88 60 85 66 L81 66 Q81 58 76 48 Z', fill: hair });
+      add('path', { d: 'M34 57 Q33 63 36 66 L38 58 Z', fill: hair });
+      add('path', { d: 'M86 57 Q87 63 84 66 L82 58 Z', fill: hair });
       strands(['M46 37 Q52 41 50 47', 'M60 33 Q64 38 62 44', 'M72 36 Q74 41 71 46']);
       shine('M41 42 Q49 34 58 33');
     }

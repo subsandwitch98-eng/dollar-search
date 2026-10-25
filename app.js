@@ -229,6 +229,37 @@
     el.appendChild(document.createTextNode(' '));
     el.appendChild(star);
   }
+  // A small magic wand after the names of portfolios made during early testing.
+  function addTesterWand(el, p) {
+    var ids = cfg.earlyTesterProfileIds;
+    if (!p || !Array.isArray(ids) || ids.indexOf(p.id) < 0) return;
+    var wand = document.createElementNS(SVG_NS, 'svg');
+    wand.setAttribute('viewBox', '0 0 24 24');
+    wand.setAttribute('class', 'tester-wand');
+    wand.setAttribute('role', 'img');
+    wand.setAttribute('aria-label', 'Early tester');
+    var title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = 'Early tester';
+    wand.appendChild(title);
+    [
+      ['line', { x1: 4, y1: 20, x2: 13.5, y2: 10.5, stroke: '#4A3550', 'stroke-width': 2.6, 'stroke-linecap': 'round' }],
+      ['line', { x1: 11.8, y1: 12.2, x2: 13.5, y2: 10.5, stroke: '#FFFFFF', 'stroke-width': 2.6, 'stroke-linecap': 'round' }],
+      ['polygon', { points: '17,2.4 18.3,5.6 21.7,5.9 19.1,8.1 19.9,11.4 17,9.6 14.1,11.4 14.9,8.1 12.3,5.9 15.7,5.6', fill: '#F6C945', stroke: '#E0A82E', 'stroke-width': 0.8, 'stroke-linejoin': 'round' }],
+      ['circle', { cx: 21.6, cy: 13.4, r: 1.1, fill: '#E26D8E' }],
+      ['circle', { cx: 10.8, cy: 4.2, r: 0.9, fill: '#E26D8E' }]
+    ].forEach(function (part) {
+      var n = document.createElementNS(SVG_NS, part[0]);
+      for (var k in part[1]) n.setAttribute(k, part[1][k]);
+      wand.appendChild(n);
+    });
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(wand);
+  }
+  // Badges after a portfolio name: the owner's star, then the early tester wand.
+  function addNameBadges(el, p) {
+    addOwnerStar(el, p);
+    addTesterWand(el, p);
+  }
 
   function findProfile(id) {
     for (var i = 0; i < state.profiles.length; i++) {
@@ -962,7 +993,7 @@
     who.style.minWidth = '0';
     var name = make('h3', 'profile-name');
     paintName(name, p.name);
-    addOwnerStar(name, p);
+    addNameBadges(name, p);
     who.appendChild(name);
     var meta = make('p', 'profile-meta');
     meta.appendChild(make('span', null, plural(p.projects.length, 'research project')));
@@ -1099,7 +1130,7 @@
     if (!p) return;
     document.title = p.name + ' · ' + state.hubName;
     paintName(siteName, p.name);
-    addOwnerStar(siteName, p);
+    addNameBadges(siteName, p);
     lede.textContent = p.description;
     var editorOpen = !form.hidden || !picForm.hidden;
     editBtn.hidden = !canEdit(p) || editorOpen;

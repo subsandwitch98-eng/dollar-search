@@ -274,8 +274,9 @@
     add('rect', { width: 120, height: 120, fill: CHAR.bg[c.bg] });
 
     // Hair behind the head, in a darker shade for depth
+    // Long and Wavy fill all the way across behind the neck; the neck and shoulders are drawn over them.
     if (style === 2) { // Long
-      add('path', { d: 'M33 52 C33 25 87 25 87 52 L90 94 Q81 99 73 93 L72 64 L48 64 L47 93 Q39 99 30 94 Z', fill: hairDark });
+      add('path', { d: 'M33 52 C33 25 87 25 87 52 L90 94 Q81 99 73 95 Q60 98 47 95 Q39 99 30 94 Z', fill: hairDark });
     }
     if (style === 5) { // Bob
       add('path', { d: 'M32 54 C32 25 88 25 88 54 L89 76 Q88 83 81 81 L39 81 Q32 83 31 76 Z', fill: hairDark });
@@ -289,7 +290,7 @@
       add('path', { d: 'M83 50 Q103 56 100 82 Q93 74 83 66 Z', fill: hairDark });
     }
     if (style === 8) { // Wavy
-      add('path', { d: 'M33 52 C33 25 87 25 87 52 Q92 62 87 72 Q93 83 86 95 L74 95 L72 64 L48 64 L46 95 L34 95 Q27 83 33 72 Q28 62 33 52 Z', fill: hairDark });
+      add('path', { d: 'M33 52 C33 25 87 25 87 52 Q92 62 87 72 Q93 83 86 95 Q73 99 60 96 Q47 99 34 95 Q27 83 33 72 Q28 62 33 52 Z', fill: hairDark });
     }
     if (style === 9) { // Afro
       add('circle', { cx: 60, cy: 46, r: 33, fill: hairDark });
@@ -307,10 +308,10 @@
     add('circle', { cx: 60, cy: 56, r: 24, fill: skin });
 
     // Hair on top of the head, with strand lines and a shine
-    if (style === 0) { // Short, with sideburns
+    if (style === 0) { // Short, with sideburns that start up inside the cap so the temples have no gap
       add('path', { d: CAP, fill: hair });
-      add('path', { d: 'M34 57 Q33 63 36 66 L38 58 Z', fill: hair });
-      add('path', { d: 'M86 57 Q87 63 84 66 L82 58 Z', fill: hair });
+      add('path', { d: 'M33 50 Q32 60 35 66 L39 66 Q39 58 44 48 Z', fill: hair });
+      add('path', { d: 'M87 50 Q88 60 85 66 L81 66 Q81 58 76 48 Z', fill: hair });
       strands(['M46 37 Q52 41 50 47', 'M60 33 Q64 38 62 44', 'M72 36 Q74 41 71 46']);
       shine('M41 42 Q49 34 58 33');
     }

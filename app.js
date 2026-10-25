@@ -291,45 +291,15 @@
     }
   }
 
-  // Hats sit on the head, so hair above the hat's lower edge is hidden (no spikes, buns, curls or
-  // crests poking out over the top). Headwear index -> the height (y) the hair is cut at.
-  // Crown, bow, headphones, headband and flower crown sit on the hair, so they don't hide any.
-  var HAT_LINE = { 1: 50, 2: 48, 6: 44, 7: 48, 8: 41 }; // Cap, Beanie, Beret, Bucket hat, Top hat
-  var hatClipCount = 0;
-
   function renderCharacter(c, label) {
     var svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 120 120');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', label);
-    var layer = null; // where add() draws: the hair group while drawing hair, else the svg itself
     function add(tag, attrs) {
       var n = document.createElementNS(SVG_NS, tag);
       for (var k in attrs) n.setAttribute(k, attrs[k]);
-      (layer || svg).appendChild(n);
-    }
-    var hatLine = HAT_LINE[c.headwear];
-    var clipId = null;
-    if (hatLine) {
-      clipId = 'hat-clip-' + (++hatClipCount);
-      var defs = document.createElementNS(SVG_NS, 'defs');
-      var clip = document.createElementNS(SVG_NS, 'clipPath');
-      clip.setAttribute('id', clipId);
-      var keep = document.createElementNS(SVG_NS, 'rect');
-      keep.setAttribute('x', '0');
-      keep.setAttribute('y', String(hatLine));
-      keep.setAttribute('width', '120');
-      keep.setAttribute('height', String(120 - hatLine));
-      clip.appendChild(keep);
-      defs.appendChild(clip);
-      svg.appendChild(defs);
-    }
-    // A group for hair; under a hat it only shows below the hat line.
-    function hairLayer() {
-      var g = document.createElementNS(SVG_NS, 'g');
-      if (clipId) g.setAttribute('clip-path', 'url(#' + clipId + ')');
-      svg.appendChild(g);
-      return g;
+      svg.appendChild(n);
     }
     var skin = CHAR.skin[c.skin], top = CHAR.top[c.top];
     var hair = CHAR.hairColor[c.hairColor];
@@ -356,7 +326,6 @@
     add('rect', { width: 120, height: 120, fill: CHAR.bg[c.bg] });
 
     // Hair behind the head, in a darker shade for depth
-    layer = hairLayer();
     // Long and Wavy fill all the way across behind the neck; the neck and shoulders are drawn over them.
     if (style === 2) { // Long
       add('path', { d: 'M33 52 C33 25 87 25 87 52 L90 94 Q81 99 73 95 Q60 98 47 95 Q39 99 30 94 Z', fill: hairDark });
@@ -383,14 +352,12 @@
     }
 
     // Shoulders and clothing, in the chosen clothing color
-    layer = null;
     drawClothing(add, c.outfit, top, skin);
     add('circle', { cx: 36.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 83.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 60, cy: 56, r: 24, fill: skin });
 
     // Hair on top of the head, with strand lines and a shine
-    layer = hairLayer();
     if (style === 0) { // Short, with sideburns
       add('path', { d: CAP, fill: hair });
       add('path', { d: 'M34 57 Q33 63 36 66 L38 58 Z', fill: hair });
@@ -478,7 +445,6 @@
     if (c.bangs === 2) add('path', { d: 'M37 51 C36 33 84 31 84 49 C76 45 66 46 57 50 C50 53 43 54 37 51 Z', fill: hair });
     if (c.bangs === 3) add('path', { d: 'M37 50 C36 33 84 33 83 50 L79 46 L76 52 L71 46 L66 52 L61 46 L56 52 L51 46 L46 52 L42 46 Z', fill: hair });
     if (c.bangs) strands(['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']);
-    layer = null;
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });

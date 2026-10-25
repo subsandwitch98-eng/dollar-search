@@ -34,6 +34,11 @@ begin
   if auth.uid() is null then
     raise exception 'Sign in to shop.';
   end if;
+  -- The Halloween items are limited: they leave the shop when October 31, 2026 ends (midnight, US Eastern time).
+  -- Keep in step with SHOP_ENDS in app.js.
+  if now() >= timestamptz '2026-11-01 04:00:00+00' then
+    raise exception 'The Halloween items have left the shop.';
+  end if;
   -- Prices live here so the website can't change them. Keep in step with SHOP in app.js.
   cost := case item_id
     when 'pumpkin-top' then 1

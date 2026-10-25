@@ -1910,6 +1910,19 @@
     { id: 'ghost-frame', name: 'Ghost frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
     { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 }
   ];
+  // The Halloween items are limited: they leave when October 31, 2026 ends (midnight US Eastern).
+  // Must match the date in buy_shop_item() in supabase/star-shop.sql.
+  var SHOP_ENDS = Date.parse('2026-11-01T04:00:00Z');
+  function shopOpen() { return Date.now() < SHOP_ENDS; }
+  // "6 days left", "Last day!", "Ends in 5 hours"...
+  function shopTimeLeft() {
+    var ms = SHOP_ENDS - Date.now();
+    var hours = Math.floor(ms / 3600000);
+    if (hours < 1) return 'Ends in less than an hour!';
+    if (hours < 24) return 'Ends in ' + plural(hours, 'hour') + '!';
+    var days = Math.ceil(ms / 86400000);
+    return days <= 1 ? 'Last day!' : plural(days, 'day') + ' left';
+  }
   function shopItemFor(key, index) {
     return SHOP.filter(function (s) { return s.key === key && s.index === index; })[0] || null;
   }
@@ -1948,11 +1961,17 @@
     var stars = starBalance();
     $('shop-balance').textContent = '★ ' + stars;
     $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
+    var open = shopOpen();
+    $('shop-limited').classList.toggle('ended', !open);
+    $('shop-limited-text').textContent = open
+      ? 'The Halloween items leave the shop on October 31, 2026. ' + shopTimeLeft()
+      : 'The Halloween items have left the shop. Anything you bought is still yours in Edit character.';
     var list = $('shop-list');
     list.textContent = '';
     var mp = myProfile();
     var base = normalizeCharacter(mp && mp.avatar ? mp.avatar.character : DEFAULT_CHAR);
-    SHOP.forEach(function (item) {
+    // After they leave, the shop only lists the items you own.
+    SHOP.filter(function (item) { return open || ownsItem(item); }).forEach(function (item) {
       var owned = ownsItem(item);
       var li = make('li', 'shop-item' + (owned ? ' owned' : ''));
       // A preview of your own character wearing the item.
@@ -1970,7 +1989,7 @@
         b.disabled = true;
       } else {
         b.textContent = '★ ' + item.price + ' · Buy';
-        b.disabled = !shopReady || !!buying || stars < item.price;
+        b.disabled = !shopReady || !open || !!buying || stars < item.price;
         if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
         b.addEventListener('click', function () { buyItem(item); });
       }
@@ -1979,7 +1998,7 @@
     });
   }
   function buyItem(item) {
-    if (!shopReady || buying || starBalance() < item.price) return;
+    if (!shopReady || !shopOpen() || buying || starBalance() < item.price) return;
     buying = item.id;
     $('shop-status').textContent = 'Buying ' + item.name + '…';
     renderShop();
@@ -2127,7 +2146,9 @@
           b.setAttribute('aria-label', value + ', locked. ' + goal.task + '.');
         }
         // Star Shop items stay locked until bought (one you're already wearing stays picked).
+        // Once the limited items have left the shop, ones you didn't buy disappear from here too.
         var shopItem = shopItemFor(key, i);
+        if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i && !shopOpen()) return;
         if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i) {
           b.disabled = true;
           b.classList.add('locked', 'shop-locked');
@@ -2141,10 +2162,11 @@
           b.setAttribute('aria-label', shopItem.name + ', locked. Buy it in the Star Shop for ' + plural(shopItem.price, 'star') + '.');
         }
         b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
+        b.dataset.option = i; // the option's number (some options can be left out, so it isn't always the button's position)
         b.addEventListener('click', function () {
           picDraft.character[key] = i;
-          Array.prototype.forEach.call(chips.children, function (x, j) {
-            x.setAttribute('aria-pressed', j === i ? 'true' : 'false');
+          Array.prototype.forEach.call(chips.children, function (x) {
+            x.setAttribute('aria-pressed', Number(x.dataset.option) === i ? 'true' : 'false');
           });
           updatePreview();
         });

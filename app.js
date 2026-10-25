@@ -255,8 +255,9 @@
       ' Q' + fx(x - k) + ' ' + fx(y + k) + ' ' + fx(x - r) + ' ' + fx(y) +
       ' Q' + fx(x - k) + ' ' + fx(y - k) + ' ' + fx(x) + ' ' + fx(y - r) + ' Z';
   }
-  // The frame sits on a white ring from radius FRAME_INNER to the edge (60); the character is shrunk to fit inside.
-  var FRAME_INNER = 48, FRAME_MID = 54;
+  // Frames are drawn on their own picture, which styles.css makes 25% wider than the character plus its
+  // white circle, so the band from radius FRAME_INNER to the edge (60) sits just outside that circle.
+  var FRAME_INNER = 49, FRAME_MID = 54.5, FRAME_WIDTH = 11;
   var frameClipCount = 0;
   function drawFrame(add, kind) {
     if (!kind) return;
@@ -269,49 +270,54 @@
     }
     function ring(r, color, w) { add('circle', { cx: 60, cy: 60, r: r, fill: 'none', stroke: color, 'stroke-width': w }); }
     var M = FRAME_MID;
-    ring(M, '#FFFFFF', 60 - FRAME_INNER);
-    if (kind === 1) { // Hearts
+    if (kind === 1) { // Hearts on a pink ring
+      ring(M, '#F7C8D4', FRAME_WIDTH);
       around(12, M, 0, function (x, y, deg, i) {
-        add('path', { d: HEART, fill: i % 2 ? '#F7A8C0' : '#E26D8E', transform: 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ') scale(' + (i % 2 ? 3.4 : 4.4) + ')' });
+        add('path', { d: HEART, fill: i % 2 ? '#FFFFFF' : '#E26D8E', transform: 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ') scale(' + (i % 2 ? 3.2 : 4.3) + ')' });
       });
-    } else if (kind === 2) { // Stars
+    } else if (kind === 2) { // Stars on a soft yellow ring
+      ring(M, '#FBE7A6', FRAME_WIDTH);
       around(12, M, 0, function (x, y, deg, i) {
         add('polygon', { points: starPoints(x, y, i % 2 ? 3.6 : 5.2), fill: '#F6C945', stroke: '#E0A82E', 'stroke-width': 0.8, 'stroke-linejoin': 'round' });
       });
-    } else if (kind === 3) { // Lace: scallops along the inner edge, pink dots and a pink outer line
-      around(24, FRAME_INNER + 0.5, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 3.2, fill: '#FFFFFF' }); });
-      around(24, FRAME_INNER + 0.5, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1, fill: '#F7C8D4' }); });
-      around(24, M + 1, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.4, fill: '#E58FA8' }); });
-      ring(58.8, '#F2B8C6', 1.6);
+    } else if (kind === 3) { // Lace: a white band with scallops on the outside, outlined in pink
+      around(24, 56, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 3.9, fill: '#F2B8C6' }); });
+      around(24, 56, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 3.1, fill: '#FFFFFF' }); });
+      ring(52.5, '#FFFFFF', 7);
+      ring(FRAME_INNER + 0.6, '#F2B8C6', 1.2);
+      around(24, 53.5, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#E58FA8' }); });
     } else if (kind === 4) { // Flowers on a vine
       ring(M, '#9BD3AE', 1.6);
       around(8, M, 22.5, function (x, y, deg) {
         add('ellipse', { cx: fx(x), cy: fx(y), rx: 3.4, ry: 1.6, fill: '#6DBB8A', transform: 'rotate(' + deg + ' ' + fx(x) + ' ' + fx(y) + ')' });
       });
-      var petals = ['#F7A8C0', '#B9A6E8', '#F29BB2', '#F4D35E'];
+      var petals = ['#F7A8C0', '#B9A6E8', '#FFFFFF', '#F4D35E'];
       around(8, M, 0, function (x, y, deg, i) {
         for (var p = 0; p < 5; p++) {
           var a = Math.PI * 2 / 5 * p + deg * Math.PI / 180;
-          add('circle', { cx: fx(x + Math.cos(a) * 2.9), cy: fx(y + Math.sin(a) * 2.9), r: 2.7, fill: petals[i % 4], stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 0.5 });
+          add('circle', { cx: fx(x + Math.cos(a) * 3), cy: fx(y + Math.sin(a) * 3), r: 2.8, fill: petals[i % 4], stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 0.5 });
         }
-        add('circle', { cx: fx(x), cy: fx(y), r: 1.8, fill: i % 4 === 3 ? '#F29E4C' : '#F6C945' });
+        add('circle', { cx: fx(x), cy: fx(y), r: 1.9, fill: i % 4 === 3 ? '#F29E4C' : '#F6C945' });
       });
     } else if (kind === 5) { // Rainbow with two little clouds
-      ['#F4A3A8', '#F8C88A', '#F6E08E', '#A8DDB5', '#9CCBEE', '#BBA9E6'].forEach(function (col, i) { ring(59 - i * 2, col, 2.1); });
-      [[22, 98], [98, 98]].forEach(function (c) {
+      ['#F4A3A8', '#F8C88A', '#F6E08E', '#A8DDB5', '#9CCBEE', '#BBA9E6'].forEach(function (col, i) {
+        ring(60 - FRAME_WIDTH / 12 - i * FRAME_WIDTH / 6, col, FRAME_WIDTH / 6 + 0.1);
+      });
+      [[21.5, 98.5], [98.5, 98.5]].forEach(function (c) {
         add('ellipse', { cx: c[0], cy: c[1] + 2.4, rx: 7, ry: 2.8, fill: '#FFFFFF' });
         [[-4, 0.8, 3.5], [0, -1.6, 4.4], [4, 0.8, 3.5]].forEach(function (b) {
           add('circle', { cx: c[0] + b[0], cy: c[1] + b[1], r: b[2], fill: '#FFFFFF' });
         });
       });
     } else if (kind === 6) { // Sparkles on a soft purple ring
-      ring(M, '#E4DAFA', 60 - FRAME_INNER);
+      ring(M, '#E4DAFA', FRAME_WIDTH);
       around(8, M, 0, function (x, y, deg, i) {
         add('path', { d: sparklePath(x, y, i % 2 ? 3.8 : 5.6), fill: i % 2 ? '#F29BB2' : '#F6C945' });
       });
       around(8, M, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#FFFFFF' }); });
-    } else if (kind === 7) { // Polka dots with a bow at the bottom
-      around(24, M, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.5, fill: '#F7A8C0' }); });
+    } else if (kind === 7) { // Pink polka-dot ribbon with a bow at the bottom
+      ring(M, '#F7C8D4', FRAME_WIDTH);
+      around(24, M, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.4, fill: '#FFFFFF' }); });
       var bow = 'translate(60 ' + (60 + M) + ') scale(0.72) translate(-60 -110)';
       [
         ['M58 111 L52 120 L56.5 120 L60 113 Z', '#C25F7E'],
@@ -385,7 +391,7 @@
     svg.setAttribute('viewBox', '0 0 120 120');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', label);
-    // With a frame, the character shrinks into the middle (radius 48) so the frame fits on a white ring around it.
+    // With a frame, the picture's circle no longer clips (so the frame can sit outside it), so clip the character here.
     var layer = svg;
     if (c.frame) {
       var clipId = 'char-clip-' + (++frameClipCount);
@@ -394,20 +400,17 @@
       var clipCircle = document.createElementNS(SVG_NS, 'circle');
       clipCircle.setAttribute('cx', 60);
       clipCircle.setAttribute('cy', 60);
-      clipCircle.setAttribute('r', FRAME_INNER);
+      clipCircle.setAttribute('r', 60);
       clip.appendChild(clipCircle);
       svg.appendChild(clip);
-      var clipped = document.createElementNS(SVG_NS, 'g');
-      clipped.setAttribute('clip-path', 'url(#' + clipId + ')');
       layer = document.createElementNS(SVG_NS, 'g');
-      layer.setAttribute('transform', 'translate(60 60) scale(' + FRAME_INNER / 60 + ') translate(-60 -60)');
-      clipped.appendChild(layer);
-      svg.appendChild(clipped);
+      layer.setAttribute('clip-path', 'url(#' + clipId + ')');
+      svg.appendChild(layer);
     }
-    function add(tag, attrs, parent) {
+    function add(tag, attrs) {
       var n = document.createElementNS(SVG_NS, tag);
       for (var k in attrs) n.setAttribute(k, attrs[k]);
-      (parent || layer).appendChild(n);
+      layer.appendChild(n);
     }
     var skin = CHAR.skin[c.skin], top = CHAR.top[c.top];
     var hair = CHAR.hairColor[c.hairColor];
@@ -740,12 +743,29 @@
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
     }
-    drawFrame(function (tag, attrs) { add(tag, attrs, svg); }, c.frame);
+    return svg;
+  }
+  // The frame is its own picture, laid over the character and sized (in styles.css) to sit just outside its circle.
+  function renderFrame(kind) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 120 120');
+    svg.setAttribute('class', 'char-frame');
+    svg.setAttribute('aria-hidden', 'true');
+    drawFrame(function (tag, attrs) {
+      var n = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      svg.appendChild(n);
+    }, kind);
     return svg;
   }
   function pictureNode(avatar, name) {
     if (!avatar) return null;
-    return renderCharacter(avatar.character, name + "'s character");
+    var pic = renderCharacter(avatar.character, name + "'s character");
+    if (!avatar.character.frame) return pic;
+    var wrap = make('span', 'char-pic');
+    wrap.appendChild(pic);
+    wrap.appendChild(renderFrame(avatar.character.frame));
+    return wrap;
   }
 
   // ---- Views and addresses: the homepage is "./", a profile is "./?p=<id>" ----

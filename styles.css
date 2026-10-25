@@ -293,6 +293,18 @@ img { max-width: 100%; }
   .portrait img, .portrait svg, .avatar img, .avatar svg, .pic-preview img, .pic-preview svg {
     display: block; width: 100%; height: 100%; object-fit: cover;
   }
+  /* Profile frames sit just outside the picture's circle: --ring is that circle's border width. */
+  .portrait { --ring: 6px; }
+  .avatar { --ring: 3px; }
+  .pic-preview { --ring: 4px; }
+  .portrait:has(.char-frame), .avatar:has(.char-frame), .pic-preview:has(.char-frame) { overflow: visible; }
+  .pic-preview:has(.char-frame) { margin: 0.9rem; }
+  .char-pic { position: relative; display: block; width: 100%; height: 100%; }
+  .char-pic .char-frame {
+    position: absolute; pointer-events: none;
+    left: calc(-1 * var(--ring, 0px) - 12.5%); top: calc(-1 * var(--ring, 0px) - 12.5%);
+    width: calc(125% + 2 * var(--ring, 0px)); height: calc(125% + 2 * var(--ring, 0px));
+  }
   .edit-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .edit-row:not(:has(> :not([hidden]))) { display: none; }
   .pic-top { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }

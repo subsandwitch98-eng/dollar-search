@@ -793,6 +793,7 @@
   }
   function showProfile(id, push) {
     if (!findProfile(id)) { showHome(push); return; }
+    if (id !== currentId) followersOpen = false;
     currentId = id;
     if (push) history.pushState(null, '', location.pathname + '?p=' + encodeURIComponent(id));
     editingId = null;
@@ -1835,7 +1836,10 @@
   var likeBtn = $('like-btn');
   var followBtn = $('follow-btn');
   var reactNote = $('react-note');
+  var followersPanel = $('followers-panel');
   var writingReaction = false;
+  var followersOpen = false; // the list of who follows you, on your own portfolio
+  var OWN_NOTE = "You can't like or follow your own portfolio. Click Followers to see who follows you.";
 
   function setReactButton(b, on, icon, label, count) {
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1848,21 +1852,72 @@
     if (!p) return;
     var liked = !!mine(state.likes, p.id);
     var following = !!mine(state.follows, p.id);
-    setReactButton(likeBtn, liked, '♥', liked ? 'Liked' : 'Like', String(countFor(state.likes, p.id)));
-    setReactButton(followBtn, following, following ? '✓' : '+', following ? 'Following' : 'Follow',
-      plural(countFor(state.follows, p.id), 'follower'));
-    // You see the counts on your own portfolio but can't like or follow it.
     var own = canEdit(p);
-    likeBtn.disabled = own || writingReaction;
-    followBtn.disabled = own || writingReaction;
-    likeBtn.classList.toggle('own', own);
-    followBtn.classList.toggle('own', own);
+    setReactButton(likeBtn, liked, '♥', liked ? 'Liked' : 'Like', String(countFor(state.likes, p.id)));
+    // On your own portfolio the follow button becomes "Followers" and opens the list of who follows you.
     if (own) {
-      reactNote.textContent = "You can't like or follow your own portfolio.";
+      setReactButton(followBtn, followersOpen, '☰', 'Followers', plural(countFor(state.follows, p.id), 'follower'));
+      followBtn.setAttribute('aria-expanded', followersOpen ? 'true' : 'false');
+      followBtn.setAttribute('aria-controls', 'followers-panel');
+    } else {
+      followersOpen = false;
+      setReactButton(followBtn, following, following ? '✓' : '+', following ? 'Following' : 'Follow',
+        plural(countFor(state.follows, p.id), 'follower'));
+      followBtn.removeAttribute('aria-expanded');
+      followBtn.removeAttribute('aria-controls');
+    }
+    // You see the counts on your own portfolio but can't like or follow it.
+    likeBtn.disabled = own || writingReaction;
+    followBtn.disabled = !own && writingReaction;
+    likeBtn.classList.toggle('own', own);
+    if (own) {
+      reactNote.textContent = OWN_NOTE;
       reactNote.hidden = false;
-    } else if (reactNote.textContent === "You can't like or follow your own portfolio.") {
+    } else if (reactNote.textContent === OWN_NOTE) {
       reactNote.hidden = true;
     }
+    renderFollowers(p);
+  }
+  // Followers are listed by their portfolio, newest first; people without a portfolio are counted at the end.
+  function renderFollowers(p) {
+    followersPanel.hidden = !followersOpen;
+    followersPanel.textContent = '';
+    if (!followersOpen) return;
+    var rows = state.follows.filter(function (f) { return f.profileId === p.id; })
+      .sort(function (a, b) { return b.since - a.since; });
+    followersPanel.appendChild(make('p', 'followers-head', 'Who follows you'));
+    if (!rows.length) {
+      followersPanel.appendChild(make('p', 'followers-empty', "No followers yet. When someone follows your portfolio, they'll show up here."));
+      return;
+    }
+    var list = make('ul', 'followers-list');
+    var noPortfolio = 0;
+    rows.forEach(function (f) {
+      var fp = state.profiles.filter(function (x) { return x.ownerId === f.userId; })[0];
+      if (!fp) { noPortfolio++; return; }
+      var li = make('li');
+      var b = make('button', 'follower');
+      b.type = 'button';
+      var pic = pictureNode(fp.avatar, fp.name);
+      var avatar = make('span', 'avatar follower-avatar', pic ? null : fp.name.charAt(0).toUpperCase());
+      if (pic) avatar.appendChild(pic);
+      avatar.setAttribute('aria-hidden', 'true');
+      var text = make('span', 'follower-text');
+      var name = make('span', 'follower-name');
+      paintName(name, fp.name);
+      text.appendChild(name);
+      if (f.since) text.appendChild(make('span', 'follower-when', 'Followed ' + timeAgo(f.since).toLowerCase()));
+      b.appendChild(avatar);
+      b.appendChild(text);
+      b.addEventListener('click', function () { showProfile(fp.id, true); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    if (noPortfolio) {
+      list.appendChild(make('li', 'follower-more',
+        (noPortfolio === 1 ? '1 person' : noPortfolio + ' people') + ' without a portfolio yet'));
+    }
+    followersPanel.appendChild(list);
   }
   function toggleReaction(table) {
     if (!me) { openAuth('signin', 'Sign in to like and follow profiles.'); return; }
@@ -1888,7 +1943,15 @@
     });
   }
   likeBtn.addEventListener('click', function () { toggleReaction('likes'); });
-  followBtn.addEventListener('click', function () { toggleReaction('follows'); });
+  followBtn.addEventListener('click', function () {
+    var p = current();
+    if (p && canEdit(p)) {
+      followersOpen = !followersOpen;
+      renderProfileReactions();
+      return;
+    }
+    toggleReaction('follows');
+  });
 
   // ---- Notification bell: new research from profiles you follow ----
   var bellBtn = $('bell-btn');

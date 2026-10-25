@@ -220,6 +220,26 @@ img { max-width: 100%; }
   .react-count { color: var(--muted); font-variant-numeric: tabular-nums; }
   .react-btn[aria-pressed="true"] .react-count { color: var(--button-fg); }
   .react-note { flex-basis: 100%; font-size: 0.85rem; color: var(--muted); }
+  /* Who follows you: opens under the buttons on your own portfolio */
+  .followers-panel {
+    flex-basis: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 1.25rem;
+    padding: 0.75rem 0.5rem 0.5rem; max-width: 26rem;
+  }
+  .followers-head { margin: 0 0 0.35rem 0.65rem; font-family: var(--display); font-weight: 600; color: var(--fg); }
+  .followers-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; max-height: 19rem; overflow-y: auto; }
+  .follower {
+    display: flex; align-items: center; gap: 0.8rem; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 0.9rem; padding: 0.6rem 0.7rem; cursor: pointer;
+    font: inherit; color: var(--fg);
+  }
+  .follower:hover { background: var(--blush); }
+  .avatar.follower-avatar { width: 2.4rem; font-size: 1rem; border-width: 2px; --ring: 2px; }
+  .follower-text { display: grid; min-width: 0; }
+  .follower-name { font-weight: 700; overflow-wrap: anywhere; }
+  .follower-name .dollar { color: var(--accent); }
+  .follower-when, .follower-more, .followers-empty { font-size: 0.85rem; color: var(--muted); }
+  .follower-more { padding: 0.35rem 0.7rem; }
+  .followers-empty { margin: 0 0.65rem 0.35rem; }
   .you-badge { background: var(--blush); color: var(--button-fg); border-radius: 999px; padding: 0.05rem 0.55rem; }
   .profile-desc { color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
   .profile-open { align-self: flex-start; margin-top: auto; padding: 0.6rem 1.15rem; font-size: 0.95rem; }

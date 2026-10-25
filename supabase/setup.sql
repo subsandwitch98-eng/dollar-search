@@ -424,6 +424,8 @@ begin
     when 'midnight-bg' then 1
     when 'devil-horns' then 2
     when 'vampire-fangs' then 2
+    when 'scarecrow-mouth' then 2
+    when 'witch-face' then 3
     when 'candy-crown' then 3
     when 'candy-frame' then 3
     when 'vampire-cape' then 4

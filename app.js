@@ -1054,6 +1054,54 @@
     svg.appendChild(path);
     return svg;
   }
+  // A deleted comment shrinks to a point, becomes a gold shooting star and streaks off the top
+  // of the screen while the gap it leaves closes. Resolves when the star is gone.
+  function shootingStarAway(el) {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !el.animate) {
+      el.style.transition = 'opacity 0.2s';
+      el.style.opacity = '0';
+      return new Promise(function (done) { setTimeout(done, 200); });
+    }
+    var rect = el.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    var y = rect.top + rect.height / 2;
+    // Fly up and to the right, past the edge of the window.
+    var dx = window.innerWidth - x + 220;
+    var dy = -(y + 220);
+    var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    el.animate([
+      { transform: 'scale(1)', opacity: 1, filter: 'blur(0)' },
+      { transform: 'scale(0.12)', opacity: 0, filter: 'blur(3px)' }
+    ], { duration: 380, easing: 'cubic-bezier(0.5, 0, 0.75, 0)', fill: 'forwards' }).finished.then(function () {
+      // Close the gap left in the list.
+      el.animate([
+        { height: el.offsetHeight + 'px' },
+        { height: '0px', paddingTop: '0px', paddingBottom: '0px', borderWidth: '0px', marginTop: '-0.6rem' }
+      ], { duration: 280, easing: 'ease-in-out', fill: 'forwards' });
+    });
+
+    var star = make('div', 'shooting-star');
+    star.setAttribute('aria-hidden', 'true');
+    star.appendChild(make('span', 'shooting-star-tail'));
+    star.appendChild(make('span', 'shooting-star-glow'));
+    star.appendChild(make('span', 'shooting-star-core'));
+    star.style.left = x + 'px';
+    star.style.top = y + 'px';
+    document.body.appendChild(star);
+    function at(px, py, scale) {
+      return 'translate(' + px + 'px, ' + py + 'px) rotate(' + angle + 'deg) scale(' + scale + ')';
+    }
+    return star.animate([
+      { transform: at(0, 0, 0.2), opacity: 0, offset: 0 },
+      { transform: at(0, 0, 1.3), opacity: 1, offset: 0.22 },
+      { transform: at(dx * 0.08, dy * 0.08, 1), opacity: 1, offset: 0.38 },
+      { transform: at(dx, dy, 0.55), opacity: 0, offset: 1 }
+    ], { duration: 1250, delay: 260, easing: 'cubic-bezier(0.45, 0, 0.7, 1)', fill: 'forwards' })
+      .finished.then(function () { star.remove(); });
+  }
+
   // Commenters are named by their portfolio, if they have one.
   function authorName(userId) {
     for (var i = 0; i < state.profiles.length; i++) {
@@ -1091,8 +1139,20 @@
             if (armedDelete !== c.id) { armedDelete = c.id; renderProjects(); return; }
             armedDelete = null;
             del.disabled = true;
-            client.from('project_comments').delete().eq('id', c.id).then(function (res) {
-              if (res.error) { del.disabled = false; del.textContent = dbMessage(res.error); return; }
+            // The star flies while the delete is saved; the list updates once both are done.
+            Promise.all([
+              shootingStarAway(li),
+              client.from('project_comments').delete().eq('id', c.id)
+            ]).then(function (results) {
+              var res = results[1];
+              if (res.error) {
+                // Bring the comment back and say why it couldn't be deleted.
+                li.getAnimations().forEach(function (a) { a.cancel(); });
+                li.style.opacity = '';
+                del.disabled = false;
+                del.textContent = dbMessage(res.error);
+                return;
+              }
               state.comments = state.comments.filter(function (x) { return x.id !== c.id; });
               renderProjects();
               refresh();

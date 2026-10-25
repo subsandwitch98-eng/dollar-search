@@ -880,17 +880,20 @@
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
     }
-    // A pet sitting in the bottom-right corner, in front of the shoulder.
-    if (c.pet) {
-      var petGroup = document.createElementNS(SVG_NS, 'g');
-      petGroup.setAttribute('transform', 'translate(87 93) scale(1.3)');
-      layer.appendChild(petGroup);
-      drawPet(function (tag, attrs) {
-        var n = document.createElementNS(SVG_NS, tag);
-        for (var k in attrs) n.setAttribute(k, attrs[k]);
-        petGroup.appendChild(n);
-      }, c.pet, CHAR.petColor[c.petColor]);
-    }
+    return svg;
+  }
+  // The pet is its own little picture, shown only in the portfolio scene beside the character (not in the character itself).
+  function renderPet(c) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '-18 -27 36 43');
+    svg.setAttribute('class', 'portfolio-pet');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Pet ' + CHAR.pet[c.pet].toLowerCase());
+    drawPet(function (tag, attrs) {
+      var n = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      svg.appendChild(n);
+    }, c.pet, CHAR.petColor[c.petColor]);
     return svg;
   }
 
@@ -1625,6 +1628,10 @@
     if (pic) portrait.appendChild(pic);
     portrait.hidden = !pic;
     profileArt.classList.toggle('has-portrait', !!pic);
+    // The pet sits on the clouds beside the character.
+    var oldPet = profileArt.querySelector('.portfolio-pet');
+    if (oldPet) oldPet.remove();
+    if (avatar && avatar.character.pet) profileArt.appendChild(renderPet(avatar.character));
   }
   function draftAvatar() {
     return { mode: 'character', character: picDraft.character };

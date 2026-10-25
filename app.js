@@ -14,7 +14,7 @@
     skin: ['#FCE3D3', '#F5CDB4', '#E5AF8C', '#C98E6A', '#9C6646', '#6E4630'],
     // New styles and colors go on the end of each list so characters people already saved keep their look.
     hairStyle: ['Short', 'Spiky', 'Long', 'Bun', 'Curly', 'Bob', 'Ponytail', 'Pigtails', 'Wavy', 'Afro', 'Buzz', 'Mohawk'],
-    bangs: ['None', 'Straight', 'Side', 'Wispy'],
+    bangs: ['None', 'Straight', 'Side', 'Wispy', 'Curtain', 'Blunt', 'Swoop', 'Choppy', 'Baby', 'Wavy', 'Clipped'],
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
       '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C'],
@@ -649,11 +649,40 @@
       shine('M54 28 L55 40');
     }
 
-    // Bangs across the forehead, stopping above the eyes
-    if (c.bangs === 1) add('path', { d: 'M37 52 C36 33 84 33 83 52 Q78 48.5 73 52 Q67 48.5 61 52 Q55 48.5 49 52 Q43 48.5 37 52 Z', fill: hair });
-    if (c.bangs === 2) add('path', { d: 'M37 51 C36 33 84 31 84 49 C76 45 66 46 57 50 C50 53 43 54 37 51 Z', fill: hair });
-    if (c.bangs === 3) add('path', { d: 'M37 50 C36 33 84 33 83 50 L79 46 L76 52 L71 46 L66 52 L61 46 L56 52 L51 46 L46 52 L42 46 Z', fill: hair });
-    if (c.bangs) strands(['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']);
+    // Bangs across the forehead, stopping above the eyes (which start at y 55).
+    // Each style: [shapes, strand lines]. 1 Straight, 2 Side, 3 Wispy, 4 Curtain, 5 Blunt, 6 Swoop,
+    // 7 Choppy, 8 Baby, 9 Wavy, 10 Clipped.
+    var BANGS = {
+      1: [['M37 52 C36 33 84 33 83 52 Q78 48.5 73 52 Q67 48.5 61 52 Q55 48.5 49 52 Q43 48.5 37 52 Z'],
+        ['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']],
+      2: [['M37 51 C36 33 84 31 84 49 C76 45 66 46 57 50 C50 53 43 54 37 51 Z'],
+        ['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']],
+      3: [['M37 50 C36 33 84 33 83 50 L79 46 L76 52 L71 46 L66 52 L61 46 L56 52 L51 46 L46 52 L42 46 Z'],
+        ['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']],
+      4: [['M37 52 C36 35 52 31 60 35 C56 38 52 42 49 47 C46 51 41 53 37 52 Z',
+        'M83 52 C84 35 68 31 60 35 C64 38 68 42 71 47 C74 51 79 53 83 52 Z'],
+        ['M56 37 Q50 41 45 48', 'M64 37 Q70 41 75 48']],
+      5: [['M36 53 C35 31 85 31 84 53 Q60 51 36 53 Z'],
+        ['M48 38 Q47 45 48 51', 'M60 36 L60 51', 'M72 38 Q73 45 72 51']],
+      6: [['M83 51 C84 33 36 31 36 49 C44 45 54 46 63 50 C70 53 77 54 83 51 Z'],
+        ['M70 40 Q71 45 70 50', 'M56 39 Q55 42 56 45']],
+      7: [['M37 50 C36 33 84 33 83 50 L80 47 L78 53 L74 46 L70 51 L65 45 L61 52 L56 46 L52 50 L48 45 L44 52 L41 46 Z'],
+        ['M52 38 Q51 43 52 48', 'M68 38 Q69 43 68 48']],
+      8: [['M38 46 C37 32 83 32 82 46 Q78 44 74 46 Q69 44 64 46 Q60 44 56 46 Q51 44 46 46 Q42 44 38 46 Z'],
+        ['M52 36 L52 43', 'M68 36 L68 43']],
+      9: [['M37 51 C36 33 84 33 83 51 C80 48 77 48 74 51 C71 54 68 48 64 50.5 C60 53 57 47 53 50 C49 53 45 48 41 51 C39.5 52 38 52 37 51 Z'],
+        ['M50 39 Q48 44 50 49', 'M66 39 Q68 44 66 49']],
+      10: [['M37 51 C36 33 84 31 84 47 C78 43 70 41 62 42 C52 43 44 46 37 51 Z'],
+        ['M48 44 Q60 39 74 42']]
+    };
+    var bang = BANGS[c.bangs];
+    if (bang) {
+      bang[0].forEach(function (d) { add('path', { d: d, fill: hair }); });
+      strands(bang[1]);
+      if (c.bangs === 10) { // a hair clip, in the clothing color
+        add('rect', { x: 42, y: 42, width: 10, height: 3.2, rx: 1.6, fill: top, stroke: shade(top, -0.3), 'stroke-width': 0.8, transform: 'rotate(-22 47 43.6)' });
+      }
+    }
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });

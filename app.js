@@ -1092,8 +1092,65 @@
   var myPortfolioBtn = $('my-portfolio-btn');
   myPortfolioBtn.addEventListener('click', function () {
     var mp = myProfile();
-    if (mp) showProfile(mp.id, true);
+    if (!mp || myPortfolioBtn.disabled) return;
+    myPortfolioBtn.disabled = true;
+    shootingStar(myPortfolioBtn, function () {
+      myPortfolioBtn.disabled = false;
+      showProfile(mp.id, true);
+    });
   });
+
+  // A gold shooting star flies from a button up and off the top-right of the screen,
+  // dropping sparkles behind it, then `done` runs (it runs right away for people who prefer less motion).
+  function shootingStar(fromEl, done) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !document.body.animate) { done(); return; }
+    var r = fromEl.getBoundingClientRect();
+    var x0 = r.left + r.width / 2, y0 = r.top + r.height / 2;
+    var x1 = window.innerWidth + 80, y1 = -80;
+    var angle = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+    var DURATION = 900;
+    var layer = make('div', 'shoot-layer');
+    layer.setAttribute('aria-hidden', 'true');
+    var star = make('div', 'shoot-star');
+    star.appendChild(make('span', 'shoot-trail'));
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    var shape = document.createElementNS(SVG_NS, 'polygon');
+    shape.setAttribute('points', '50,8 61.8,35.8 91.8,38.4 69,58.2 75.9,87.6 50,72 24.1,87.6 31,58.2 8.2,38.4 38.2,35.8');
+    svg.appendChild(shape);
+    star.appendChild(svg);
+    layer.appendChild(star);
+    document.body.appendChild(layer);
+    function at(x, y, scale) {
+      return 'translate(' + x + 'px, ' + y + 'px) rotate(' + angle + 'deg) scale(' + scale + ')';
+    }
+    // It speeds up as it goes, like it's being flung.
+    star.animate([
+      { transform: at(x0, y0, 0.3), opacity: 0 },
+      { transform: at(x0, y0 - 6, 1.15), opacity: 1, offset: 0.14 },
+      { transform: at(x1, y1, 0.9), opacity: 1 }
+    ], { duration: DURATION, easing: 'cubic-bezier(0.55, 0, 0.8, 0.4)', fill: 'forwards' });
+    // Sparkles left behind along the path.
+    for (var i = 1; i <= 12; i++) {
+      (function (i) {
+        var t = i / 13;
+        var eased = Math.pow(t, 1.8);
+        setTimeout(function () {
+          var s = make('span', 'shoot-spark' + (i % 2 ? '' : ' pink'));
+          var x = x0 + (x1 - x0) * eased + (Math.random() * 16 - 8);
+          var y = y0 + (y1 - y0) * eased + (Math.random() * 16 - 8);
+          layer.appendChild(s);
+          s.animate([
+            { transform: 'translate(' + x + 'px, ' + y + 'px) scale(0.2) rotate(0deg)', opacity: 1 },
+            { transform: 'translate(' + x + 'px, ' + (y + 10) + 'px) scale(1) rotate(45deg)', opacity: 0.9, offset: 0.35 },
+            { transform: 'translate(' + x + 'px, ' + (y + 24) + 'px) scale(0.3) rotate(90deg)', opacity: 0 }
+          ], { duration: 700, easing: 'ease-out', fill: 'forwards' });
+        }, DURATION * 0.1 + DURATION * 0.85 * t);
+      })(i);
+    }
+    setTimeout(done, DURATION - 60);
+    setTimeout(function () { layer.remove(); }, DURATION + 800);
+  }
   var homeFilter = 'all'; // 'all', 'following' or 'friends'
   var addingProfile = false;
 

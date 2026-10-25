@@ -383,6 +383,21 @@ img { max-width: 100%; }
     padding: 0.4rem 1rem; border: 1.5px solid #D9CCF5;
   }
   #profile-filter { justify-self: start; }
+  /* Shooting star that carries you to your portfolio from "My portfolio" */
+  .shoot-layer { position: fixed; inset: 0; z-index: 80; pointer-events: none; overflow: hidden; }
+  .shoot-star { position: absolute; left: 0; top: 0; width: 38px; height: 38px; margin: -19px 0 0 -19px; }
+  .shoot-star svg { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 0 6px #FFE58A) drop-shadow(0 0 2px #F6C945); }
+  .shoot-star polygon { fill: #F6C945; stroke: #E0A82E; stroke-width: 5; stroke-linejoin: round; }
+  .shoot-trail {
+    position: absolute; right: 50%; top: 50%; width: 180px; height: 8px; margin-top: -4px; border-radius: 999px;
+    background: linear-gradient(90deg, rgba(246, 201, 69, 0), rgba(246, 201, 69, 0.55) 55%, rgba(255, 243, 196, 0.95));
+  }
+  .shoot-spark {
+    position: absolute; left: 0; top: 0; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #F6C945;
+    clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  }
+  .shoot-spark.pink { background: #F29BB2; }
+
   /* Home: search profiles by name or description */
   .profile-search { position: relative; width: min(26rem, 100%); }
   .profile-search-icon {

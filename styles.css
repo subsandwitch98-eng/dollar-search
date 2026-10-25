@@ -230,6 +230,14 @@ img { max-width: 100%; }
     display: inline-block; width: 0.8em; height: 0.8em; vertical-align: 0.02em;
     fill: #F6C945; stroke: #E0A82E; stroke-width: 7; stroke-linejoin: round; overflow: visible;
   }
+  /* "Emojis can't be used" note, shown briefly at the bottom of the screen */
+  .emoji-note {
+    position: fixed; left: 50%; bottom: 1.5rem; z-index: 60; transform: translate(-50%, 1rem);
+    background: var(--button-fg); color: var(--surface); font-weight: 700; font-size: 0.9rem;
+    border-radius: 999px; padding: 0.6rem 1.1rem; box-shadow: 0 8px 20px rgba(142, 53, 83, 0.25);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: calc(100% - 2rem); text-align: center;
+  }
+  .emoji-note.show { opacity: 1; transform: translate(-50%, 0); }
   /* Small magic wand after early testers' names */
   .tester-wand { display: inline-block; width: 0.75em; height: 0.75em; vertical-align: 0; overflow: visible; }
   .profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; color: var(--muted); }

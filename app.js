@@ -2710,6 +2710,43 @@
     }
   });
 
+  // ---- No emojis: they're taken out of every text box as people type or paste ----
+  // Emoji-style characters, skin tones and flags. Plain symbols like ♥ ★ © stay, unless written as emoji.
+  var EMOJI = /\p{Emoji_Presentation}|\p{Extended_Pictographic}️|[\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}]/gu;
+  var emojiNote = null;
+  var emojiNoteTimer = null;
+  function stripEmoji(text) {
+    var out = text.replace(EMOJI, '');
+    // Leftover joiners and emoji-style markers from emoji sequences.
+    return out === text ? text : out.replace(/[‍️⃣]/g, '');
+  }
+  function showEmojiNote() {
+    if (!emojiNote) {
+      emojiNote = make('p', 'emoji-note', "Emojis can't be used on Dollar Search.");
+      emojiNote.setAttribute('role', 'status');
+      document.body.appendChild(emojiNote);
+    }
+    emojiNote.classList.add('show');
+    clearTimeout(emojiNoteTimer);
+    emojiNoteTimer = setTimeout(function () { emojiNote.classList.remove('show'); }, 2600);
+  }
+  // Runs before the text box's own listeners (capture), so drafts never keep an emoji.
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    var isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|url)$/.test(el.type));
+    if (!isText) return;
+    var clean = stripEmoji(el.value);
+    if (clean === el.value) return;
+    var caret = el.selectionStart;
+    var removed = el.value.length - clean.length;
+    el.value = clean;
+    if (caret != null) {
+      var at = Math.max(0, caret - removed);
+      el.setSelectionRange(at, at);
+    }
+    showEmojiNote();
+  }, true);
+
   // ---- Putting it together ----
   function busy() {
     var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; });

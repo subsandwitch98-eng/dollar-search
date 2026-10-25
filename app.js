@@ -1861,8 +1861,11 @@
       followBtn.setAttribute('aria-controls', 'followers-panel');
     } else {
       followersOpen = false;
-      setReactButton(followBtn, following, following ? '✓' : '+', following ? 'Following' : 'Follow',
+      // If they follow you back, you're friends.
+      var friends = following && areFriends(me.id, p.ownerId);
+      setReactButton(followBtn, following, following ? '✓' : '+', friends ? 'Friends' : following ? 'Following' : 'Follow',
         plural(countFor(state.follows, p.id), 'follower'));
+      followBtn.title = friends ? 'You follow each other. Click to unfollow.' : '';
       followBtn.removeAttribute('aria-expanded');
       followBtn.removeAttribute('aria-controls');
     }
@@ -1878,46 +1881,76 @@
     }
     renderFollowers(p);
   }
-  // Followers are listed by their portfolio, newest first; people without a portfolio are counted at the end.
+  // The follow row where `userId` follows any portfolio owned by `ownerId`, or undefined.
+  function followOfOwner(userId, ownerId) {
+    return state.follows.filter(function (f) {
+      var target = findProfile(f.profileId);
+      return f.userId === userId && target && target.ownerId === ownerId;
+    })[0];
+  }
+  // Two people are friends when each follows the other's portfolio.
+  function areFriends(userA, userB) {
+    return userA !== userB && !!followOfOwner(userA, userB) && !!followOfOwner(userB, userA);
+  }
+  function followerItem(fp, line) {
+    var li = make('li');
+    var b = make('button', 'follower');
+    b.type = 'button';
+    var pic = pictureNode(fp.avatar, fp.name);
+    var avatar = make('span', 'avatar follower-avatar', pic ? null : fp.name.charAt(0).toUpperCase());
+    if (pic) avatar.appendChild(pic);
+    avatar.setAttribute('aria-hidden', 'true');
+    var text = make('span', 'follower-text');
+    var name = make('span', 'follower-name');
+    paintName(name, fp.name);
+    text.appendChild(name);
+    if (line) text.appendChild(make('span', 'follower-when', line));
+    b.appendChild(avatar);
+    b.appendChild(text);
+    b.addEventListener('click', function () { showProfile(fp.id, true); });
+    li.appendChild(b);
+    return li;
+  }
+  // Friends (you follow each other) come first, then other followers, newest first;
+  // people without a portfolio are counted at the end.
   function renderFollowers(p) {
     followersPanel.hidden = !followersOpen;
     followersPanel.textContent = '';
     if (!followersOpen) return;
     var rows = state.follows.filter(function (f) { return f.profileId === p.id; })
       .sort(function (a, b) { return b.since - a.since; });
-    followersPanel.appendChild(make('p', 'followers-head', 'Who follows you'));
     if (!rows.length) {
+      followersPanel.appendChild(make('p', 'followers-head', 'Who follows you'));
       followersPanel.appendChild(make('p', 'followers-empty', "No followers yet. When someone follows your portfolio, they'll show up here."));
       return;
     }
-    var list = make('ul', 'followers-list');
+    var friends = make('ul', 'followers-list');
+    var followers = make('ul', 'followers-list');
     var noPortfolio = 0;
     rows.forEach(function (f) {
       var fp = state.profiles.filter(function (x) { return x.ownerId === f.userId; })[0];
       if (!fp) { noPortfolio++; return; }
-      var li = make('li');
-      var b = make('button', 'follower');
-      b.type = 'button';
-      var pic = pictureNode(fp.avatar, fp.name);
-      var avatar = make('span', 'avatar follower-avatar', pic ? null : fp.name.charAt(0).toUpperCase());
-      if (pic) avatar.appendChild(pic);
-      avatar.setAttribute('aria-hidden', 'true');
-      var text = make('span', 'follower-text');
-      var name = make('span', 'follower-name');
-      paintName(name, fp.name);
-      text.appendChild(name);
-      if (f.since) text.appendChild(make('span', 'follower-when', 'Followed ' + timeAgo(f.since).toLowerCase()));
-      b.appendChild(avatar);
-      b.appendChild(text);
-      b.addEventListener('click', function () { showProfile(fp.id, true); });
-      li.appendChild(b);
-      list.appendChild(li);
+      var back = followOfOwner(p.ownerId, f.userId);
+      if (back && f.userId !== p.ownerId) {
+        var since = Math.max(f.since, back.since);
+        friends.appendChild(followerItem(fp, since ? 'Friends since ' + timeAgo(since).toLowerCase() : 'You follow each other'));
+      } else {
+        followers.appendChild(followerItem(fp, f.since ? 'Followed you ' + timeAgo(f.since).toLowerCase() : ''));
+      }
     });
     if (noPortfolio) {
-      list.appendChild(make('li', 'follower-more',
+      followers.appendChild(make('li', 'follower-more',
         (noPortfolio === 1 ? '1 person' : noPortfolio + ' people') + ' without a portfolio yet'));
     }
-    followersPanel.appendChild(list);
+    if (friends.children.length) {
+      followersPanel.appendChild(make('p', 'followers-head', 'Friends · ' + friends.children.length));
+      followersPanel.appendChild(make('p', 'followers-sub', 'You follow each other.'));
+      followersPanel.appendChild(friends);
+    }
+    if (followers.children.length) {
+      followersPanel.appendChild(make('p', 'followers-head', friends.children.length ? 'Other followers' : 'Who follows you'));
+      followersPanel.appendChild(followers);
+    }
   }
   function toggleReaction(table) {
     if (!me) { openAuth('signin', 'Sign in to like and follow profiles.'); return; }

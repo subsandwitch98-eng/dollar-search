@@ -1023,3 +1023,24 @@ img { max-width: 100%; }
 /* Star Shop pets are previewed on their own in the shop */
 .avatar.shop-avatar.shop-pet { background: #FBE3E6; }
 .avatar.shop-avatar.shop-pet svg { width: 70%; height: 70%; margin: auto; overflow: visible; }
+
+/* Research cards: cover picture, topic tags, reading time and date, pinned card */
+.project-image { display: block; width: calc(100% + 3rem); max-width: none; margin: -1.5rem -1.5rem 0.25rem; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 1.5rem 1.5rem 0 0; background: var(--blush); }
+.tag-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tag-chip { font-size: 0.72rem; font-weight: 700; color: #6E58B0; background: #ECE6FA; border-radius: 999px; padding: 0.1rem 0.55rem; }
+.project-meta { font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-top: -0.25rem; }
+.project.pinned { border-color: #F6C945; box-shadow: 0 0 0 2px #F6C945 inset; }
+.pin-tag { align-self: flex-start; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: #F6C945; color: #6B4508; border-radius: 999px; padding: 0.1rem 0.6rem; }
+.recent-card .tag-row { margin-top: 0.1rem; }
+/* Home: topic filter for Recent research, and research search results */
+.recent-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
+.research-results { margin-top: 1.75rem; display: grid; gap: 0.6rem; }
+.research-result-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 0.6rem; }
+.research-result {
+  display: grid; gap: 0.15rem; width: 100%; text-align: left; cursor: pointer; font: inherit;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: 0.8rem 1rem; color: var(--fg);
+}
+.research-result:hover { border-color: var(--pink); background: var(--blush); }
+.research-result-title { font-weight: 700; overflow-wrap: anywhere; }
+.research-result-by { font-size: 0.85rem; color: var(--muted); }
+.research-result-by .dollar { color: var(--accent); }

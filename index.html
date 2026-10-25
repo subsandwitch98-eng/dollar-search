@@ -115,7 +115,7 @@
           <div class="profile-search" role="search">
             <svg class="profile-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
             <label class="sr-only" for="profile-search">Search profiles</label>
-            <input id="profile-search" type="search" placeholder="Search profiles by name or description" maxlength="60" autocomplete="off">
+            <input id="profile-search" type="search" placeholder="Search profiles and research" maxlength="60" autocomplete="off">
           </div>
           <div class="card-tabs" id="profile-filter" role="group" aria-label="Show profiles" hidden>
             <button class="card-tab" id="filter-all" type="button" aria-pressed="true">All</button>
@@ -126,6 +126,10 @@
         <p class="load-note" id="load-note">Loading profiles…</p>
         <div class="card-grid" id="profile-list"></div>
         <p class="empty-note" id="profiles-empty" hidden>No profiles yet. Be the first to create one.</p>
+        <div class="research-results" id="research-results" hidden>
+          <p class="edit-label" id="research-results-label">Research</p>
+          <ul class="research-result-list" id="research-result-list"></ul>
+        </div>
       </div>
     </section>
 
@@ -141,6 +145,7 @@
             <button class="recent-arrow" id="recent-next" type="button" aria-label="Scroll forward">→</button>
           </div>
         </div>
+        <div class="recent-tags" id="recent-tags" role="group" aria-label="Show research about" hidden></div>
         <ol class="recent-strip" id="recent-strip" aria-label="Recent research, newest first"></ol>
         <p class="empty-note" id="recent-empty" hidden>No research yet. Add a research project to your portfolio and it shows up here.</p>
       </div>

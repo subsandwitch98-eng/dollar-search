@@ -65,19 +65,38 @@
       return { name: typeof s.name === 'string' ? s.name : '', link: s.link };
     });
   }
+  // Research topics, shared by research tags and the idea generator.
+  var TAGS = ['Science', 'Technology', 'Health', 'Environment', 'Space', 'Society', 'Money', 'Sports',
+    'Food', 'Arts', 'Animals', 'Education', 'Psychology', 'History'];
+  // True once the database has the newer research columns (tags, image, updated date, pinned card).
+  var extrasReady = false;
   function toProject(r) {
+    var created = Date.parse(r.created_at) || 0;
     return {
       id: r.id, profileId: r.profile_id, title: r.title || '', link: r.link || '',
       description: r.description || '', sources: normalizeSources(r.sources),
-      createdAt: Date.parse(r.created_at) || 0
+      createdAt: created,
+      tags: Array.isArray(r.tags) ? r.tags.filter(function (t) { return TAGS.indexOf(t) >= 0; }).slice(0, 3) : [],
+      image: typeof r.image === 'string' ? r.image : '',
+      updatedAt: Date.parse(r.updated_at) || created
     };
+  }
+  // Selects the newer columns too, falling back to the original ones if the database doesn't have them yet.
+  function selectNewer(table, newer, basic) {
+    return client.from(table).select(basic + ', ' + newer).order('created_at').then(function (res) {
+      if (!res.error) return res;
+      return client.from(table).select(basic).order('created_at').then(function (old) {
+        old.usedFallback = true;
+        return old;
+      });
+    });
   }
 
   function loadAll() {
     return Promise.all([
       client.from('site_settings').select('hub_name, hub_intro').eq('id', 1).maybeSingle(),
-      client.from('profiles').select('id, owner_id, name, description, email, avatar, created_at').order('created_at'),
-      client.from('projects').select('id, profile_id, title, link, description, sources, created_at').order('created_at'),
+      selectNewer('profiles', 'pinned_project', 'id, owner_id, name, description, email, avatar, created_at'),
+      selectNewer('projects', 'tags, image, updated_at', 'id, profile_id, title, link, description, sources, created_at'),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
       client.from('project_likes').select('user_id, project_id'),
@@ -90,11 +109,13 @@
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
       }
+      extrasReady = !res[1].usedFallback && !res[2].usedFallback;
       var projects = res[2].data.map(toProject);
       state.profiles = res[1].data.map(function (r) {
         return {
           id: r.id, ownerId: r.owner_id, name: r.name || 'Untitled profile',
           description: r.description || '', email: r.email || '', avatar: normalizeAvatar(r.avatar),
+          pinnedProject: r.pinned_project || null,
           projects: projects.filter(function (q) { return q.profileId === r.id; })
         };
       });
@@ -1367,6 +1388,8 @@
     when.title = 'Published ' + exactTime(q.createdAt);
     b.appendChild(when);
     b.appendChild(make('span', 'recent-title', q.title));
+    var recentTagsRow = tagChips(q);
+    if (recentTagsRow) b.appendChild(recentTagsRow);
     if (q.description) b.appendChild(make('span', 'recent-desc', q.description));
     var by = make('span', 'recent-by');
     var pic = pictureNode(p.avatar, p.name);
@@ -1409,6 +1432,69 @@
     li.appendChild(card);
     return li;
   }
+  // Search also finds research: titles, descriptions, topics and source names.
+  function renderResearchResults(query) {
+    var box = $('research-results');
+    var list = $('research-result-list');
+    list.textContent = '';
+    if (!query || !loaded) { box.hidden = true; return; }
+    var hits = [];
+    state.profiles.forEach(function (p) {
+      p.projects.forEach(function (q) {
+        var text = (q.title + ' ' + q.description + ' ' + q.tags.join(' ') + ' ' +
+          q.sources.map(function (s) { return s.name; }).join(' ')).toLowerCase();
+        if (text.indexOf(query) >= 0) hits.push({ p: p, q: q });
+      });
+    });
+    box.hidden = false;
+    $('research-results-label').textContent = hits.length
+      ? 'Research matching “' + profileSearch.value.trim() + '” · ' + hits.length
+      : 'No research matches “' + profileSearch.value.trim() + '”.';
+    hits.slice(0, 12).forEach(function (it) {
+      var li = make('li');
+      var b = make('button', 'research-result');
+      b.type = 'button';
+      b.appendChild(make('span', 'research-result-title', it.q.title));
+      var by = make('span', 'research-result-by');
+      by.appendChild(document.createTextNode('by '));
+      var nm = make('span');
+      paintName(nm, it.p.name);
+      by.appendChild(nm);
+      b.appendChild(by);
+      b.addEventListener('click', function () {
+        showProfile(it.p.id, true);
+        var target = $('project-' + it.q.id);
+        if (!target) return;
+        target.scrollIntoView({ block: 'center' });
+        target.classList.add('flash');
+        setTimeout(function () { target.classList.remove('flash'); }, 1600);
+      });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
+  // Topic filter above Recent research: All plus every topic that some research uses.
+  var recentTag = '';
+  function renderRecentTags(all) {
+    var box = $('recent-tags');
+    var used = TAGS.filter(function (t) { return all.some(function (it) { return it.q.tags.indexOf(t) >= 0; }); });
+    if (recentTag && used.indexOf(recentTag) < 0) recentTag = '';
+    box.hidden = !used.length;
+    box.textContent = '';
+    [''].concat(used).forEach(function (t) {
+      var b = make('button', 'chip tag-filter', t || 'All topics');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', recentTag === t ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        recentTag = t;
+        recentStrip.scrollLeft = 0;
+        renderRecent();
+      });
+      box.appendChild(b);
+    });
+  }
+
   function renderRecent() {
     var ready = !!client && loaded && !loadError;
     recentSection.hidden = !ready;
@@ -1418,6 +1504,8 @@
       p.projects.forEach(function (q) { all.push({ p: p, q: q }); });
     });
     all.sort(function (a, b) { return b.q.createdAt - a.q.createdAt; });
+    renderRecentTags(all);
+    if (recentTag) all = all.filter(function (it) { return it.q.tags.indexOf(recentTag) >= 0; });
     all = all.slice(0, RECENT_LIMIT);
     // Keep the reader's place when the list refreshes.
     var keep = recentStrip.scrollLeft;
@@ -1606,6 +1694,7 @@
     profilesEmpty.textContent = query
       ? 'No profiles match “' + profileSearch.value.trim() + '”.'
       : 'No profiles yet. Be the first to create one.';
+    renderResearchResults(query);
 
     profileList.textContent = '';
     if (!loaded || loadError || !client) { profilesEmpty.hidden = true; return; }
@@ -2489,9 +2578,59 @@
   var editingId = null; // a project id, 'new', or null
   var openTabs = {};    // project id -> selected tab index, for this visit only
 
+  // Small pieces shared by research cards: the cover picture, topic tags, and "1 min read · Updated 2 days ago".
+  function projectImage(q) {
+    var src = cleanLink(q.image);
+    if (!src) return null;
+    var img = make('img', 'project-image');
+    img.src = src;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', function () { img.remove(); });
+    return img;
+  }
+  function tagChips(q) {
+    if (!q.tags.length) return null;
+    var row = make('div', 'tag-row');
+    q.tags.forEach(function (t) { row.appendChild(make('span', 'tag-chip', t)); });
+    return row;
+  }
+  function readMinutes(q) {
+    var text = q.title + ' ' + q.description + ' ' + q.sources.map(function (s) { return s.name; }).join(' ');
+    var words = text.trim().split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.round(words / 200));
+  }
+  function projectMeta(q) {
+    var edited = q.updatedAt > q.createdAt + 60000;
+    var line = make('p', 'project-meta', readMinutes(q) + ' min read · ' +
+      (edited ? 'Updated ' : 'Posted ') + timeAgo(edited ? q.updatedAt : q.createdAt).toLowerCase());
+    line.title = (edited ? 'Updated ' : 'Posted ') + exactTime(edited ? q.updatedAt : q.createdAt);
+    return line;
+  }
+  function isPinned(q) {
+    var owner = findProfile(q.profileId);
+    return !!owner && owner.pinnedProject === q.id;
+  }
+  // The owner can pin one research card to the top of their portfolio.
+  function togglePin(q) {
+    var owner = findProfile(q.profileId);
+    if (!owner || !canEdit(owner) || !extrasReady) return;
+    var next = owner.pinnedProject === q.id ? null : q.id;
+    owner.pinnedProject = next;
+    renderProjects();
+    client.from('profiles').update({ pinned_project: next }).eq('id', owner.id).then(function (res) {
+      if (res.error) showToast(dbMessage(res.error));
+      refresh();
+    });
+  }
+
   function projectCard(p, editable) {
-    var card = make('article', 'project');
+    var card = make('article', 'project' + (isPinned(p) ? ' pinned' : ''));
     card.id = 'project-' + p.id;
+    var cover = projectImage(p);
+    if (cover) card.appendChild(cover);
+    if (isPinned(p)) card.appendChild(make('span', 'pin-tag', 'Pinned'));
     var title = make('h3', 'project-title');
     var href = cleanLink(p.link);
     if (href) {
@@ -2507,6 +2646,9 @@
       title.textContent = p.title;
     }
     card.appendChild(title);
+    var tags = tagChips(p);
+    if (tags) card.appendChild(tags);
+    card.appendChild(projectMeta(p));
     var collabLine = collabNames(p);
     if (collabLine) card.appendChild(collabLine);
     var mineToEdit = canEditProject(p); // owner or accepted collaborator
@@ -2610,6 +2752,13 @@
       edit.type = 'button';
       edit.addEventListener('click', function () { openProject(p.id); });
       tools.appendChild(edit);
+    }
+    if (editable && extrasReady) {
+      var pin = make('button', 'mini-btn pin-btn', isPinned(p) ? 'Unpin' : 'Pin');
+      pin.type = 'button';
+      pin.title = isPinned(p) ? 'Stop showing this first' : 'Show this research first on your portfolio';
+      pin.addEventListener('click', function () { togglePin(p); });
+      tools.appendChild(pin);
     }
     card.appendChild(tools);
     if (open) card.appendChild(commentsPanel(p, comments, editable));
@@ -2951,6 +3100,36 @@
       .concat(field('Description', descIn, 'project-desc-input'))
       .forEach(function (node) { f.appendChild(node); });
 
+    // Topics (up to 3) and a cover picture, once the database has room for them.
+    var pickedTags = isNew ? [] : p.tags.slice();
+    var imageIn = textInput(500, isNew ? '' : p.image);
+    if (extrasReady) {
+      var tagLabel = make('span', 'edit-label', 'Topics (pick up to 3)');
+      tagLabel.id = 'project-tags-label';
+      var tagChipsEl = make('div', 'chips');
+      tagChipsEl.setAttribute('role', 'group');
+      tagChipsEl.setAttribute('aria-labelledby', tagLabel.id);
+      TAGS.forEach(function (t) {
+        var b = make('button', 'chip', t);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', pickedTags.indexOf(t) >= 0 ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          var at = pickedTags.indexOf(t);
+          if (at >= 0) pickedTags.splice(at, 1);
+          else if (pickedTags.length < 3) pickedTags.push(t);
+          else { statusEl.textContent = 'Pick up to 3 topics. Tap one to take it off.'; return; }
+          b.setAttribute('aria-pressed', at >= 0 ? 'false' : 'true');
+          statusEl.textContent = '';
+        });
+        tagChipsEl.appendChild(b);
+      });
+      f.appendChild(tagLabel);
+      f.appendChild(tagChipsEl);
+      imageIn.inputMode = 'url';
+      imageIn.placeholder = 'https://… (a link to a picture)';
+      field('Cover picture link (optional)', imageIn, 'project-image-input').forEach(function (node) { f.appendChild(node); });
+    }
+
     // Sources: any number of name + link rows.
     var sourcesLabel = make('span', 'edit-label', 'Sources');
     sourcesLabel.id = 'project-sources-label';
@@ -3065,6 +3244,16 @@
         sourceList.push({ name: sName, link: sLink });
       }
       var row = { title: t, link: link, description: d, sources: sourceList };
+      if (extrasReady) {
+        var image = cleanLink(imageIn.value);
+        if (image === null) {
+          statusEl.textContent = 'That picture link does not look right. Paste the full web address of the picture.';
+          imageIn.focus();
+          return;
+        }
+        row.tags = pickedTags;
+        row.image = image;
+      }
       setBusy(buttons, true);
       statusEl.textContent = 'Saving…';
       if (isNew) {
@@ -3094,6 +3283,8 @@
     var editable = canEdit(p);
     // Research shared with this portfolio through an accepted collab shows after its own research.
     var cards = p.projects.concat(collabProjectsFor(p));
+    // The pinned card goes first.
+    cards.sort(function (a, b) { return (isPinned(b) && b.profileId === p.id ? 1 : 0) - (isPinned(a) && a.profileId === p.id ? 1 : 0); });
     if (editingId === 'new' ? !editable : editingId !== null && !cards.some(function (q) {
       return q.id === editingId && canEditProject(q);
     })) editingId = null;

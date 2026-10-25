@@ -187,6 +187,28 @@ img { max-width: 100%; }
   .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 1.25rem; margin-top: 2rem; }
   .empty-note { color: var(--muted); margin-top: 1rem; }
 
+  /* Home: Upload tips, under the profiles */
+  .tips-band { padding-block: 4rem; }
+  .section-sub { color: var(--muted); }
+  .tip-grid {
+    list-style: none; margin: 2rem 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 1.25rem;
+  }
+  .tip-card {
+    position: relative; display: grid; gap: 0.5rem; align-content: start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.5rem;
+  }
+  .tip-card h3 { font-size: 1.2rem; font-weight: 600; color: var(--fg); }
+  .tip-card p { color: var(--muted); line-height: 1.55; }
+  .tip-card strong { color: var(--button-fg); }
+  .tip-num {
+    display: grid; place-items: center; width: 2.4rem; aspect-ratio: 1;
+    font-family: var(--display); font-weight: 700; font-size: 1rem; color: #8A5A10;
+    background: #F6C945;
+    clip-path: polygon(50% 0, 61.8% 32%, 97% 34.5%, 69% 56%, 79% 91%, 50% 70.5%, 21% 91%, 31% 56%, 3% 34.5%, 38.2% 32%);
+  }
+  .tip-code { font-family: ui-monospace, Consolas, monospace; font-size: 0.9em; background: var(--blush); border-radius: 0.4rem; padding: 0 0.3rem; }
+
   /* Profile cards on the homepage */
   .profile-card {
     display: flex; flex-direction: column; gap: 0.9rem;

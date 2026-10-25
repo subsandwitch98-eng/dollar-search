@@ -147,20 +147,19 @@ img { max-width: 100%; }
   .edit-status { font-size: 0.85rem; color: var(--muted); min-height: 1.3em; }
   .btn.armed { background: var(--button-fg); border-color: var(--button-fg); color: var(--surface); }
 
-  /* Hero art: three rails converging, drawn in CSS */
+  /* Profile art: the character sits on a stack of research books on clouds, under floating stars */
   .art {
     position: relative; aspect-ratio: 1; max-width: 100%;
     background: var(--blush); border-radius: 2.5rem; overflow: hidden;
   }
-  .art .rails {
-    position: absolute; inset: 18% 12% 0;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10%;
-    transform: perspective(380px) rotateX(48deg); transform-origin: bottom;
-  }
-  .art .rail {
-    border-left: 4px solid var(--pink); border-right: 4px solid var(--pink);
-    background: repeating-linear-gradient(to bottom, transparent 0 18px, var(--pink) 18px 26px);
-    opacity: 0.9;
+  .art .book-scene { position: absolute; left: 0; bottom: 0; width: 100%; height: 35%; }
+  .art .clouds { fill: #FFF6F2; }
+  .art .scene-spark { fill: var(--accent); opacity: 0.7; transform-box: fill-box; transform-origin: center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .art .scene-spark { animation: twinkle 2.6s ease-in-out infinite; }
+    .art .s2 { animation-delay: -0.7s; }
+    .art .s3 { animation-delay: -1.4s; }
+    .art .s4 { animation-delay: -2s; }
   }
   /* Floating gold stars: each bobs and rocks, and pops with a glow in turn. */
   .art .float-star { position: absolute; width: 16%; aspect-ratio: 1; overflow: visible; }
@@ -342,7 +341,7 @@ img { max-width: 100%; }
 
   /* Profile picture: an uploaded photo or a built character, standing on the tracks */
   .portrait {
-    position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%);
     width: 58%; aspect-ratio: 1; border-radius: 50%; overflow: hidden;
     border: 6px solid var(--surface); background: var(--surface);
     box-shadow: 0 10px 24px rgba(142, 53, 83, 0.18);

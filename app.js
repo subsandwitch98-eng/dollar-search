@@ -921,8 +921,24 @@
       add('rect', { x: 33, y: 46, width: 54, height: 9, rx: 4.5, fill: 'rgba(255,255,255,0.3)' });
       add('circle', { cx: 60, cy: 24, r: 5.5, fill: '#FFFFFF' });
     }
+    // Headbands follow the top of the head so they sit right on it: the hair cap (radius 26 around 60,57)
+    // for most styles, or the smaller shaved cap (around 60,53) for Buzz and Mohawk.
+    var shavedHead = style === 10 || style === 11;
+    var crown = shavedHead ? { cx: 60, cy: 53, r: 23.4 } : { cx: 60, cy: 57, r: 25.5 };
+    // The arc of the crown (pushed out by `extra`) between the two points at height y.
+    function crownArc(y, extra) {
+      var r = crown.r + (extra || 0), dy = y - crown.cy, dx = Math.sqrt(r * r - dy * dy);
+      return 'M' + fx(crown.cx - dx) + ' ' + y + ' A' + r + ' ' + r + ' 0 ' + (y > crown.cy ? 1 : 0) + ' 1 ' + fx(crown.cx + dx) + ' ' + y;
+    }
+    // A point on the crown, `deg` degrees from the very top (negative is to the left).
+    function crownPoint(deg) {
+      var a = deg * Math.PI / 180;
+      return { x: crown.cx + Math.sin(a) * crown.r, y: crown.cy - Math.cos(a) * crown.r };
+    }
+    // Decorations drawn for a band peaking at y 28 move down to the real top of the head.
+    var lift = 'translate(0 ' + fx(crown.cy - crown.r - 28) + ')';
     if (c.headwear === 3) {
-      add('path', { d: 'M33 60 C33 22 87 22 87 60', fill: 'none', stroke: ink, 'stroke-width': 5, 'stroke-linecap': 'round' });
+      add('path', { d: crownArc(60, 1), fill: 'none', stroke: ink, 'stroke-width': 5, 'stroke-linecap': 'round' });
       add('rect', { x: 27, y: 51, width: 11, height: 18, rx: 5, fill: top });
       add('rect', { x: 82, y: 51, width: 11, height: 18, rx: 5, fill: top });
     }
@@ -955,8 +971,9 @@
       add('rect', { x: 35, y: 38, width: 50, height: 6, rx: 3, fill: '#2E2226' });
     }
     if (c.headwear === 9) { // Headband over the hair
-      add('path', { d: 'M35 50 Q37 32 60 31 Q83 32 85 50', fill: 'none', stroke: top, 'stroke-width': 5, 'stroke-linecap': 'round' });
-      add('path', { d: 'M40 42 Q46 34 56 32.5', fill: 'none', stroke: shade(top, 0.45), 'stroke-width': 1.5, 'stroke-linecap': 'round' });
+      add('path', { d: crownArc(48), fill: 'none', stroke: top, 'stroke-width': 5, 'stroke-linecap': 'round' });
+      var s1 = crownPoint(-52), s2 = crownPoint(-16);
+      add('path', { d: 'M' + fx(s1.x) + ' ' + fx(s1.y) + ' A' + crown.r + ' ' + crown.r + ' 0 0 1 ' + fx(s2.x) + ' ' + fx(s2.y), fill: 'none', stroke: shade(top, 0.45), 'stroke-width': 1.5, 'stroke-linecap': 'round' });
     }
     if (c.headwear === 10) { // Flower crown: a vine with leaves and five flowers
       add('path', { d: 'M35 47 Q60 28 85 47', fill: 'none', stroke: '#6E9F5C', 'stroke-width': 2, 'stroke-linecap': 'round' });
@@ -992,23 +1009,29 @@
       add('path', { d: 'M55.5 28.4 Q60 31.6 64.5 28.4', fill: 'none', stroke: '#5A2E0E', 'stroke-width': 1.3, 'stroke-linecap': 'round', transform: pk });
     }
     if (c.headwear === 13) { // A headband with two little bat wings
-      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#2E2440', 'stroke-width': 3.4, 'stroke-linecap': 'round' });
-      add('path', { d: 'M51 31 Q45 21 35 23 Q38.5 26.5 37.5 30 Q41 28.8 43 32.5 Q46.5 29.8 51 31 Z', fill: '#3A2E4F' });
-      add('path', { d: 'M69 31 Q75 21 85 23 Q81.5 26.5 82.5 30 Q79 28.8 77 32.5 Q73.5 29.8 69 31 Z', fill: '#3A2E4F' });
-      add('circle', { cx: 60, cy: 28, r: 2.6, fill: '#3A2E4F' });
-      add('circle', { cx: 59, cy: 27.6, r: 0.6, fill: '#F6C945' });
-      add('circle', { cx: 61, cy: 27.6, r: 0.6, fill: '#F6C945' });
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#2E2440', 'stroke-width': 3.4, 'stroke-linecap': 'round' });
+      add('path', { d: 'M51 31 Q45 21 35 23 Q38.5 26.5 37.5 30 Q41 28.8 43 32.5 Q46.5 29.8 51 31 Z', fill: '#3A2E4F', transform: lift });
+      add('path', { d: 'M69 31 Q75 21 85 23 Q81.5 26.5 82.5 30 Q79 28.8 77 32.5 Q73.5 29.8 69 31 Z', fill: '#3A2E4F', transform: lift });
+      add('circle', { cx: 60, cy: 28, r: 2.6, fill: '#3A2E4F', transform: lift });
+      add('circle', { cx: 59, cy: 27.6, r: 0.6, fill: '#F6C945', transform: lift });
+      add('circle', { cx: 61, cy: 27.6, r: 0.6, fill: '#F6C945', transform: lift });
     }
     // More Halloween headwear: 14 Devil horns, 15 Candy corn crown.
-    if (c.headwear === 14) { // Two little curved red horns on a headband
-      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#B83B3B', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
-      add('path', { d: 'M44 33 Q39 25 43 17 Q46.5 26 51 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
-      add('path', { d: 'M76 33 Q81 25 77 17 Q73.5 26 69 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
-      add('path', { d: 'M44.5 27 Q43.5 23.5 44 21', fill: 'none', stroke: '#F7A8A8', 'stroke-width': 1, 'stroke-linecap': 'round' });
+    if (c.headwear === 14) { // Two little curved red horns on a headband, each standing on the band
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#B83B3B', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
+      var hl = crownPoint(-30), hr = crownPoint(30);
+      var leftHorn = 'translate(' + fx(hl.x - 47.5) + ' ' + fx(hl.y - 31.8) + ')';
+      var rightHorn = 'translate(' + fx(hr.x - 72.5) + ' ' + fx(hr.y - 31.8) + ')';
+      add('path', { d: 'M44 33 Q39 25 43 17 Q46.5 26 51 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round', transform: leftHorn });
+      add('path', { d: 'M76 33 Q81 25 77 17 Q73.5 26 69 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round', transform: rightHorn });
+      add('path', { d: 'M44.5 27 Q43.5 23.5 44 21', fill: 'none', stroke: '#F7A8A8', 'stroke-width': 1, 'stroke-linecap': 'round', transform: leftHorn });
     }
-    if (c.headwear === 15) { // A band of five candy corns
-      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#F28C28', 'stroke-width': 2.6, 'stroke-linecap': 'round' });
-      [[40, 39, -38], [49, 32, -16], [60, 29.5, 0], [71, 32, 16], [80, 39, 38]].forEach(function (cc) {
+    if (c.headwear === 15) { // A band of five candy corns, each standing on the band
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#F28C28', 'stroke-width': 2.6, 'stroke-linecap': 'round' });
+      [-38, -17, 0, 17, 38].map(function (deg) {
+        var pt = crownPoint(deg);
+        return [Number(fx(pt.x)), Number(fx(pt.y)), deg];
+      }).forEach(function (cc) {
         var t = 'rotate(' + cc[2] + ' ' + cc[0] + ' ' + cc[1] + ')';
         var x = cc[0], y = cc[1];
         add('polygon', { points: (x - 3.6) + ',' + y + ' ' + (x + 3.6) + ',' + y + ' ' + (x + 2.4) + ',' + (y - 2.8) + ' ' + (x - 2.4) + ',' + (y - 2.8), fill: '#F6C945', transform: t });

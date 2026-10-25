@@ -528,3 +528,19 @@ img { max-width: 100%; }
 
 /* On your own portfolio the like and follow buttons only show counts */
 .react-btn.own { opacity: 0.6; }
+
+/* Like button at the bottom of each research card */
+.project-tools { align-items: center; }
+.card-like {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--body); font-weight: 700; font-size: 0.85rem; color: var(--button-fg);
+  background: var(--surface); border: 1.5px solid var(--pink); border-radius: 999px;
+  padding: 0.3rem 0.8rem; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.card-like:hover:not(:disabled) { background: var(--blush); }
+.card-like-heart { color: var(--accent); }
+.card-like[aria-pressed="true"] { background: var(--button); border-color: var(--button); }
+.card-like[aria-pressed="true"] .card-like-heart { color: var(--button-fg); }
+.card-like:disabled { cursor: default; }
+.card-like.own { opacity: 0.6; }
+@media (pointer: coarse) { .card-like { min-height: 2.75rem; padding-inline: 1rem; } }

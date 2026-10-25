@@ -45,7 +45,7 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [] };
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -72,9 +72,11 @@
       client.from('profiles').select('id, owner_id, name, description, email, avatar, created_at').order('created_at'),
       client.from('projects').select('id, profile_id, title, link, description, sources, created_at').order('created_at'),
       client.from('likes').select('user_id, profile_id'),
-      client.from('follows').select('user_id, profile_id, created_at')
+      client.from('follows').select('user_id, profile_id, created_at'),
+      client.from('project_likes').select('user_id, project_id')
     ]).then(function (res) {
-      res.forEach(function (r) { if (r.error) throw r.error; });
+      // Research likes are optional: if that table isn't set up yet, the rest of the site still loads.
+      res.forEach(function (r, i) { if (r.error && i !== 5) throw r.error; });
       if (res[0].data) {
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
@@ -90,6 +92,9 @@
       state.likes = res[3].data.map(function (l) { return { userId: l.user_id, profileId: l.profile_id }; });
       state.follows = res[4].data.map(function (f) {
         return { userId: f.user_id, profileId: f.profile_id, since: Date.parse(f.created_at) || 0 };
+      });
+      state.projectLikes = res[5].error ? [] : res[5].data.map(function (l) {
+        return { userId: l.user_id, projectId: l.project_id };
       });
       if (!me) { isAdmin = false; seenAt = 0; return; }
       return Promise.all([
@@ -971,15 +976,63 @@
       card.appendChild(about);
     }
 
+    // Footer: research likes for everyone to see; only other people's research can be liked.
+    var tools = make('div', 'project-tools');
+    var likes = state.projectLikes.filter(function (l) { return l.projectId === p.id; });
+    var liked = !!me && likes.some(function (l) { return l.userId === me.id; });
+    var like = make('button', 'card-like');
+    like.type = 'button';
+    like.setAttribute('aria-pressed', liked ? 'true' : 'false');
+    like.setAttribute('aria-label', (liked ? 'Unlike ' : 'Like ') + p.title + ', ' + plural(likes.length, 'like'));
+    var heart = make('span', 'card-like-heart', '♥');
+    heart.setAttribute('aria-hidden', 'true');
+    like.appendChild(heart);
+    like.appendChild(make('span', null, String(likes.length)));
     if (editable) {
-      var tools = make('div', 'project-tools');
+      like.disabled = true;
+      like.classList.add('own');
+      like.title = "You can't like your own research";
+      like.setAttribute('aria-label', plural(likes.length, 'like') + '. You can’t like your own research.');
+    } else {
+      like.disabled = likingProject === p.id;
+      like.addEventListener('click', function () { toggleProjectLike(p); });
+    }
+    tools.appendChild(like);
+    if (editable) {
       var edit = make('button', 'mini-btn', 'Edit');
       edit.type = 'button';
       edit.addEventListener('click', function () { openProject(p.id); });
       tools.appendChild(edit);
-      card.appendChild(tools);
     }
+    card.appendChild(tools);
     return card;
+  }
+
+  var likingProject = null; // the research project whose like is being saved
+  function toggleProjectLike(q) {
+    if (!me) { openAuth('signin', 'Sign in to like research.'); return; }
+    if (likingProject || canEdit(current())) return;
+    var mineIndex = -1;
+    state.projectLikes.forEach(function (l, i) { if (l.userId === me.id && l.projectId === q.id) mineIndex = i; });
+    var before = state.projectLikes.slice();
+    // Show the change right away, then save it.
+    if (mineIndex >= 0) state.projectLikes.splice(mineIndex, 1);
+    else state.projectLikes.push({ userId: me.id, projectId: q.id });
+    likingProject = q.id;
+    renderProjects();
+    var request = mineIndex >= 0
+      ? client.from('project_likes').delete().eq('user_id', me.id).eq('project_id', q.id)
+      : client.from('project_likes').insert({ project_id: q.id });
+    request.then(function (res) {
+      likingProject = null;
+      if (res.error) {
+        state.projectLikes = before;
+        reactNote.textContent = dbMessage(res.error);
+        reactNote.hidden = false;
+      }
+      renderProjects();
+      if (!res.error) refresh();
+    });
   }
 
   function projectForm(p) {

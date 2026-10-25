@@ -12,9 +12,10 @@
   // ---- Profile pictures: an uploaded photo (small JPEG data URL) or a character built from these options ----
   var CHAR = {
     skin: ['#FCE3D3', '#F5CDB4', '#E5AF8C', '#C98E6A', '#9C6646', '#6E4630'],
-    hairStyle: ['Short', 'Spiky', 'Long', 'Bun', 'Curly'],
+    // New styles and colors go on the end of each list so characters people already saved keep their look.
+    hairStyle: ['Short', 'Spiky', 'Long', 'Bun', 'Curly', 'Bob', 'Ponytail', 'Pigtails', 'Wavy', 'Afro', 'Buzz', 'Mohawk'],
     bangs: ['None', 'Straight', 'Side', 'Wispy'],
-    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3'],
+    hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones'],
     glasses: ['None', 'Glasses', 'Shades'],
@@ -229,6 +230,15 @@
 
   // ---- Drawing profile pictures ----
   var SVG_NS = 'http://www.w3.org/2000/svg';
+  // Lighter (amount > 0) or darker (amount < 0) version of a #rrggbb color, for hair shading.
+  function shade(hex, amount) {
+    var n = parseInt(hex.slice(1), 16);
+    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(function (ch) {
+      var v = Math.round(amount < 0 ? ch * (1 + amount) : ch + (255 - ch) * amount);
+      return ('0' + v.toString(16)).slice(-2);
+    }).join('');
+  }
+
   function renderCharacter(c, label) {
     var svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 120 120');
@@ -239,12 +249,55 @@
       for (var k in attrs) n.setAttribute(k, attrs[k]);
       svg.appendChild(n);
     }
-    var skin = CHAR.skin[c.skin], hair = CHAR.hairColor[c.hairColor], top = CHAR.top[c.top];
+    var skin = CHAR.skin[c.skin], top = CHAR.top[c.top];
+    var hair = CHAR.hairColor[c.hairColor];
+    var hairDark = shade(hair, -0.28);   // hair behind the head and strand lines
+    var hairLight = shade(hair, 0.35);   // shine
     var ink = '#3A2A30';
+    var style = c.hairStyle;
     function line(d) { return { d: d, fill: 'none', stroke: ink, 'stroke-width': 2.4, 'stroke-linecap': 'round' }; }
+    function strands(paths) {
+      paths.forEach(function (d) {
+        add('path', { d: d, fill: 'none', stroke: hairDark, 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.8 });
+      });
+    }
+    function shine(d) {
+      add('path', { d: d, fill: 'none', stroke: hairLight, 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.7 });
+    }
+    function tie(x, y) {
+      add('circle', { cx: x, cy: y, r: 3.6, fill: top, stroke: shade(top, -0.3), 'stroke-width': 1 });
+    }
+    // Full hair cap, a little wider than the head (radius 26 vs 24) so no skin shows above the hairline.
+    var CAP = 'M34 57 A26 26 0 0 1 86 57 C80 45 69 40 60 41 C51 40 40 45 34 57 Z';
+    var SHAVED = 'M36.5 53 A23.6 23.6 0 0 1 83.5 53 C76 47 68 45 60 45 C52 45 44 47 36.5 53 Z';
 
     add('rect', { width: 120, height: 120, fill: CHAR.bg[c.bg] });
-    if (c.hairStyle === 2) add('path', { d: 'M34 54 C34 26 86 26 86 54 L89 92 L72 92 L72 64 L48 64 L48 92 L31 92 Z', fill: hair });
+
+    // Hair behind the head, in a darker shade for depth
+    if (style === 2) { // Long
+      add('path', { d: 'M33 52 C33 25 87 25 87 52 L90 94 Q81 99 73 93 L72 64 L48 64 L47 93 Q39 99 30 94 Z', fill: hairDark });
+    }
+    if (style === 5) { // Bob
+      add('path', { d: 'M32 54 C32 25 88 25 88 54 L89 76 Q88 83 81 81 L39 81 Q32 83 31 76 Z', fill: hairDark });
+    }
+    if (style === 6) { // Ponytail, swinging out behind the right side
+      add('path', { d: 'M80 40 Q102 42 100 68 Q98 84 88 92 Q93 74 85 58 Z', fill: hairDark });
+      add('path', { d: 'M86 46 Q97 52 95 68', fill: 'none', stroke: hair, 'stroke-width': 2, 'stroke-linecap': 'round', opacity: 0.8 });
+    }
+    if (style === 7) { // Pigtails
+      add('path', { d: 'M37 50 Q17 56 20 82 Q27 74 37 66 Z', fill: hairDark });
+      add('path', { d: 'M83 50 Q103 56 100 82 Q93 74 83 66 Z', fill: hairDark });
+    }
+    if (style === 8) { // Wavy
+      add('path', { d: 'M33 52 C33 25 87 25 87 52 Q92 62 87 72 Q93 83 86 95 L74 95 L72 64 L48 64 L46 95 L34 95 Q27 83 33 72 Q28 62 33 52 Z', fill: hairDark });
+    }
+    if (style === 9) { // Afro
+      add('circle', { cx: 60, cy: 46, r: 33, fill: hairDark });
+      [[34, 34, 9], [46, 20, 10], [62, 16, 10], [78, 22, 10], [88, 36, 9], [30, 50, 8], [90, 52, 8]].forEach(function (b) {
+        add('circle', { cx: b[0], cy: b[1], r: b[2], fill: hair });
+      });
+    }
+
     // Shoulders, neck, ears, head
     add('path', { d: 'M18 120 C18 94 38 86 60 86 C82 86 102 94 102 120 Z', fill: top });
     add('rect', { x: 52, y: 72, width: 16, height: 16, rx: 6, fill: skin });
@@ -252,23 +305,93 @@
     add('circle', { cx: 36.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 83.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 60, cy: 56, r: 24, fill: skin });
-    // Hair: a cap slightly wider than the head so no skin shows above the hairline
-    if (c.hairStyle === 0 || c.hairStyle === 2 || c.hairStyle === 3 || c.hairStyle === 4) {
-      add('path', { d: 'M34 57 A26 26 0 0 1 86 57 C80 45 69 40 60 41 C51 40 40 45 34 57 Z', fill: hair });
+
+    // Hair on top of the head, with strand lines and a shine
+    if (style === 0) { // Short, with sideburns
+      add('path', { d: CAP, fill: hair });
+      add('path', { d: 'M34 57 Q33 63 36 66 L38 58 Z', fill: hair });
+      add('path', { d: 'M86 57 Q87 63 84 66 L82 58 Z', fill: hair });
+      strands(['M46 37 Q52 41 50 47', 'M60 33 Q64 38 62 44', 'M72 36 Q74 41 71 46']);
+      shine('M41 42 Q49 34 58 33');
     }
-    if (c.hairStyle === 1) {
+    if (style === 1) { // Spiky
       add('path', { d: 'M34 57 L34 40 L41 39 L44 26 L53 30 L60 20 L67 31 L76 25 L78 38 L86 42 L86 57 C80 45 70 40 60 41 C50 40 40 45 34 57 Z', fill: hair });
+      strands(['M44 28 L47 40', 'M60 22 L60 38', 'M76 27 L72 40']);
+      shine('M50 33 L56 28');
     }
-    if (c.hairStyle === 3) add('circle', { cx: 60, cy: 27, r: 9, fill: hair });
-    if (c.hairStyle === 4) {
-      [[39, 47, 9], [45, 37, 10], [57, 32, 11], [70, 35, 10], [80, 45, 9]].forEach(function (b) {
+    if (style === 2 || style === 8) { // Long and Wavy: cap plus locks falling past the ears
+      add('path', { d: CAP, fill: hair });
+      if (style === 2) {
+        add('path', { d: 'M34 56 Q31 72 35 88 L42 88 Q39 71 41 57 Z', fill: hair });
+        add('path', { d: 'M86 56 Q89 72 85 88 L78 88 Q81 71 79 57 Z', fill: hair });
+      } else {
+        add('path', { d: 'M34 56 Q29 64 34 72 Q30 80 35 90 L42 90 Q38 80 41 72 Q37 64 41 57 Z', fill: hair });
+        add('path', { d: 'M86 56 Q91 64 86 72 Q90 80 85 90 L78 90 Q82 80 79 72 Q83 64 79 57 Z', fill: hair });
+      }
+      strands(['M50 35 Q46 42 47 50', 'M70 35 Q74 42 73 50']);
+      shine('M42 42 Q50 34 59 33');
+    }
+    if (style === 3) { // Bun
+      add('path', { d: CAP, fill: hair });
+      add('circle', { cx: 60, cy: 26, r: 10, fill: hair });
+      add('path', { d: 'M51 30 Q60 35 69 30', fill: 'none', stroke: hairDark, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+      strands(['M45 38 Q54 33 60 31', 'M75 38 Q66 33 60 31', 'M55 22 Q60 19 65 22']);
+      shine('M42 43 Q49 36 56 35');
+    }
+    if (style === 4) { // Curly
+      add('path', { d: CAP, fill: hairDark });
+      [[38, 50, 8], [42, 40, 9], [50, 33, 9], [60, 30, 10], [70, 33, 9], [78, 40, 9], [82, 50, 8]].forEach(function (b) {
         add('circle', { cx: b[0], cy: b[1], r: b[2], fill: hair });
       });
+      [[44, 38], [58, 27], [73, 31], [80, 45]].forEach(function (b) {
+        add('circle', { cx: b[0], cy: b[1], r: 2.2, fill: hairLight, opacity: 0.7 });
+      });
     }
+    if (style === 5) { // Bob: chin-length sides
+      add('path', { d: CAP, fill: hair });
+      add('path', { d: 'M34 56 Q32 70 37 80 L44 80 Q40 68 42 57 Z', fill: hair });
+      add('path', { d: 'M86 56 Q88 70 83 80 L76 80 Q80 68 78 57 Z', fill: hair });
+      strands(['M48 36 Q45 44 46 52', 'M72 36 Q75 44 74 52']);
+      shine('M42 42 Q50 34 59 33');
+    }
+    if (style === 6) { // Ponytail: slicked back with a tie
+      add('path', { d: CAP, fill: hair });
+      strands(['M42 47 Q58 36 82 42', 'M46 41 Q60 33 80 38']);
+      tie(84, 43);
+      shine('M44 40 Q52 34 62 33');
+    }
+    if (style === 7) { // Pigtails: middle part and a tie on each side
+      add('path', { d: CAP, fill: hair });
+      add('path', { d: 'M60 32 L60 41', fill: 'none', stroke: hairDark, 'stroke-width': 1.8, 'stroke-linecap': 'round' });
+      strands(['M58 34 Q48 38 42 47', 'M62 34 Q72 38 78 47']);
+      tie(36, 52);
+      tie(84, 52);
+      shine('M44 41 Q50 36 56 35');
+    }
+    if (style === 9) { // Afro: soft hairline at the front
+      add('path', { d: 'M36 53 C36 36 84 36 84 53 C77 45 68 42 60 43 C52 42 43 45 36 53 Z', fill: hair });
+      [[48, 30], [64, 24], [78, 32], [38, 42]].forEach(function (b) {
+        add('circle', { cx: b[0], cy: b[1], r: 2, fill: hairLight, opacity: 0.6 });
+      });
+    }
+    if (style === 10) { // Buzz cut
+      add('path', { d: SHAVED, fill: hair, opacity: 0.85 });
+      [[46, 40], [54, 36], [62, 35], [70, 37], [77, 42], [50, 44], [66, 41]].forEach(function (b) {
+        add('circle', { cx: b[0], cy: b[1], r: 0.9, fill: hairDark, opacity: 0.7 });
+      });
+    }
+    if (style === 11) { // Mohawk: shaved sides, a tall crest down the middle
+      add('path', { d: SHAVED, fill: hair, opacity: 0.3 });
+      add('path', { d: 'M53 47 L50 22 L56 27 L58 14 L62 26 L67 18 L68 47 Q60 44 53 47 Z', fill: hair });
+      strands(['M58 18 L59 40', 'M64 22 L63 40']);
+      shine('M54 28 L55 40');
+    }
+
     // Bangs across the forehead, stopping above the eyes
     if (c.bangs === 1) add('path', { d: 'M37 52 C36 33 84 33 83 52 Q78 48.5 73 52 Q67 48.5 61 52 Q55 48.5 49 52 Q43 48.5 37 52 Z', fill: hair });
     if (c.bangs === 2) add('path', { d: 'M37 51 C36 33 84 31 84 49 C76 45 66 46 57 50 C50 53 43 54 37 51 Z', fill: hair });
     if (c.bangs === 3) add('path', { d: 'M37 50 C36 33 84 33 83 50 L79 46 L76 52 L71 46 L66 52 L61 46 L56 52 L51 46 L46 52 L42 46 Z', fill: hair });
+    if (c.bangs) strands(['M50 40 Q49 45 50 50', 'M64 39 Q65 44 64 49']);
     // Face
     add('circle', { cx: 47, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });
     add('circle', { cx: 73, cy: 66, r: 4, fill: '#F29BB2', opacity: 0.45 });

@@ -368,20 +368,20 @@
       tie(84, 52);
       shine('M44 41 Q50 36 56 35');
     }
-    if (style === 9) { // Afro: soft hairline at the front
-      add('path', { d: 'M36 53 C36 36 84 36 84 53 C77 45 68 42 60 43 C52 42 43 45 36 53 Z', fill: hair });
+    if (style === 9) { // Afro: full cap over the head, blending into the curls behind
+      add('path', { d: CAP, fill: hair });
       [[48, 30], [64, 24], [78, 32], [38, 42]].forEach(function (b) {
         add('circle', { cx: b[0], cy: b[1], r: 2, fill: hairLight, opacity: 0.6 });
       });
     }
     if (style === 10) { // Buzz cut
-      add('path', { d: SHAVED, fill: hair, opacity: 0.85 });
+      add('path', { d: SHAVED, fill: hair });
       [[46, 40], [54, 36], [62, 35], [70, 37], [77, 42], [50, 44], [66, 41]].forEach(function (b) {
         add('circle', { cx: b[0], cy: b[1], r: 0.9, fill: hairDark, opacity: 0.7 });
       });
     }
     if (style === 11) { // Mohawk: shaved sides, a tall crest down the middle
-      add('path', { d: SHAVED, fill: hair, opacity: 0.3 });
+      add('path', { d: SHAVED, fill: hairDark });
       add('path', { d: 'M53 47 L50 22 L56 27 L58 14 L62 26 L67 18 L68 47 Q60 44 53 47 Z', fill: hair });
       strands(['M58 18 L59 40', 'M64 22 L63 40']);
       shine('M54 28 L55 40');

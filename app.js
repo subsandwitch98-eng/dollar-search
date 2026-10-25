@@ -1017,6 +1017,7 @@
   var navProfiles = $('nav-profiles');
   var navHome = $('nav-home');
   var navResearch = $('nav-research');
+  var navAchievements = $('nav-achievements');
   var navContact = $('nav-contact');
   var currentId = new URLSearchParams(location.search).get('p');
 
@@ -1030,6 +1031,7 @@
     navProfiles.hidden = false;
     navHome.hidden = true;
     navResearch.hidden = true;
+    navAchievements.hidden = true;
     navContact.hidden = true;
     renderHome();
     window.scrollTo(0, 0);
@@ -1051,6 +1053,7 @@
     navProfiles.hidden = true;
     navHome.hidden = false;
     navResearch.hidden = false;
+    navAchievements.hidden = false;
     renderProfile();
     window.scrollTo(0, 0);
   }
@@ -1511,6 +1514,7 @@
     ctaContact.hidden = !p.email;
     navContact.hidden = !p.email;
     renderProjects();
+    renderAchievements(p);
   }
 
   function resetDelete() {
@@ -1621,6 +1625,123 @@
     ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip'],
     ['Pet', 'pet', 'chip', 'pets'], ['Pet color', 'petColor', 'swatch', 'pets']
   ];
+  // Pets are achievements: each one unlocks when its owner has done a task on the site.
+  // pet number -> [task, how far along this portfolio is, goal]
+  var PET_UNLOCKS = {
+    1: ['Publish your first research card', function (p) { return p.projects.length; }, 1],
+    2: ['Get your first follower', function (p) { return countFor(state.follows, p.id); }, 1],
+    3: ['Make a friend: follow someone who follows you', function (p) { return friendCount(p.ownerId); }, 1],
+    4: ['Leave 3 comments or tips on other people’s research', function (p) {
+      return state.comments.filter(function (c) { return c.userId === p.ownerId; }).length;
+    }, 3],
+    5: ['Get 5 likes on your research', function (p) {
+      var ids = p.projects.map(function (q) { return q.id; });
+      return state.projectLikes.filter(function (l) { return ids.indexOf(l.projectId) >= 0; }).length;
+    }, 5],
+    6: ['Team up with someone on a collab', function (p) {
+      return state.collabs.filter(function (c) {
+        var q = findProject(c.projectId);
+        return c.status === 'accepted' && (c.toProfile === p.id || (q && q.profileId === p.id));
+      }).length;
+    }, 1]
+  };
+  function petProgress(p, kind) {
+    var u = PET_UNLOCKS[kind];
+    if (!u) return null;
+    var have = Math.min(u[1](p), u[2]);
+    return { task: u[0], have: have, goal: u[2], unlocked: have >= u[2] };
+  }
+  function lockIcon() {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('class', 'lock-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    var shackle = document.createElementNS(SVG_NS, 'path');
+    shackle.setAttribute('d', 'M5 7 V5 a3 3 0 0 1 6 0 V7');
+    shackle.setAttribute('fill', 'none');
+    shackle.setAttribute('stroke', 'currentColor');
+    shackle.setAttribute('stroke-width', '1.8');
+    var body = document.createElementNS(SVG_NS, 'rect');
+    body.setAttribute('x', '3');
+    body.setAttribute('y', '7');
+    body.setAttribute('width', '10');
+    body.setAttribute('height', '7.5');
+    body.setAttribute('rx', '1.6');
+    body.setAttribute('fill', 'currentColor');
+    svg.appendChild(shackle);
+    svg.appendChild(body);
+    return svg;
+  }
+  // The list of pet achievements on the Pets tab: each pet, its task and how far along you are.
+  function petGoalsList(p) {
+    var box = make('div', 'pet-goals');
+    var unlocked = CHAR.pet.filter(function (_, i) { return i && petProgress(p, i).unlocked; }).length;
+    box.appendChild(make('p', 'edit-label', 'Pet achievements · ' + unlocked + ' of ' + (CHAR.pet.length - 1) + ' unlocked'));
+    var list = make('ul', 'pet-goal-list');
+    CHAR.pet.forEach(function (name, i) {
+      if (!i) return;
+      var g = petProgress(p, i);
+      var li = make('li', 'pet-goal' + (g.unlocked ? ' done' : ''));
+      var icon = make('span', 'pet-goal-icon');
+      var mini = renderPet({ pet: i, petColor: picDraft.character.petColor });
+      mini.removeAttribute('class');
+      mini.setAttribute('aria-hidden', 'true');
+      icon.appendChild(mini);
+      if (!g.unlocked) icon.appendChild(lockIcon());
+      var text = make('span', 'pet-goal-text');
+      text.appendChild(make('span', 'pet-goal-name', name + (g.unlocked ? ' · Unlocked' : '')));
+      text.appendChild(make('span', 'pet-goal-task', g.task));
+      if (!g.unlocked && g.goal > 1) {
+        var bar = make('span', 'pet-goal-bar');
+        var fill = make('span', 'pet-goal-fill');
+        fill.style.width = Math.round(g.have / g.goal * 100) + '%';
+        bar.appendChild(fill);
+        text.appendChild(bar);
+        text.appendChild(make('span', 'pet-goal-count', g.have + ' of ' + g.goal));
+      }
+      li.appendChild(icon);
+      li.appendChild(text);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  // The Achievements section on a portfolio: every pet achievement, done or not, for that portfolio.
+  var ACHIEVEMENT_NAMES = { 1: 'First research', 2: 'First follower', 3: 'Best friends', 4: 'Helpful critic', 5: 'Crowd favorite', 6: 'Team player' };
+  function renderAchievements(p) {
+    var list = $('achievement-list');
+    list.textContent = '';
+    var done = 0;
+    CHAR.pet.forEach(function (petName, i) {
+      if (!i) return;
+      var g = petProgress(p, i);
+      if (g.unlocked) done++;
+      var li = make('li', 'achievement' + (g.unlocked ? ' done' : ''));
+      var badge = make('span', 'achievement-badge');
+      var pet = renderPet({ pet: i, petColor: p.avatar ? p.avatar.character.petColor : 0 });
+      pet.removeAttribute('class');
+      pet.setAttribute('aria-hidden', 'true');
+      badge.appendChild(pet);
+      if (!g.unlocked) badge.appendChild(lockIcon());
+      li.appendChild(badge);
+      li.appendChild(make('span', 'achievement-status', g.unlocked ? 'Unlocked' : 'Locked'));
+      li.appendChild(make('h3', 'achievement-name', ACHIEVEMENT_NAMES[i]));
+      li.appendChild(make('p', 'achievement-task', g.task));
+      if (!g.unlocked && g.goal > 1) {
+        var bar = make('span', 'pet-goal-bar');
+        var fill = make('span', 'pet-goal-fill');
+        fill.style.width = Math.round(g.have / g.goal * 100) + '%';
+        bar.appendChild(fill);
+        li.appendChild(bar);
+        li.appendChild(make('span', 'pet-goal-count', g.have + ' of ' + g.goal));
+      }
+      li.appendChild(make('p', 'achievement-reward', (g.unlocked ? 'Unlocked the ' : 'Unlocks the ') + petName.toLowerCase()));
+      list.appendChild(li);
+    });
+    $('achievements-sub').textContent = done + ' of ' + (CHAR.pet.length - 1) + ' unlocked. Each achievement unlocks a pet to pick in Edit character.';
+  }
+
   // The customizer has two tabs: Character (everything without a 4th entry above) and Pets.
   var PIC_TABS = [['character', 'Character'], ['pets', 'Pets']];
   var picTab = 'character';
@@ -1724,6 +1845,15 @@
           b.style.background = value;
           b.setAttribute('aria-label', g[0] + ' ' + (i + 1));
         }
+        // Pets stay locked until their task is done (the one you already have stays picked).
+        var goal = key === 'pet' ? petProgress(p, i) : null;
+        if (goal && !goal.unlocked && picDraft.character.pet !== i) {
+          b.disabled = true;
+          b.classList.add('locked');
+          b.insertBefore(lockIcon(), b.firstChild);
+          b.title = 'Locked: ' + goal.task;
+          b.setAttribute('aria-label', value + ', locked. ' + goal.task + '.');
+        }
         b.setAttribute('aria-pressed', picDraft.character[key] === i ? 'true' : 'false');
         b.addEventListener('click', function () {
           picDraft.character[key] = i;
@@ -1738,14 +1868,17 @@
       group.appendChild(chips);
       picForm.appendChild(group);
     });
+    if (onPets) picForm.appendChild(petGoalsList(p));
     var shuffle = make('button', 'mini-btn add-source', 'Shuffle');
     shuffle.type = 'button';
     shuffle.id = 'pic-shuffle';
     shuffle.style.justifySelf = 'start';
-    // Shuffle only what's on this tab.
+    // Shuffle only what's on this tab, and only pets you've unlocked.
     shuffle.addEventListener('click', function () {
       PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
-        picDraft.character[g[1]] = Math.floor(Math.random() * CHAR[g[1]].length);
+        var choices = CHAR[g[1]].map(function (_, i) { return i; });
+        if (g[1] === 'pet') choices = choices.filter(function (i) { return !i || petProgress(p, i).unlocked; });
+        picDraft.character[g[1]] = choices[Math.floor(Math.random() * choices.length)];
       });
       buildPicForm('pic-shuffle');
     });

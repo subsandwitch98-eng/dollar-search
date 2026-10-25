@@ -18,17 +18,19 @@
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#7B4FA0'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
       '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#F28C28'],
-    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown'],
+    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape', 'Flannel', 'Cozy scarf'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown', 'Leaf crown', 'Earmuffs', 'Santa hat'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk', 'Vampire', 'Scarecrow (removed)', 'Witch'],
-    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb'],
-    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy'],
+    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A', '#F6D9B8', '#2F5D50'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb', 'Maple leaves', 'Snowflakes'],
+    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy', 'Hedgehog', 'Snowman', 'Penguin'],
+    // The scene on your portfolio: what your character stands on and what's behind it.
+    scene: ['Books', 'Library', 'Night sky', 'Garden'],
     petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
   };
-  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame', 'pet', 'petColor'];
-  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0, pet: 0, petColor: 0 };
+  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame', 'pet', 'petColor', 'scene'];
+  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0, pet: 0, petColor: 0, scene: 0 };
   // Options that were removed. They keep their place in the lists above (so the options after them keep
   // their numbers), but nobody can pick them and characters that had one go back to the default.
   var RETIRED = { face: [12] }; // 12: Scarecrow smile
@@ -46,12 +48,14 @@
   // Profile pictures are characters only; anything else saved in the past is ignored.
   function normalizeAvatar(a) {
     if (!a || typeof a !== 'object' || a.mode !== 'character') return null;
-    return { mode: 'character', character: normalizeCharacter(a.character) };
+    // The pet's name is shown under the pet on the portfolio.
+    var petName = typeof a.petName === 'string' ? a.petName.trim().slice(0, 20) : '';
+    return { mode: 'character', character: normalizeCharacter(a.character), petName: petName };
   }
 
   // ---- State, loaded from the database ----
   var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
-    reactions: [], messages: [], notes: {} };
+    reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
@@ -92,6 +96,17 @@
     return client.from(table).select(basic + ', ' + newer).order('created_at').then(function (res) {
       if (!res.error) return res;
       return client.from(table).select(basic).order('created_at').then(function (old) {
+        old.usedFallback = true;
+        return old;
+      });
+    });
+  }
+
+  // Runs a query, and if the database doesn't have its newer columns yet, the older query instead.
+  function orOlder(query, older) {
+    return query.then(function (res) {
+      if (!res.error) return res;
+      return older().then(function (old) {
         old.usedFallback = true;
         return old;
       });
@@ -155,13 +170,17 @@
       if (!me) {
         isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = [];
         messagesReady = false; notesReady = false; state.messages = []; state.notes = {};
+        giftingReady = false; state.starsGiven = 0; state.giftsReceived = [];
         return;
       }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
         client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
-        client.from('shop_purchases').select('item, price').eq('user_id', me.id),
-        client.from('star_gifts').select('stars').eq('user_id', me.id),
+        // With gifting set up, you also see items and stars you gave to friends (falls back to just your own).
+        orOlder(client.from('shop_purchases').select('item, price, user_id, paid_by'),
+          function () { return client.from('shop_purchases').select('item, price').eq('user_id', me.id); }),
+        orOlder(client.from('star_gifts').select('user_id, stars, from_user, created_at'),
+          function () { return client.from('star_gifts').select('stars').eq('user_id', me.id); }),
         client.from('star_claims').select('day').eq('user_id', me.id),
         client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false }),
         client.from('messages').select('id, from_user, to_user, body, created_at, read_at').order('created_at'),
@@ -174,13 +193,23 @@
         // so bought items never disappear from the page.
         if (!extra[2].error) {
           shopReady = true;
-          state.purchases = extra[2].data.map(function (r) { return { item: r.item, price: r.price }; });
+          state.purchases = extra[2].data.map(function (r) {
+            return { item: r.item, price: r.price, owner: r.user_id || me.id, paidBy: r.paid_by || null };
+          });
         } else if (!state.purchases.length) {
           shopReady = false;
         }
-        // Gifted stars (like the early tester gift). Keep the last known total if a reload fails.
+        giftingReady = !extra[2].error && !extra[2].usedFallback && !extra[3].error && !extra[3].usedFallback;
+        // Gifted stars (like the early tester gift, or stars from friends), and stars you gave away.
+        // Keep the last known totals if a reload fails.
         if (!extra[3].error) {
-          state.giftStars = extra[3].data.reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
+          var got = extra[3].data.filter(function (g) { return !g.user_id || g.user_id === me.id; });
+          state.giftStars = got.reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
+          state.giftsReceived = got.filter(function (g) { return g.from_user; }).map(function (g) {
+            return { from: g.from_user, stars: g.stars, at: Date.parse(g.created_at) || 0 };
+          });
+          state.starsGiven = extra[3].data.filter(function (g) { return g.from_user === me.id && g.user_id !== me.id; })
+            .reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
         }
         // Daily stars claimed (one per day) and saved research. Both stay hidden until their tables exist.
         claimsReady = !extra[4].error;
@@ -554,8 +583,33 @@
         add('circle', { cx: fx(x - 0.9), cy: fx(y - 0.5), r: 0.6, fill: '#FFFDF7' });
         add('circle', { cx: fx(x + 0.9), cy: fx(y - 0.5), r: 0.6, fill: '#FFFDF7' });
       });
+    } else if (kind === 12) { // Star Shop Fall: a warm ring of red, orange and gold maple leaves
+      ring(M, '#F7D6B0', FRAME_WIDTH);
+      around(16, M, 11.25, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 0.9, fill: '#C9661A', opacity: 0.6 }); });
+      var leafColors = ['#D9483B', '#F28C28', '#E8B22E', '#B5532A'];
+      around(8, M, 0, function (x, y, deg, i) {
+        var t = 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + (deg + (i % 2 ? 20 : -20)) + ')';
+        add('path', { d: MAPLE_LEAF, fill: leafColors[i % 4], transform: t });
+        add('path', { d: 'M0 2 L0 6.2', stroke: shade(leafColors[i % 4], -0.3), 'stroke-width': 0.7, 'stroke-linecap': 'round', transform: t });
+      });
+    } else if (kind === 13) { // Star Shop Winter: an icy blue ring of snowflakes
+      ring(M, '#D6EAF8', FRAME_WIDTH);
+      ring(59.3, '#FFFFFF', 1.2);
+      ring(FRAME_INNER + 0.7, '#FFFFFF', 1.2);
+      around(10, M, 18, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.1, fill: '#FFFFFF' }); });
+      around(10, M, 0, function (x, y, deg, i) {
+        var t = 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ') scale(' + (i % 2 ? 0.75 : 1) + ')';
+        [0, 60, 120].forEach(function (r) {
+          add('path', { d: 'M0 -4.6 L0 4.6 M-1.4 -3.4 L0 -2.3 L1.4 -3.4 M-1.4 3.4 L0 2.3 L1.4 3.4', fill: 'none', stroke: '#8EC5E8', 'stroke-width': 2.2, 'stroke-linecap': 'round', transform: t + ' rotate(' + r + ')' });
+        });
+        [0, 60, 120].forEach(function (r) {
+          add('path', { d: 'M0 -4.6 L0 4.6 M-1.4 -3.4 L0 -2.3 L1.4 -3.4 M-1.4 3.4 L0 2.3 L1.4 3.4', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 1, 'stroke-linecap': 'round', transform: t + ' rotate(' + r + ')' });
+        });
+      });
     }
   }
+  // A maple leaf about 11 across, pointing up, centered on (0, 0).
+  var MAPLE_LEAF = 'M0 -5.6 L1.3 -2.7 L3.7 -3.8 L2.9 -0.9 L5.4 0 L2.5 1.5 L3.1 3.3 L0.7 2.5 L0 2.4 L-0.7 2.5 L-3.1 3.3 L-2.5 1.5 L-5.4 0 L-2.9 -0.9 L-3.7 -3.8 L-1.3 -2.7 Z';
 
   // Shoulders, neck and clothing. Kinds: 0 Tee, 1 Hoodie, 2 Sweater, 3 Shirt, 4 Jacket, 5 Overalls.
   // The neck is drawn here too, so collars and hoods can sit in front of or behind it.
@@ -585,6 +639,38 @@
       add('path', { d: 'M51 87 L60 102 L69 87 Q60 92 51 87 Z', fill: '#FFFDF7' });
       add('path', { d: 'M51 87 L45 120 M69 87 L75 120', fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linecap': 'round' });
       add('circle', { cx: 60, cy: 95, r: 2.2, fill: '#E05A5A' });
+      return;
+    }
+    if (kind === 7) { // Star Shop Fall: a plaid flannel shirt in the clothing color
+      add('path', { d: SHOULDERS, fill: color });
+      // Plaid: wide dark stripes, then thin light ones, kept inside the shoulders.
+      [[30, 92.6], [45, 87.6], [75, 87.6], [90, 92.6]].forEach(function (v) {
+        add('path', { d: 'M' + v[0] + ' ' + v[1] + ' L' + v[0] + ' 120', stroke: dark, 'stroke-width': 4.5, opacity: 0.45 });
+        add('path', { d: 'M' + (v[0] + 3.5) + ' ' + (v[1] + 0.5) + ' L' + (v[0] + 3.5) + ' 120', stroke: light, 'stroke-width': 0.9, opacity: 0.7 });
+      });
+      [[101, 21.8, 98.2], [113, 19.4, 100.6]].forEach(function (h) {
+        add('path', { d: 'M' + h[1] + ' ' + h[0] + ' L' + h[2] + ' ' + h[0], stroke: dark, 'stroke-width': 4.5, opacity: 0.45 });
+        add('path', { d: 'M' + h[1] + ' ' + (h[0] + 3.5) + ' L' + h[2] + ' ' + (h[0] + 3.5), stroke: light, 'stroke-width': 0.9, opacity: 0.7 });
+      });
+      neck();
+      add('path', { d: 'M60 95 L60 120', stroke: shade(color, -0.4), 'stroke-width': 1.2, opacity: 0.7 });
+      add('path', { d: 'M50 85 L60 95 L52 99 Z', fill: shade(color, -0.12), stroke: shade(color, -0.4), 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M70 85 L60 95 L68 99 Z', fill: shade(color, -0.12), stroke: shade(color, -0.4), 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      [103, 111].forEach(function (y) { add('circle', { cx: 60, cy: y, r: 1.5, fill: '#FBF7F2' }); });
+      return;
+    }
+    if (kind === 8) { // Star Shop Winter: a tee in the clothing color with a red and white striped knit scarf
+      add('path', { d: SHOULDERS, fill: color });
+      neck();
+      var red = '#E05A5A', cream = '#FFF6EE';
+      add('path', { d: 'M62 92 L67 113 L59.5 114.5 L56.5 94 Z', fill: red });
+      [[97.5, 98.5], [103, 104], [108.5, 109.5]].forEach(function (s) {
+        add('path', { d: 'M57.2 ' + s[0] + ' L63.4 ' + (s[0] - 1.2), stroke: cream, 'stroke-width': 2.2 });
+      });
+      add('path', { d: 'M59.6 114.5 L59 118 M62 114 L61.8 117.6 M64.4 113.6 L64.8 117 M66.6 113.2 L67.6 116.4', stroke: red, 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M46 83 Q60 92 74 83 L76 90 Q60 101 44 90 Z', fill: red, stroke: shade(red, -0.2), 'stroke-width': 0.8, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M45 86.8 Q60 97 75 86.8', fill: 'none', stroke: cream, 'stroke-width': 2.2 });
+      add('path', { d: 'M50 88 L50.8 91.6 M55 90 L55.6 93.8 M60 91 L60 94.8 M65 90 L64.4 93.8 M70 88 L69.2 91.6', stroke: shade(red, -0.2), 'stroke-width': 0.6, opacity: 0.6 });
       return;
     }
 
@@ -1098,6 +1184,41 @@
         add('polygon', { points: (x - 1.2) + ',' + (y - 5.6) + ' ' + (x + 1.2) + ',' + (y - 5.6) + ' ' + x + ',' + (y - 8.2), fill: '#FFFDF7', transform: t });
       });
     }
+    // Star Shop Fall and Winter headwear: 16 Leaf crown, 17 Earmuffs, 18 Santa hat.
+    if (c.headwear === 16) { // Autumn leaves standing on a thin twig band, with a little acorn at the top
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#8A5A3C', 'stroke-width': 2.2, 'stroke-linecap': 'round' });
+      var fall = ['#D9483B', '#F28C28', '#E8B22E', '#B5532A', '#E8B22E', '#F28C28', '#D9483B'];
+      [-50, -30, -12, 12, 30, 50].forEach(function (deg, i) {
+        var pt = crownPoint(deg);
+        var t = 'translate(' + fx(pt.x) + ' ' + fx(pt.y - 3.4) + ') rotate(' + (deg * 1.1) + ') scale(1.3)';
+        add('path', { d: MAPLE_LEAF, fill: fall[i], stroke: shade(fall[i], -0.25), 'stroke-width': 0.5, transform: t });
+        add('path', { d: 'M0 2 L0 4.6', stroke: shade(fall[i], -0.35), 'stroke-width': 0.7, transform: t });
+      });
+      var acorn = crownPoint(0);
+      add('ellipse', { cx: 60, cy: fx(acorn.y - 3), rx: 3.3, ry: 3.9, fill: '#C98E5A' });
+      add('path', { d: 'M56.2 ' + fx(acorn.y - 4.6) + ' Q60 ' + fx(acorn.y - 9.4) + ' 63.8 ' + fx(acorn.y - 4.6) + ' Z', fill: '#7A4E2E' });
+      add('path', { d: 'M60 ' + fx(acorn.y - 7.6) + ' L60.8 ' + fx(acorn.y - 9.6), stroke: '#7A4E2E', 'stroke-width': 1, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 17) { // Fluffy white earmuffs on a band in the clothing color
+      add('path', { d: crownArc(58, 1.2), fill: 'none', stroke: top, 'stroke-width': 3.6, 'stroke-linecap': 'round' });
+      add('path', { d: crownArc(58, 1.2), fill: 'none', stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 1, 'stroke-linecap': 'round' });
+      [33, 87].forEach(function (x) {
+        [[0, -4.2], [3.8, -1.4], [2.4, 3.6], [-2.4, 3.6], [-3.8, -1.4]].forEach(function (o) {
+          add('circle', { cx: x + o[0], cy: 60 + o[1], r: 4, fill: '#FFFDF7', stroke: '#E9DDE2', 'stroke-width': 0.7 });
+        });
+        add('circle', { cx: x, cy: 60, r: 4.6, fill: '#FFFDF7' });
+        add('circle', { cx: x - 1.4, cy: 58.4, r: 1.3, fill: '#FFFFFF' });
+      });
+    }
+    if (c.headwear === 18) { // A floppy red Santa hat with a white trim and pom-pom
+      add('path', { d: 'M35 45 Q36 22 58 16 Q77 11 91 27 Q94 33 93 37 Q87 31 81 32 Q85 38 85 45 Z', fill: '#E05A5A' });
+      add('path', { d: 'M58 18 Q74 14 87 26', fill: 'none', stroke: '#F58A8A', 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.8 });
+      add('path', { d: 'M34 45.5 Q60 36 86 45.5', fill: 'none', stroke: '#FFFDF7', 'stroke-width': 8, 'stroke-linecap': 'round' });
+      [40, 48, 56, 64, 72, 80].forEach(function (x, i) {
+        add('circle', { cx: x, cy: i === 0 || i === 5 ? 44 : 41.6, r: 1, fill: '#EDE3E6' });
+      });
+      add('circle', { cx: 93, cy: 38, r: 5.2, fill: '#FFFDF7', stroke: '#EDE3E6', 'stroke-width': 0.8 });
+    }
     return svg;
   }
   // The pet is its own little picture, shown only in the portfolio scene beside the character (not in the character itself).
@@ -1229,6 +1350,51 @@
       add('path', { d: 'M-4 5 Q0 8.6 4 5', fill: 'none', stroke: '#5A2E0E', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
       add('circle', { cx: -6, cy: 5, r: 1.4, fill: pink, opacity: 0.55 });
       add('circle', { cx: 6, cy: 5, r: 1.4, fill: pink, opacity: 0.55 });
+    } else if (kind === 10) { // Star Shop Fall: a round hedgehog with spines in the pet color
+      var spines = [];
+      for (var sp = 0; sp <= 16; sp++) {
+        var sa = Math.PI + Math.PI * sp / 16, sr = sp % 2 ? 11 : 15;
+        spines.push(fx(2 + Math.cos(sa) * sr * 1.05) + ',' + fx(6 + Math.sin(sa) * sr));
+      }
+      add('polygon', { points: spines.join(' ') + ' 17,10 17,13 -12,13', fill: color, stroke: line, 'stroke-width': 1.1, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M-4 -2 L-1 2 M4 -4 L5 1 M10 0 L9 4', stroke: line, 'stroke-width': 0.8, 'stroke-linecap': 'round', opacity: 0.6 });
+      add('ellipse', { cx: -7, cy: 6.5, rx: 7.5, ry: 6.5, fill: '#F5DEC4', stroke: '#C9A27A', 'stroke-width': 1 });
+      add('circle', { cx: -14, cy: 7, r: 1.5, fill: '#3A2A30' });
+      add('circle', { cx: -8, cy: 4.4, r: 1.3, fill: '#3A2A30' });
+      add('circle', { cx: -7.8, cy: 8.6, r: 1.5, fill: pink, opacity: 0.6 });
+      add('ellipse', { cx: -6, cy: 13.6, rx: 2.4, ry: 1.2, fill: '#C9A27A' });
+      add('ellipse', { cx: 7, cy: 13.6, rx: 2.4, ry: 1.2, fill: '#C9A27A' });
+    } else if (kind === 11) { // Star Shop Winter: a snowman with a scarf in the pet color
+      add('path', { d: 'M-8 -2 L-15 -7 M-13 -5.6 L-14.6 -3.4 M8 -2 L15 -7 M13 -5.6 L13.6 -9', stroke: '#8A5A3C', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('circle', { cx: 0, cy: 5.5, r: 9, fill: '#FFFDF7', stroke: '#CFE0EC', 'stroke-width': 1.1 });
+      add('circle', { cx: 0, cy: -8.5, r: 6.8, fill: '#FFFDF7', stroke: '#CFE0EC', 'stroke-width': 1.1 });
+      add('circle', { cx: 0, cy: 3, r: 1, fill: '#3A2A30' });
+      add('circle', { cx: 0, cy: 7.5, r: 1, fill: '#3A2A30' });
+      add('path', { d: 'M-5.4 -3.4 Q0 0 5.4 -3.4 L5.6 -1 Q0 2.2 -5.6 -1 Z', fill: color, stroke: line, 'stroke-width': 0.6 });
+      add('path', { d: 'M3 -1 L4.6 4 L2 4.4 L1.2 -0.4 Z', fill: color, stroke: line, 'stroke-width': 0.6 });
+      add('circle', { cx: -2.4, cy: -10, r: 1, fill: '#3A2A30' });
+      add('circle', { cx: 2.4, cy: -10, r: 1, fill: '#3A2A30' });
+      add('path', { d: 'M-0.2 -8.4 L5.2 -7.2 L-0.2 -6.6 Z', fill: '#F28C28' });
+      add('circle', { cx: -4.2, cy: -7.2, r: 1.2, fill: pink, opacity: 0.6 });
+      add('circle', { cx: 4.4, cy: -6, r: 1.2, fill: pink, opacity: 0.6 });
+      add('rect', { x: -5, y: -17.6, width: 10, height: 2, rx: 1, fill: '#3A2E33' });
+      add('rect', { x: -3.4, y: -23, width: 6.8, height: 6, rx: 1, fill: '#3A2E33' });
+      add('rect', { x: -3.4, y: -19.6, width: 6.8, height: 1.4, fill: '#E05A5A' });
+    } else if (kind === 12) { // Star Shop Winter: a penguin with a little bow tie in the pet color
+      add('ellipse', { cx: -5, cy: 14, rx: 3.4, ry: 1.5, fill: '#F2A541' });
+      add('ellipse', { cx: 5, cy: 14, rx: 3.4, ry: 1.5, fill: '#F2A541' });
+      add('ellipse', { cx: -10.5, cy: 3, rx: 3, ry: 7, fill: '#2E3440', transform: 'rotate(18 -10.5 3)' });
+      add('ellipse', { cx: 10.5, cy: 3, rx: 3, ry: 7, fill: '#2E3440', transform: 'rotate(-18 10.5 3)' });
+      add('ellipse', { cx: 0, cy: 1, rx: 10.5, ry: 13, fill: '#2E3440' });
+      add('ellipse', { cx: 0, cy: 4.5, rx: 7, ry: 9, fill: '#FFFDF7' });
+      add('path', { d: 'M-6.4 -6.5 Q0 -12 6.4 -6.5 Q4 -3.6 0 -4.6 Q-4 -3.6 -6.4 -6.5 Z', fill: '#FFFDF7' });
+      add('circle', { cx: -3, cy: -6.6, r: 1.3, fill: '#2E3440' });
+      add('circle', { cx: 3, cy: -6.6, r: 1.3, fill: '#2E3440' });
+      add('path', { d: 'M-2 -4.4 L2 -4.4 L0 -1.8 Z', fill: '#F2A541' });
+      add('circle', { cx: -5, cy: -3.6, r: 1.3, fill: pink, opacity: 0.6 });
+      add('circle', { cx: 5, cy: -3.6, r: 1.3, fill: pink, opacity: 0.6 });
+      add('path', { d: 'M0 0.6 L-3.4 -1.2 L-3.4 2.4 Z M0 0.6 L3.4 -1.2 L3.4 2.4 Z', fill: color, stroke: line, 'stroke-width': 0.5 });
+      add('circle', { cx: 0, cy: 0.6, r: 0.9, fill: color, stroke: line, 'stroke-width': 0.5 });
     } else if (kind === 6) { // Fish in a round bowl
       add('circle', { cx: 0, cy: 2, r: 12.5, fill: '#DDF0FA', stroke: '#8EC5E8', 'stroke-width': 1.2 });
       add('path', { d: 'M-11 -2 Q0 1 11 -2 L11 2 A12.5 12.5 0 0 1 -11 2 Z', fill: '#BDE3F5', opacity: 0.7 });
@@ -2070,7 +2236,7 @@
   var PIC_GROUPS = [
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
     ['Clothing', 'outfit', 'chip'], ['Clothing color', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
-    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip'],
+    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip'], ['Portfolio scene', 'scene', 'chip'],
     ['Pet', 'pet', 'chip', 'pets'], ['Pet color', 'petColor', 'swatch', 'pets']
   ];
   // Pets are achievements: each one unlocks when its owner has done a task on the site.
@@ -2265,36 +2431,66 @@
   });
 
   // ---- Star Shop: stars come from likes, and buy items for your character ----
-  // Prices must match buy_shop_item() in supabase/star-shop.sql, which is what actually checks them.
-  // The Halloween collection.
+  // Prices and seasons must match buy_shop_item() in supabase/more-features.sql, which is what actually checks them.
+  // Each season's items are only in the shop for that season (US Eastern dates). Items you bought stay yours.
+  var SEASONS = {
+    halloween: { name: 'Halloween', starts: 0, ends: Date.parse('2026-11-01T04:00:00Z'), last: 'October 31' },
+    fall: { name: 'Fall', starts: Date.parse('2026-11-01T04:00:00Z'), ends: Date.parse('2026-12-01T05:00:00Z'), first: 'November 1', last: 'November 30' },
+    winter: { name: 'Winter', starts: Date.parse('2026-12-01T05:00:00Z'), ends: Date.parse('2027-01-01T05:00:00Z'), first: 'December 1', last: 'December 31' }
+  };
+  var SEASON_ORDER = ['halloween', 'fall', 'winter'];
   var SHOP = [
-    { id: 'pumpkin-top', name: 'Pumpkin orange outfit', kind: 'Clothing color', key: 'top', index: 17, price: 1 },
-    { id: 'witchy-hair', name: 'Witchy purple hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1 },
-    { id: 'bat-headband', name: 'Bat headband', kind: 'Headwear', key: 'headwear', index: 13, price: 2 },
-    { id: 'pumpkin-hat', name: 'Pumpkin hat', kind: 'Headwear', key: 'headwear', index: 12, price: 3 },
-    { id: 'witch-hat', name: 'Witch hat', kind: 'Headwear', key: 'headwear', index: 11, price: 4 },
-    { id: 'ghost-frame', name: 'Ghost frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
-    { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 },
-    { id: 'midnight-bg', name: 'Midnight background', kind: 'Background', key: 'bg', index: 6, price: 1 },
-    { id: 'devil-horns', name: 'Devil horns', kind: 'Headwear', key: 'headwear', index: 14, price: 2 },
-    { id: 'vampire-fangs', name: 'Vampire fangs', kind: 'Face', key: 'face', index: 11, price: 2 },
-    { id: 'witch-face', name: 'Witch face', kind: 'Face', key: 'face', index: 13, price: 3 },
-    { id: 'candy-crown', name: 'Candy corn crown', kind: 'Headwear', key: 'headwear', index: 15, price: 3 },
-    { id: 'candy-frame', name: 'Candy corn frame', kind: 'Frame', key: 'frame', index: 10, price: 3 },
-    { id: 'vampire-cape', name: 'Vampire cape', kind: 'Clothing', key: 'outfit', index: 6, price: 4 },
-    { id: 'web-frame', name: 'Spiderweb frame', kind: 'Frame', key: 'frame', index: 11, price: 4 },
-    { id: 'bat-pet', name: 'Bat buddy', kind: 'Pet', key: 'pet', index: 7, price: 5 },
-    { id: 'ghost-pet', name: 'Ghost pet', kind: 'Pet', key: 'pet', index: 8, price: 5 },
-    { id: 'pumpkin-pet', name: 'Pumpkin buddy', kind: 'Pet', key: 'pet', index: 9, price: 6 }
+    { id: 'pumpkin-top', name: 'Pumpkin orange outfit', kind: 'Clothing color', key: 'top', index: 17, price: 1, season: 'halloween' },
+    { id: 'witchy-hair', name: 'Witchy purple hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1, season: 'halloween' },
+    { id: 'bat-headband', name: 'Bat headband', kind: 'Headwear', key: 'headwear', index: 13, price: 2, season: 'halloween' },
+    { id: 'pumpkin-hat', name: 'Pumpkin hat', kind: 'Headwear', key: 'headwear', index: 12, price: 3, season: 'halloween' },
+    { id: 'witch-hat', name: 'Witch hat', kind: 'Headwear', key: 'headwear', index: 11, price: 4, season: 'halloween' },
+    { id: 'ghost-frame', name: 'Ghost frame', kind: 'Frame', key: 'frame', index: 9, price: 4, season: 'halloween' },
+    { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5, season: 'halloween' },
+    { id: 'midnight-bg', name: 'Midnight background', kind: 'Background', key: 'bg', index: 6, price: 1, season: 'halloween' },
+    { id: 'devil-horns', name: 'Devil horns', kind: 'Headwear', key: 'headwear', index: 14, price: 2, season: 'halloween' },
+    { id: 'vampire-fangs', name: 'Vampire fangs', kind: 'Face', key: 'face', index: 11, price: 2, season: 'halloween' },
+    { id: 'witch-face', name: 'Witch face', kind: 'Face', key: 'face', index: 13, price: 3, season: 'halloween' },
+    { id: 'candy-crown', name: 'Candy corn crown', kind: 'Headwear', key: 'headwear', index: 15, price: 3, season: 'halloween' },
+    { id: 'candy-frame', name: 'Candy corn frame', kind: 'Frame', key: 'frame', index: 10, price: 3, season: 'halloween' },
+    { id: 'vampire-cape', name: 'Vampire cape', kind: 'Clothing', key: 'outfit', index: 6, price: 4, season: 'halloween' },
+    { id: 'web-frame', name: 'Spiderweb frame', kind: 'Frame', key: 'frame', index: 11, price: 4, season: 'halloween' },
+    { id: 'bat-pet', name: 'Bat buddy', kind: 'Pet', key: 'pet', index: 7, price: 5, season: 'halloween' },
+    { id: 'ghost-pet', name: 'Ghost pet', kind: 'Pet', key: 'pet', index: 8, price: 5, season: 'halloween' },
+    { id: 'pumpkin-pet', name: 'Pumpkin buddy', kind: 'Pet', key: 'pet', index: 9, price: 6, season: 'halloween' },
+    // Fall, all through November.
+    { id: 'harvest-bg', name: 'Harvest background', kind: 'Background', key: 'bg', index: 7, price: 1, season: 'fall' },
+    { id: 'leaf-crown', name: 'Autumn leaf crown', kind: 'Headwear', key: 'headwear', index: 16, price: 2, season: 'fall' },
+    { id: 'flannel', name: 'Plaid flannel', kind: 'Clothing', key: 'outfit', index: 7, price: 3, season: 'fall' },
+    { id: 'maple-frame', name: 'Maple leaf frame', kind: 'Frame', key: 'frame', index: 12, price: 4, season: 'fall' },
+    { id: 'hedgehog-pet', name: 'Hedgehog', kind: 'Pet', key: 'pet', index: 10, price: 5, season: 'fall' },
+    // Winter, all through December.
+    { id: 'pine-bg', name: 'Snowy pine background', kind: 'Background', key: 'bg', index: 8, price: 1, season: 'winter' },
+    { id: 'earmuffs', name: 'Fluffy earmuffs', kind: 'Headwear', key: 'headwear', index: 17, price: 2, season: 'winter' },
+    { id: 'cozy-scarf', name: 'Cozy knit scarf', kind: 'Clothing', key: 'outfit', index: 8, price: 3, season: 'winter' },
+    { id: 'santa-hat', name: 'Santa hat', kind: 'Headwear', key: 'headwear', index: 18, price: 3, season: 'winter' },
+    { id: 'snowflake-frame', name: 'Snowflake frame', kind: 'Frame', key: 'frame', index: 13, price: 4, season: 'winter' },
+    { id: 'snowman-pet', name: 'Snowman', kind: 'Pet', key: 'pet', index: 11, price: 5, season: 'winter' },
+    { id: 'penguin-pet', name: 'Penguin', kind: 'Pet', key: 'pet', index: 12, price: 6, season: 'winter' }
   ];
-  // The Halloween items are limited: they leave when October 31, 2026 ends (midnight US Eastern).
-  // Must match the date in buy_shop_item() in supabase/star-shop.sql.
-  var SHOP_ENDS = Date.parse('2026-11-01T04:00:00Z');
-  function shopOpen() { return Date.now() < SHOP_ENDS; }
-  // "6 days left", "Last day!", "Ends in 5 hours"...
-  function shopTimeLeft() {
-    var ms = SHOP_ENDS - Date.now();
+  function onSale(item) {
+    var s = SEASONS[item.season], now = Date.now();
+    return now >= s.starts && now < s.ends;
+  }
+  function upcoming(item) { return Date.now() < SEASONS[item.season].starts; }
+  // The season on sale right now, or null once they've all ended.
+  function currentSeason() {
+    var now = Date.now();
+    return SEASON_ORDER.filter(function (k) { return now >= SEASONS[k].starts && now < SEASONS[k].ends; })[0] || null;
+  }
+  // "6 days left", "Last day!", "Ends in 5 hours"... or, with `arriving`, "Arrives in 7 days".
+  function timeUntil(when, arriving) {
+    var ms = when - Date.now();
     var hours = Math.floor(ms / 3600000);
+    if (arriving) {
+      if (hours < 24) return 'Arrives in ' + plural(Math.max(1, hours), 'hour');
+      return 'Arrives in ' + plural(Math.ceil(ms / 86400000), 'day');
+    }
     if (hours < 1) return 'Ends in less than an hour!';
     if (hours < 24) return 'Ends in ' + plural(hours, 'hour') + '!';
     var days = Math.ceil(ms / 86400000);
@@ -2303,8 +2499,9 @@
   function shopItemFor(key, index) {
     return SHOP.filter(function (s) { return s.key === key && s.index === index; })[0] || null;
   }
+  // The purchases you can see include items you gifted to friends: those count as spent, not owned.
   function ownsItem(item) {
-    return state.purchases.some(function (p) { return p.item === item.id; });
+    return state.purchases.some(function (p) { return p.item === item.id && (!p.owner || p.owner === me.id); });
   }
   // Stars earned: one per like on your portfolio and on your research, plus any gifted stars.
   function starsEarned() {
@@ -2369,9 +2566,12 @@
     b.addEventListener('click', claimDailyStar);
     box.appendChild(b);
   }
+  // Spent: items you bought (for yourself or as gifts) and stars you gave to friends.
   function starBalance() {
-    var spent = state.purchases.reduce(function (sum, p) { return sum + p.price; }, 0);
-    return Math.max(0, starsEarned() - spent);
+    var spent = state.purchases.reduce(function (sum, p) {
+      return sum + ((p.paidBy || p.owner || me.id) === me.id ? p.price : 0);
+    }, 0);
+    return Math.max(0, starsEarned() - spent - state.starsGiven);
   }
   var cartBtn = $('cart-btn');
   var shopDialog = $('shop-dialog');
@@ -2394,46 +2594,200 @@
     var stars = starBalance();
     $('shop-balance').textContent = '★ ' + stars;
     $('shop-balance-note').textContent = (stars === 1 ? 'star' : 'stars') + ' to spend';
-    var open = shopOpen();
+    var season = currentSeason();
+    $('shop-title').textContent = season ? 'Star Shop · ' + SEASONS[season].name : 'Star Shop';
     renderDailyStar();
     renderInventory();
+    renderGiftBox();
     var gift = $('shop-gift');
     gift.hidden = !state.giftStars;
-    gift.textContent = 'Includes a gift of ' + plural(state.giftStars, 'star') + '. Thanks for being an early tester!';
-    $('shop-limited').classList.toggle('ended', !open);
-    $('shop-limited-text').textContent = open
-      ? 'The Halloween items leave the shop on October 31, 2026. ' + shopTimeLeft()
-      : 'The Halloween items have left the shop. Anything you bought is still yours in Edit character.';
-    var list = $('shop-list');
-    list.textContent = '';
+    // Gifts from the site (like the early tester gift) and from friends.
+    var fromFriends = state.giftsReceived.reduce(function (sum, g) { return sum + g.stars; }, 0);
+    var fromSite = state.giftStars - fromFriends;
+    var parts = [];
+    if (fromSite > 0) parts.push(plural(fromSite, 'early tester star'));
+    if (fromFriends > 0) parts.push(fromFriends + ' from ' + giftSenders());
+    gift.textContent = 'Includes ' + plural(state.giftStars, 'gifted star') + ': ' + parts.join(' and ') + '. Thank you!';
+    $('shop-limited').classList.toggle('ended', !season);
+    $('shop-limited-text').textContent = season
+      ? 'The ' + SEASONS[season].name + ' items leave the shop on ' + SEASONS[season].last + ', 2026. ' + timeUntil(SEASONS[season].ends)
+      : 'The seasonal items have left the shop. Anything you bought is still yours in Edit character.';
     var mp = myProfile();
     var base = normalizeCharacter(mp && mp.avatar ? mp.avatar.character : DEFAULT_CHAR);
-    // After they leave, the shop only lists the items you own.
-    SHOP.filter(function (item) { return open || ownsItem(item); }).forEach(function (item) {
-      var owned = ownsItem(item);
-      var li = make('li', 'shop-item' + (owned ? ' owned' : ''));
-      // A preview of your own character wearing the item.
-      var look = normalizeCharacter(base);
-      look[item.key] = item.index;
-      var pic = make('span', 'avatar shop-avatar' + (item.key === 'pet' ? ' shop-pet' : ''));
-      // Pets aren't part of the character picture, so they're previewed on their own.
-      pic.appendChild(item.key === 'pet' ? renderPet(look) : pictureNode({ mode: 'character', character: look }, item.name));
-      li.appendChild(pic);
-      li.appendChild(make('span', 'shop-kind', item.kind));
-      li.appendChild(make('h3', 'shop-name', item.name));
-      var b = make('button', 'btn ' + (owned ? 'btn-ghost' : 'btn-solid') + ' shop-buy');
-      b.type = 'button';
-      if (owned) {
-        b.textContent = 'Owned · Wear it';
-        b.addEventListener('click', function () { wearItem(item); });
+    var friend = shopFor && areFriends(me.id, shopFor) ? shopFor : '';
+    // On sale now, plus anything you own from a season that has ended.
+    var list = $('shop-list');
+    list.textContent = '';
+    SHOP.filter(function (item) { return onSale(item) || (!upcoming(item) && ownsItem(item)); }).forEach(function (item) {
+      list.appendChild(shopCard(item, base, stars, friend));
+    });
+    // Coming soon: the next seasons' items, to look at before they arrive.
+    var soon = $('shop-upcoming');
+    soon.textContent = '';
+    SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).forEach(function (k) {
+      var head = make('div', 'shop-soon-head');
+      head.appendChild(make('span', 'shop-soon-tag', 'Coming soon'));
+      head.appendChild(make('h3', 'shop-soon-title', SEASONS[k].name + ' items · ' + SEASONS[k].first + ' to ' + SEASONS[k].last));
+      head.appendChild(make('span', 'shop-soon-when', timeUntil(SEASONS[k].starts, true)));
+      soon.appendChild(head);
+      var grid = make('ul', 'shop-grid shop-soon-grid');
+      SHOP.filter(function (item) { return item.season === k; }).forEach(function (item) {
+        grid.appendChild(shopCard(item, base, stars, friend));
+      });
+      soon.appendChild(grid);
+    });
+  }
+  // One item in the shop, with a preview of your own character wearing it.
+  function shopCard(item, base, stars, friend) {
+    var owned = ownsItem(item);
+    var soon = upcoming(item);
+    var li = make('li', 'shop-item' + (owned && !friend ? ' owned' : '') + (soon ? ' soon' : ''));
+    var look = normalizeCharacter(base);
+    look[item.key] = item.index;
+    var pic = make('span', 'avatar shop-avatar' + (item.key === 'pet' ? ' shop-pet' : ''));
+    // Pets aren't part of the character picture, so they're previewed on their own.
+    pic.appendChild(item.key === 'pet' ? renderPet(look) : pictureNode({ mode: 'character', character: look }, item.name));
+    li.appendChild(pic);
+    li.appendChild(make('span', 'shop-kind', item.kind));
+    li.appendChild(make('h3', 'shop-name', item.name));
+    var from = giftedBy(item);
+    if (from && !friend) li.appendChild(make('span', 'shop-from', 'Gift from ' + from));
+    var b = make('button', 'btn ' + (owned && !friend ? 'btn-ghost' : 'btn-solid') + ' shop-buy');
+    b.type = 'button';
+    if (soon) {
+      b.textContent = '★ ' + item.price + ' · ' + timeUntil(SEASONS[item.season].starts, true).replace('Arrives in', 'In');
+      b.disabled = true;
+    } else if (friend) {
+      b.textContent = '★ ' + item.price + ' · Gift';
+      b.disabled = !giftingReady || !onSale(item) || !!buying || stars < item.price;
+      b.setAttribute('aria-label', 'Gift the ' + item.name.toLowerCase() + ' to ' + ownerName(friend) + ' for ' + plural(item.price, 'star'));
+      if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
+      b.addEventListener('click', function () { giftItem(item, friend); });
+    } else if (owned) {
+      b.textContent = 'Owned · Wear it';
+      b.addEventListener('click', function () { wearItem(item); });
+    } else {
+      b.textContent = '★ ' + item.price + ' · Buy';
+      b.disabled = !shopReady || !onSale(item) || !!buying || stars < item.price;
+      if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
+      b.addEventListener('click', function () { buyItem(item); });
+    }
+    li.appendChild(b);
+    return li;
+  }
+
+  // ---- Gifts: buy an item for a friend, or send them some of your stars ----
+  var giftingReady = false; // true once the database can record who paid for an item
+  var shopFor = '';         // a friend's account id while shopping for them, '' for yourself
+  function giftFriendIds() {
+    var ids = {};
+    state.profiles.forEach(function (p) { if (areFriends(me.id, p.ownerId)) ids[p.ownerId] = true; });
+    return Object.keys(ids).sort(function (a, b) { return ownerName(a).localeCompare(ownerName(b)); });
+  }
+  // Who gave you an item, if it was a gift.
+  function giftedBy(item) {
+    var row = state.purchases.filter(function (p) { return p.item === item.id && p.owner === me.id && p.paidBy && p.paidBy !== me.id; })[0];
+    return row ? ownerName(row.paidBy) || 'a friend' : '';
+  }
+  function giftSenders() {
+    var names = {};
+    state.giftsReceived.forEach(function (g) { var n = ownerName(g.from); if (n) names[n] = true; });
+    var list = Object.keys(names);
+    return list.length ? list.join(', ') : 'friends';
+  }
+  function renderGiftBox() {
+    var box = $('shop-giftbox');
+    var friends = giftingReady ? giftFriendIds() : [];
+    if (shopFor && friends.indexOf(shopFor) < 0) shopFor = '';
+    box.hidden = !friends.length;
+    if (!friends.length) return;
+    box.textContent = '';
+    var row = make('div', 'giftbox-row');
+    var label = make('label', 'giftbox-label', 'Shopping for');
+    label.htmlFor = 'shop-for';
+    row.appendChild(label);
+    var select = make('select', 'giftbox-select');
+    select.id = 'shop-for';
+    var meOpt = make('option', null, 'Me');
+    meOpt.value = '';
+    select.appendChild(meOpt);
+    friends.forEach(function (id) {
+      var o = make('option', null, 'A gift for ' + ownerName(id));
+      o.value = id;
+      select.appendChild(o);
+    });
+    select.value = shopFor;
+    select.addEventListener('change', function () {
+      shopFor = select.value;
+      $('shop-status').textContent = '';
+      renderShop();
+      $('shop-for').focus();
+    });
+    row.appendChild(select);
+    box.appendChild(row);
+    if (!shopFor) {
+      box.appendChild(make('p', 'giftbox-note', 'Pick a friend to buy them an item or send them some of your stars.'));
+      return;
+    }
+    box.appendChild(make('p', 'giftbox-note', 'Click Gift on any item below to send it to ' + ownerName(shopFor) + '. It goes straight into their inventory.'));
+    var starsRow = make('form', 'giftbox-row giftbox-stars');
+    var amountLabel = make('label', 'giftbox-label', 'Or send stars');
+    amountLabel.htmlFor = 'gift-amount';
+    starsRow.appendChild(amountLabel);
+    var amount = make('input', 'giftbox-amount');
+    amount.id = 'gift-amount';
+    amount.type = 'number';
+    amount.min = '1';
+    amount.max = '50';
+    amount.value = '1';
+    amount.inputMode = 'numeric';
+    starsRow.appendChild(amount);
+    var send = make('button', 'mini-btn', 'Send ★');
+    send.type = 'submit';
+    send.disabled = !!buying || starBalance() < 1;
+    starsRow.appendChild(send);
+    starsRow.addEventListener('submit', function (e) {
+      e.preventDefault();
+      giftStars(shopFor, Math.floor(Number(amount.value)));
+    });
+    box.appendChild(starsRow);
+  }
+  function giftItem(item, friendId) {
+    if (!giftingReady || !onSale(item) || buying || starBalance() < item.price) return;
+    buying = item.id;
+    $('shop-status').textContent = 'Sending the ' + item.name.toLowerCase() + ' to ' + ownerName(friendId) + '…';
+    renderShop();
+    client.rpc('gift_shop_item', { item_id: item.id, to_user: friendId }).then(function (res) {
+      buying = null;
+      if (res.error) {
+        $('shop-status').textContent = res.error.message || dbMessage(res.error);
       } else {
-        b.textContent = '★ ' + item.price + ' · Buy';
-        b.disabled = !shopReady || !open || !!buying || stars < item.price;
-        if (stars < item.price) b.title = 'You need ' + plural(item.price - stars, 'more star');
-        b.addEventListener('click', function () { buyItem(item); });
+        state.purchases.push({ item: item.id, price: item.price, owner: friendId, paidBy: me.id });
+        $('shop-status').textContent = 'You gifted the ' + item.name.toLowerCase() + ' to ' + ownerName(friendId) + '!';
+        renderCart();
+        refresh();
       }
-      li.appendChild(b);
-      list.appendChild(li);
+      renderShop();
+    });
+  }
+  function giftStars(friendId, amount) {
+    if (!giftingReady || buying) return;
+    if (!(amount >= 1 && amount <= 50)) { $('shop-status').textContent = 'You can send 1 to 50 stars at a time.'; return; }
+    if (amount > starBalance()) { $('shop-status').textContent = 'You don’t have that many stars yet.'; return; }
+    buying = 'stars';
+    $('shop-status').textContent = 'Sending ' + plural(amount, 'star') + '…';
+    renderShop();
+    client.rpc('gift_stars', { to_user: friendId, amount: amount }).then(function (res) {
+      buying = null;
+      if (res.error) {
+        $('shop-status').textContent = res.error.message || dbMessage(res.error);
+      } else {
+        state.starsGiven += amount;
+        $('shop-status').textContent = 'You sent ' + plural(amount, 'star') + ' to ' + ownerName(friendId) + '!';
+        renderCart();
+        refresh();
+      }
+      renderShop();
     });
   }
   // Your inventory at the top of the shop: everything you've bought, each with a Wear it button.
@@ -2476,7 +2830,7 @@
       'Click Save character to keep it.');
   }
   function buyItem(item) {
-    if (!shopReady || !shopOpen() || buying || starBalance() < item.price) return;
+    if (!shopReady || !onSale(item) || buying || starBalance() < item.price) return;
     buying = item.id;
     $('shop-status').textContent = 'Buying ' + item.name + '…';
     renderShop();
@@ -2487,7 +2841,7 @@
         renderShop();
         return;
       }
-      if (!ownsItem(item)) state.purchases.push({ item: item.id, price: item.price });
+      if (!ownsItem(item)) state.purchases.push({ item: item.id, price: item.price, owner: me.id, paidBy: me.id });
       $('shop-status').textContent = 'You bought the ' + item.name.toLowerCase() + '! It’s in Your items at the top. Click Wear it to put it on.';
       renderCart();
       renderShop();
@@ -2570,13 +2924,101 @@
     if (pic) portrait.appendChild(pic);
     portrait.hidden = !pic;
     profileArt.classList.toggle('has-portrait', !!pic);
-    // The pet sits on the clouds beside the character.
+    paintScene(avatar ? avatar.character.scene : 0);
+    // The pet sits on the clouds beside the character, with its name underneath.
     var oldPet = profileArt.querySelector('.portfolio-pet');
     if (oldPet) oldPet.remove();
-    if (avatar && avatar.character.pet) profileArt.appendChild(renderPet(avatar.character));
+    var oldTag = profileArt.querySelector('.pet-name-tag');
+    if (oldTag) oldTag.remove();
+    if (avatar && avatar.character.pet) {
+      var petPic = renderPet(avatar.character);
+      if (avatar.petName) petPic.setAttribute('aria-label', 'Pet ' + CHAR.pet[avatar.character.pet].toLowerCase() + ' named ' + avatar.petName);
+      profileArt.appendChild(petPic);
+      if (avatar.petName) profileArt.appendChild(make('span', 'pet-name-tag', avatar.petName));
+    }
   }
   function draftAvatar() {
-    return { mode: 'character', character: picDraft.character };
+    return { mode: 'character', character: picDraft.character, petName: (picDraft.petName || '').trim().slice(0, 20) };
+  }
+
+  // ---- Portfolio scenes: what the character stands on and what's behind it ----
+  // 0 Books (the scene in index.html), 1 Library, 2 Night sky, 3 Garden.
+  var SCENE_CLASS = ['', 'scene-library', 'scene-night', 'scene-garden'];
+  var bookScene = profileArt.querySelector('.book-scene');
+  function sceneSvg(viewBox, cls) {
+    var s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('viewBox', viewBox);
+    s.setAttribute('class', cls);
+    s.setAttribute('aria-hidden', 'true');
+    return s;
+  }
+  function paintScene(scene) {
+    SCENE_CLASS.forEach(function (c) { if (c) profileArt.classList.remove(c); });
+    var oldBack = profileArt.querySelector('.scene-backdrop');
+    if (oldBack) oldBack.remove();
+    var oldGround = bookScene.querySelector('.scene-ground');
+    if (oldGround) oldGround.remove();
+    if (!SCENE_CLASS[scene]) return;
+    profileArt.classList.add(SCENE_CLASS[scene]);
+    var back = sceneSvg('0 0 200 200', 'scene-backdrop');
+    back.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    var ground = document.createElementNS(SVG_NS, 'g');
+    ground.setAttribute('class', 'scene-ground');
+    function to(parent) {
+      return function (tag, attrs) {
+        var n = document.createElementNS(SVG_NS, tag);
+        for (var k in attrs) n.setAttribute(k, attrs[k]);
+        parent.appendChild(n);
+        return n;
+      };
+    }
+    var b = to(back), g = to(ground);
+    if (scene === 1) { // Library: shelves of books behind, a comfy reading pouf to sit on
+      var spines = ['#D2728F', '#B9A6E8', '#F4D35E', '#8EC5E8', '#9BD3AE', '#F29E4C', '#E58FA8'];
+      [[24, 62], [86, 124]].forEach(function (shelf, row) {
+        var x = 4, n = row * 3;
+        while (x < 196) {
+          var w = 7 + (n * 7) % 5, h = 30 + (n * 11) % 9;
+          b('rect', { x: x, y: shelf[1] - h, width: w, height: h, rx: 1.2, fill: spines[n % spines.length], opacity: 0.55 });
+          b('rect', { x: x + 1.5, y: shelf[1] - h + 5, width: w - 3, height: 1.4, fill: '#FFFFFF', opacity: 0.45 });
+          x += w + 1.2 + (n % 4 === 3 ? 6 : 0);
+          n++;
+        }
+        b('rect', { x: 0, y: shelf[1], width: 200, height: 5, fill: '#C9A27A', opacity: 0.8 });
+      });
+      g('ellipse', { cx: 100, cy: 66, rx: 46, ry: 4, fill: 'rgba(110, 70, 48, 0.18)' });
+      g('path', { d: 'M56 42 Q56 64 66 66 L134 66 Q144 64 144 42 Z', fill: '#B9A6E8' });
+      g('ellipse', { cx: 100, cy: 42, rx: 44, ry: 9, fill: '#CDBDF2' });
+      g('path', { d: 'M70 47 Q100 53 130 47', fill: 'none', stroke: '#9A86CF', 'stroke-width': 1.4, 'stroke-linecap': 'round' });
+      [78, 100, 122].forEach(function (x) { g('circle', { cx: x, cy: 57, r: 1.6, fill: '#9A86CF' }); });
+    } else if (scene === 2) { // Night sky: a moon and stars, and a crescent moon to sit in
+      b('circle', { cx: 162, cy: 36, r: 15, fill: '#F6E08E' });
+      b('circle', { cx: 169, cy: 31, r: 13, fill: '#2E2856' });
+      [[20, 30, 1.6], [48, 18, 1.1], [80, 40, 1.3], [118, 14, 1.6], [140, 66, 1.1], [30, 80, 1.2], [186, 92, 1.4], [12, 120, 1.1], [104, 26, 0.9], [60, 60, 0.9]].forEach(function (s, i) {
+        b('circle', { cx: s[0], cy: s[1], r: s[2], fill: '#FFF6D6', class: 'night-star' + (i % 3 ? '' : ' twinkle') });
+      });
+      g('path', { d: 'M46 34 Q100 92 154 34 Q100 66 46 34 Z', fill: '#F6E08E', stroke: '#E0B53C', 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      g('circle', { cx: 80, cy: 52, r: 2.4, fill: '#E8CB66' });
+      g('circle', { cx: 116, cy: 55, r: 1.8, fill: '#E8CB66' });
+    } else if (scene === 3) { // Garden: a sun, a little fence and flowers, and a grassy hill
+      b('circle', { cx: 166, cy: 34, r: 14, fill: '#F6C945', opacity: 0.85 });
+      for (var fx2 = 4; fx2 < 200; fx2 += 14) {
+        b('path', { d: 'M' + fx2 + ' 150 L' + fx2 + ' 124 L' + (fx2 + 4) + ' 119 L' + (fx2 + 8) + ' 124 L' + (fx2 + 8) + ' 150 Z', fill: '#FFFDF7', opacity: 0.85 });
+      }
+      b('rect', { x: 0, y: 130, width: 200, height: 4, fill: '#FFFDF7', opacity: 0.85 });
+      g('path', { d: 'M28 70 Q100 18 172 70 Z', fill: '#7BB37A' });
+      g('path', { d: 'M48 54 Q100 22 152 54', fill: 'none', stroke: '#9BD3AE', 'stroke-width': 2, 'stroke-linecap': 'round', opacity: 0.7 });
+      [[44, 60, '#F7A8C0'], [62, 48, '#FFFFFF'], [140, 50, '#F4D35E'], [156, 61, '#B9A6E8'], [12, 60, '#F7A8C0'], [190, 58, '#F4D35E']].forEach(function (f) {
+        g('path', { d: 'M' + f[0] + ' ' + f[1] + ' L' + f[0] + ' ' + (f[1] + 7), stroke: '#5E9B5B', 'stroke-width': 1.2 });
+        for (var p = 0; p < 5; p++) {
+          var a = Math.PI * 2 / 5 * p;
+          g('circle', { cx: (f[0] + Math.cos(a) * 2.4).toFixed(1), cy: (f[1] + Math.sin(a) * 2.4).toFixed(1), r: 2, fill: f[2] });
+        }
+        g('circle', { cx: f[0], cy: f[1], r: 1.3, fill: '#F29E4C' });
+      });
+    }
+    profileArt.insertBefore(back, profileArt.firstChild);
+    bookScene.insertBefore(ground, bookScene.querySelector('.scene-spark'));
   }
   function closePicEditor() {
     picForm.hidden = true;
@@ -2586,7 +3028,7 @@
   }
   picBtn.addEventListener('click', function () {
     var a = current().avatar;
-    picDraft = { character: normalizeCharacter(a ? a.character : DEFAULT_CHAR) };
+    picDraft = { character: normalizeCharacter(a ? a.character : DEFAULT_CHAR), petName: a ? a.petName : '' };
     editBtn.hidden = true;
     picBtn.hidden = true;
     picTab = 'character';
@@ -2679,9 +3121,9 @@
         }
         // Star Shop items stay locked until bought (one you're already wearing stays picked).
         if (isRetired(key, i)) return; // removed options aren't offered
-        // Once the limited items have left the shop, ones you didn't buy disappear from here too.
+        // Seasonal items you didn't buy only show here while they're on sale.
         var shopItem = shopItemFor(key, i);
-        if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i && !shopOpen()) return;
+        if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i && !onSale(shopItem)) return;
         if (shopItem && !ownsItem(shopItem) && picDraft.character[key] !== i) {
           b.disabled = true;
           b.classList.add('locked', 'shop-locked');
@@ -2715,7 +3157,27 @@
       group.appendChild(chips);
       picForm.appendChild(group);
     });
-    if (onPets) picForm.appendChild(petGoalsList(p));
+    if (onPets) {
+      // A name for your pet, shown under it on your portfolio.
+      var nameGroup = make('div', 'option-group');
+      var nameLabel = make('label', 'edit-label', 'Pet name');
+      nameLabel.htmlFor = 'pet-name-input';
+      var nameInput = make('input', 'pet-name-input');
+      nameInput.id = 'pet-name-input';
+      nameInput.type = 'text';
+      nameInput.maxLength = 20;
+      nameInput.placeholder = 'Give your pet a name';
+      nameInput.autocomplete = 'off';
+      nameInput.value = picDraft.petName || '';
+      nameInput.addEventListener('input', function () {
+        picDraft.petName = nameInput.value;
+        paintPortrait(draftAvatar(), p.name);
+      });
+      nameGroup.appendChild(nameLabel);
+      nameGroup.appendChild(nameInput);
+      picForm.appendChild(nameGroup);
+      picForm.appendChild(petGoalsList(p));
+    }
     var shuffle = make('button', 'mini-btn add-source', 'Shuffle');
     shuffle.hidden = picTab === 'inventory';
     shuffle.type = 'button';

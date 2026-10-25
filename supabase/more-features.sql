@@ -190,3 +190,174 @@ create policy "team edits notes" on public.collab_notes for update to authentica
   using (public.on_research_team(project_id)) with check (public.on_research_team(project_id));
 grant select, insert on public.collab_notes to authenticated;
 grant update (body, updated_by, updated_at) on public.collab_notes to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Star Shop: Fall and Winter items, gifts to friends, and daily stars counting toward your balance.
+-- Replaces buy_shop_item() from star-shop.sql.
+-- ---------------------------------------------------------------------------
+-- Who paid for an item (a friend, when it was a gift). Empty means you bought it yourself.
+alter table public.shop_purchases add column if not exists paid_by uuid references auth.users (id) on delete set null;
+drop policy if exists "see own purchases" on public.shop_purchases;
+create policy "see own purchases" on public.shop_purchases for select to authenticated
+  using (user_id = auth.uid() or paid_by = auth.uid());
+
+-- Who sent a gift of stars (a friend). Empty for gifts from the site, like the early tester gift.
+alter table public.star_gifts add column if not exists from_user uuid references auth.users (id) on delete set null;
+drop policy if exists "see own gifts" on public.star_gifts;
+create policy "see own gifts" on public.star_gifts for select to authenticated
+  using (user_id = auth.uid() or from_user = auth.uid());
+
+-- Each item's price and when it's in the shop (US Eastern dates). Keep in step with SHOP and SEASONS in app.js.
+create or replace function public.shop_item_info(item_id text, out price int, out starts timestamptz, out ends timestamptz)
+language sql
+immutable
+set search_path = ''
+as $$
+  select items.cost,
+    case items.season when 'halloween' then timestamptz '2000-01-01 00:00:00+00'
+                      when 'fall' then timestamptz '2026-11-01 04:00:00+00'
+                      else timestamptz '2026-12-01 05:00:00+00' end,
+    case items.season when 'halloween' then timestamptz '2026-11-01 04:00:00+00'
+                      when 'fall' then timestamptz '2026-12-01 05:00:00+00'
+                      else timestamptz '2027-01-01 05:00:00+00' end
+  from (values
+    ('pumpkin-top', 1, 'halloween'), ('witchy-hair', 1, 'halloween'), ('bat-headband', 2, 'halloween'),
+    ('pumpkin-hat', 3, 'halloween'), ('witch-hat', 4, 'halloween'), ('ghost-frame', 4, 'halloween'),
+    ('pumpkin-frame', 5, 'halloween'), ('midnight-bg', 1, 'halloween'), ('devil-horns', 2, 'halloween'),
+    ('vampire-fangs', 2, 'halloween'), ('witch-face', 3, 'halloween'), ('candy-crown', 3, 'halloween'),
+    ('candy-frame', 3, 'halloween'), ('vampire-cape', 4, 'halloween'), ('web-frame', 4, 'halloween'),
+    ('bat-pet', 5, 'halloween'), ('ghost-pet', 5, 'halloween'), ('pumpkin-pet', 6, 'halloween'),
+    ('harvest-bg', 1, 'fall'), ('leaf-crown', 2, 'fall'), ('flannel', 3, 'fall'),
+    ('maple-frame', 4, 'fall'), ('hedgehog-pet', 5, 'fall'),
+    ('pine-bg', 1, 'winter'), ('earmuffs', 2, 'winter'), ('cozy-scarf', 3, 'winter'), ('santa-hat', 3, 'winter'),
+    ('snowflake-frame', 4, 'winter'), ('snowman-pet', 5, 'winter'), ('penguin-pet', 6, 'winter')
+  ) as items (id, cost, season)
+  where items.id = item_id;
+$$;
+
+-- Stars the signed-in person has left: likes on their portfolios and research, gifts and daily stars,
+-- minus what they've spent on items (for themselves or as gifts) and stars they've given away.
+create or replace function public.shop_stars_left()
+returns int
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (
+    (select count(*) from public.likes l join public.profiles p on p.id = l.profile_id where p.owner_id = auth.uid())
+    + (select count(*) from public.project_likes pl join public.projects r on r.id = pl.project_id
+         join public.profiles p on p.id = r.profile_id where p.owner_id = auth.uid())
+    + (select coalesce(sum(g.stars), 0) from public.star_gifts g where g.user_id = auth.uid())
+    + (select count(*) from public.star_claims c where c.user_id = auth.uid())
+    - (select coalesce(sum(s.price), 0) from public.shop_purchases s where coalesce(s.paid_by, s.user_id) = auth.uid())
+    - (select coalesce(sum(g.stars), 0) from public.star_gifts g where g.from_user = auth.uid() and g.user_id <> auth.uid())
+  )::int;
+$$;
+revoke all on function public.shop_stars_left() from public, anon, authenticated;
+
+create or replace function public.buy_shop_item(item_id text)
+returns json
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  info record;
+  left_over int;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to shop.';
+  end if;
+  select * into info from public.shop_item_info(item_id);
+  if info.price is null then
+    raise exception 'That item is not in the shop.';
+  end if;
+  if now() < info.starts then
+    raise exception 'That item is not in the shop yet.';
+  end if;
+  if now() >= info.ends then
+    raise exception 'That item has left the shop.';
+  end if;
+  if exists (select 1 from public.shop_purchases where user_id = auth.uid() and item = item_id) then
+    raise exception 'You already own that item.';
+  end if;
+  left_over := public.shop_stars_left();
+  if left_over < info.price then
+    raise exception 'Not enough stars yet.';
+  end if;
+  insert into public.shop_purchases (user_id, item, price) values (auth.uid(), item_id, info.price);
+  return json_build_object('ok', true, 'stars', left_over - info.price);
+end;
+$$;
+revoke all on function public.buy_shop_item(text) from public;
+grant execute on function public.buy_shop_item(text) to authenticated;
+
+-- Buy an item for a friend. It goes into their inventory; you pay the stars.
+create or replace function public.gift_shop_item(item_id text, to_user uuid)
+returns json
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  info record;
+  left_over int;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to send gifts.';
+  end if;
+  if not public.are_friends(auth.uid(), to_user) then
+    raise exception 'You can only send gifts to friends: people who follow you back.';
+  end if;
+  select * into info from public.shop_item_info(item_id);
+  if info.price is null then
+    raise exception 'That item is not in the shop.';
+  end if;
+  if now() < info.starts or now() >= info.ends then
+    raise exception 'That item is not in the shop right now.';
+  end if;
+  if exists (select 1 from public.shop_purchases where user_id = to_user and item = item_id) then
+    raise exception 'Your friend already has that item. Try another one!';
+  end if;
+  left_over := public.shop_stars_left();
+  if left_over < info.price then
+    raise exception 'Not enough stars yet.';
+  end if;
+  insert into public.shop_purchases (user_id, item, price, paid_by) values (to_user, item_id, info.price, auth.uid());
+  return json_build_object('ok', true, 'stars', left_over - info.price);
+end;
+$$;
+revoke all on function public.gift_shop_item(text, uuid) from public;
+grant execute on function public.gift_shop_item(text, uuid) to authenticated;
+
+-- Send 1 to 50 of your stars to a friend.
+create or replace function public.gift_stars(to_user uuid, amount int)
+returns json
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  left_over int;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to send gifts.';
+  end if;
+  if amount is null or amount < 1 or amount > 50 then
+    raise exception 'You can send 1 to 50 stars at a time.';
+  end if;
+  if not public.are_friends(auth.uid(), to_user) then
+    raise exception 'You can only send gifts to friends: people who follow you back.';
+  end if;
+  left_over := public.shop_stars_left();
+  if left_over < amount then
+    raise exception 'You do not have that many stars yet.';
+  end if;
+  insert into public.star_gifts (user_id, reason, stars, from_user)
+  values (to_user, 'friend-gift:' || gen_random_uuid()::text, amount, auth.uid());
+  return json_build_object('ok', true, 'stars', left_over - amount);
+end;
+$$;
+revoke all on function public.gift_stars(uuid, int) from public;
+grant execute on function public.gift_stars(uuid, int) to authenticated;

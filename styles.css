@@ -1197,3 +1197,58 @@ img { max-width: 100%; }
     flex: 1; min-width: 0; resize: none; box-sizing: border-box; font: inherit; font-size: 0.95rem; color: var(--fg);
     background: var(--surface); border: 1.5px solid var(--pink); border-radius: 1rem; padding: 0.55rem 0.8rem;
   }
+
+  /* Portfolio scenes: Library, Night sky and Garden take the place of the books */
+  .art .scene-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .art.scene-library, .art.scene-night, .art.scene-garden { transition: background-color 0.3s; }
+  .art.scene-library .books, .art.scene-night .books, .art.scene-garden .books { display: none; }
+  .art.pet-mode .scene-ground { display: none; }
+  .art.scene-library { background: #F5E6D6; }
+  .art.scene-library .clouds { fill: #E6CDB2; }
+  .art.scene-night { background: #2E2856; }
+  .art.scene-night .clouds { fill: #4B4386; }
+  .art.scene-night .scene-spark { fill: #F6E08E; }
+  .art.scene-night .portrait { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); }
+  .art.scene-garden { background: #DCEFFA; }
+  .art.scene-garden .clouds { fill: #9BD3AE; }
+  .art.scene-garden .scene-spark { fill: #F7A8C0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .art .night-star.twinkle { animation: twinkle 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  }
+  /* The pet's name, on a little tag under the pet */
+  .art .pet-name-tag {
+    position: absolute; right: 1.5%; bottom: 1.5%; z-index: 4; max-width: 30%;
+    font-family: var(--display); font-weight: 600; font-size: 0.75rem; line-height: 1.2;
+    color: var(--button-fg); background: var(--surface); border-radius: 999px; padding: 0.1rem 0.5rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px rgba(142, 53, 83, 0.15);
+  }
+  .art.pet-mode .pet-name-tag { right: auto; left: 50%; transform: translateX(-50%); bottom: 2%; max-width: 60%; font-size: 0.95rem; }
+  .pet-name-input { max-width: 16rem; }
+
+  /* Star Shop: gifts to friends and the Coming soon seasons */
+  .shop-giftbox {
+    display: grid; gap: 0.45rem; margin: 0.2rem 0; padding: 0.75rem 1rem;
+    border-radius: 1.25rem; background: var(--blush); border: 1px solid var(--pink);
+  }
+  .giftbox-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.7rem; }
+  .giftbox-label { font-weight: 700; color: var(--button-fg); font-size: 0.9rem; }
+  .giftbox-select, .giftbox-amount {
+    font: inherit; font-size: 0.9rem; color: var(--fg); background: var(--surface);
+    border: 1.5px solid var(--pink); border-radius: 999px; padding: 0.3rem 0.8rem;
+  }
+  .giftbox-amount { width: 4.5rem; }
+  .dialog .giftbox-note { font-size: 0.85rem; margin: 0; }
+  .shop-from { font-size: 0.75rem; font-weight: 700; color: #6B4508; background: #FFE9A8; border-radius: 999px; padding: 0.05rem 0.55rem; }
+  .shop-upcoming { display: grid; gap: 0.6rem; margin-top: 1rem; }
+  .shop-soon-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem; margin-top: 0.6rem; }
+  .shop-soon-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #fff; background: var(--accent); border-radius: 999px; padding: 0.15rem 0.6rem;
+  }
+  .dialog .shop-soon-title { font-family: var(--display); font-size: 1.15rem; font-weight: 600; margin: 0; color: var(--fg); }
+  .shop-soon-when { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+  .shop-item.soon { border-style: dashed; }
+  .shop-item.soon .shop-buy:disabled { opacity: 0.75; }
+  .dialog .shop-giftbox .giftbox-amount { width: 5rem; flex: none; margin: 0; box-sizing: border-box; font-size: 0.9rem; padding: 0.3rem 0.7rem; border-radius: 999px; border-width: 1.5px; background: var(--surface); }
+  .dialog .shop-giftbox .giftbox-select { width: auto; flex: 0 1 auto; margin: 0; }
+  .dialog .shop-giftbox .giftbox-label { display: inline; margin: 0; }

@@ -1024,6 +1024,7 @@
   function showHome(push) {
     currentId = null;
     if (push) history.pushState(null, '', location.pathname);
+    achievementsDialog.hidden = true;
     closePicEditor();
     closeProfileEditor();
     homeView.hidden = false;
@@ -1514,7 +1515,7 @@
     ctaContact.hidden = !p.email;
     navContact.hidden = !p.email;
     renderProjects();
-    renderAchievements(p);
+    if (!achievementsDialog.hidden) renderAchievements(p);
   }
 
   function resetDelete() {
@@ -1742,6 +1743,29 @@
     });
     $('achievements-sub').textContent = done + ' of ' + (CHAR.pet.length - 1) + ' unlocked. Each achievement unlocks a pet to pick in Edit character.';
   }
+
+  // The Achievements pop-up opens from the Achievements link at the top of a portfolio.
+  var achievementsDialog = $('achievements');
+  var achievementsOpener = null;
+  function openAchievements() {
+    var p = current();
+    if (!p) return;
+    achievementsOpener = document.activeElement;
+    renderAchievements(p);
+    $('achievements-title').textContent = p.name + '’s achievements';
+    achievementsDialog.hidden = false;
+    $('achievements-close').focus();
+  }
+  function closeAchievements() {
+    achievementsDialog.hidden = true;
+    if (achievementsOpener && achievementsOpener.focus) achievementsOpener.focus();
+  }
+  $('achievements-close').addEventListener('click', closeAchievements);
+  achievementsDialog.addEventListener('click', function (e) { if (e.target === achievementsDialog) closeAchievements(); });
+  navAchievements.addEventListener('click', function (e) {
+    e.preventDefault();
+    openAchievements();
+  });
 
   // The customizer has two tabs: Character (everything without a 4th entry above) and Pets.
   var PIC_TABS = [['character', 'Character'], ['pets', 'Pets']];
@@ -3161,6 +3185,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!authDialog.hidden) { closeAuth(); return; }
+    if (!achievementsDialog.hidden) { closeAchievements(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
     if (!accountMenu.hidden) { closeAccountMenu(); accountBtn.focus(); }
   });

@@ -544,10 +544,17 @@ img { max-width: 100%; }
   .pic-preview.pet-preview { background: #FBE3E6; }
   .pic-preview.pet-preview svg { width: 64%; height: 64%; overflow: visible; }
   .pet-none { font-weight: 700; color: var(--muted); }
-  /* Achievements section on a portfolio */
-  .achievements-band { padding-block: 4rem; }
+  /* Achievements pop-up on a portfolio */
+  .dialog.achievements-dialog { width: min(48rem, 100%); padding: 1.5rem 1.5rem 1.75rem; gap: 0.4rem; }
+  .achievements-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .achievements-head h2 { overflow-wrap: anywhere; }
+  .dialog-close {
+    flex: none; width: 2.5rem; height: 2.5rem; border-radius: 50%; cursor: pointer;
+    font-size: 1.5rem; line-height: 1; color: var(--button-fg); background: var(--blush); border: 0;
+  }
+  .dialog-close:hover { background: var(--pink); }
   .achievement-grid {
-    list-style: none; margin: 2rem 0 0; padding: 0;
+    list-style: none; margin: 1rem 0 0; padding: 0;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr)); gap: 1rem;
   }
   .achievement {
@@ -572,9 +579,9 @@ img { max-width: 100%; }
   }
   .achievement.done .achievement-status { background: #F6C945; color: #6B4508; }
   .achievement-name { font-size: 1.15rem; font-weight: 600; color: var(--fg); }
-  .achievement-task { font-size: 0.88rem; color: var(--muted); line-height: 1.45; }
+  .achievement .achievement-task { font-size: 0.88rem; color: var(--muted); line-height: 1.45; }
   .achievement .pet-goal-bar { width: 80%; }
-  .achievement-reward { font-size: 0.8rem; font-weight: 700; color: var(--button-fg); margin-top: 0.15rem; }
+  .achievement .achievement-reward { font-size: 0.8rem; font-weight: 700; color: var(--button-fg); margin-top: 0.15rem; }
 
   /* Locked pets and the pet achievements list */
   .chip.locked { display: inline-flex; align-items: center; gap: 0.3rem; opacity: 0.55; cursor: not-allowed; border-style: dashed; }

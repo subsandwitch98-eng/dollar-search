@@ -62,17 +62,38 @@
             <a class="btn btn-solid" href="#profiles">See profiles</a>
           </div>
         </div>
-        <!-- A magnifying glass searching a stack of research papers; lines light up as it passes. -->
-        <div class="art search-art" aria-hidden="true">
+        <!-- A pencil writing research notes, with a star keychain on its end that sparkles every 3 seconds. -->
+        <div class="art write-art" aria-hidden="true">
           <div class="paper paper-back"><span class="paper-title"></span><span></span><span></span><span></span></div>
           <div class="paper paper-mid"><span class="paper-title"></span><span></span><span></span><span></span></div>
-          <div class="paper paper-front">
-            <span class="paper-title"></span>
-            <span class="scan l1"></span><span class="scan l2"></span><span class="scan l3"></span>
-            <span class="scan l4"></span><span class="scan l5"></span>
-          </div>
+          <div class="paper paper-front"></div>
+          <span class="ink-title"></span>
+          <span class="ink i1"></span><span class="ink i2"></span><span class="ink i3"></span>
+          <span class="ink i4"></span><span class="ink i5"></span>
           <span class="spark k1"></span><span class="spark k2"></span><span class="spark k3"></span>
-          <div class="lens"><span class="lens-glass">$</span><span class="lens-handle"></span></div>
+          <svg class="pencil" viewBox="0 0 200 200">
+            <g transform="rotate(-38 100 100)">
+              <polygon class="pencil-wood" points="32,94 52,89 52,111 32,106"/>
+              <polygon class="pencil-lead" points="20,100 32,95 32,105"/>
+              <rect class="pencil-body" x="52" y="89" width="92" height="22"/>
+              <rect class="pencil-stripe" x="52" y="96" width="92" height="7"/>
+              <rect class="pencil-ferrule" x="144" y="88" width="12" height="24" rx="2"/>
+              <line class="pencil-ferrule-line" x1="148" y1="88" x2="148" y2="112"/>
+              <line class="pencil-ferrule-line" x1="152" y1="88" x2="152" y2="112"/>
+              <rect class="pencil-eraser" x="155" y="89" width="17" height="22" rx="6"/>
+            </g>
+            <!-- Keychain hangs from the eraser end (160,53 once the pencil is tilted). -->
+            <g class="keychain">
+              <circle class="key-ring" cx="161" cy="52" r="5"/>
+              <line class="key-chain" x1="161" y1="57" x2="161" y2="80"/>
+              <g class="key-star">
+                <polygon class="star-shape" points="161,78 165.2,88.2 176.2,89 167.8,96.1 170.4,106.8 161,101 151.6,106.8 154.2,96.1 145.8,89 156.8,88.2"/>
+                <path class="glint g1" d="M182 80 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2 l5 -2 Z"/>
+                <path class="glint g2" d="M140 98 l1.5 3.5 l3.5 1.5 l-3.5 1.5 l-1.5 3.5 l-1.5 -3.5 l-3.5 -1.5 l3.5 -1.5 Z"/>
+                <path class="glint g3" d="M172 112 l1.2 3 l3 1.2 l-3 1.2 l-1.2 3 l-1.2 -3 l-3 -1.2 l3 -1.2 Z"/>
+              </g>
+            </g>
+          </svg>
         </div>
       </div>
     </section>

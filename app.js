@@ -677,10 +677,10 @@
     };
     var bang = BANGS[c.bangs];
     if (bang) {
-      // With Long and Wavy hair the bangs reach further out to the sides, into the side locks.
-      var wide = style === 2 || style === 8 ? 'translate(60 0) scale(1.14 1) translate(-60 0)' : '';
+      // Bangs reach a little further out to the sides, so they blend into the hair at the temples.
+      var wide = 'translate(60 0) scale(1.14 1) translate(-60 0)';
       var bangAttrs = function (a) {
-        if (wide) a.transform = wide + (a.transform ? ' ' + a.transform : '');
+        a.transform = wide + (a.transform ? ' ' + a.transform : '');
         return a;
       };
       bang[0].forEach(function (d) { add('path', bangAttrs({ d: d, fill: hair })); });

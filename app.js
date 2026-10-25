@@ -938,8 +938,83 @@
   var homeFilter = 'all'; // 'all', 'following' or 'friends'
   var addingProfile = false;
 
+  // ---- Home: Recent research, a sideways-scrolling strip of the newest research from everyone ----
+  var recentSection = $('recent-research');
+  var recentStrip = $('recent-strip');
+  var recentEmpty = $('recent-empty');
+  var RECENT_LIMIT = 20;
+
+  function recentCard(p, q) {
+    var li = make('li', 'recent-item');
+    var b = make('button', 'recent-card');
+    b.type = 'button';
+    var fresh = Date.now() - q.createdAt < 24 * 3600000;
+    var when = make('span', 'recent-when' + (fresh ? ' fresh' : ''), fresh ? 'New · ' + timeAgo(q.createdAt) : timeAgo(q.createdAt));
+    b.appendChild(when);
+    b.appendChild(make('span', 'recent-title', q.title));
+    if (q.description) b.appendChild(make('span', 'recent-desc', q.description));
+    var by = make('span', 'recent-by');
+    var pic = pictureNode(p.avatar, p.name);
+    var avatar = make('span', 'avatar recent-avatar', pic ? null : p.name.charAt(0).toUpperCase());
+    if (pic) avatar.appendChild(pic);
+    avatar.setAttribute('aria-hidden', 'true');
+    var name = make('span', 'recent-name');
+    paintName(name, p.name);
+    by.appendChild(avatar);
+    by.appendChild(name);
+    var likes = state.projectLikes.filter(function (l) { return l.projectId === q.id; }).length;
+    by.appendChild(make('span', 'recent-likes', '♥ ' + likes));
+    b.appendChild(by);
+    b.setAttribute('aria-label', q.title + ', by ' + p.name + ', ' + timeAgo(q.createdAt).toLowerCase());
+    // Opens the portfolio and scrolls to this research card.
+    b.addEventListener('click', function () {
+      showProfile(p.id, true);
+      var target = $('project-' + q.id);
+      if (!target) return;
+      target.scrollIntoView({ block: 'center' });
+      target.classList.add('flash');
+      setTimeout(function () { target.classList.remove('flash'); }, 1600);
+    });
+    li.appendChild(b);
+    return li;
+  }
+  function renderRecent() {
+    var ready = !!client && loaded && !loadError;
+    recentSection.hidden = !ready;
+    if (!ready) return;
+    var all = [];
+    state.profiles.forEach(function (p) {
+      p.projects.forEach(function (q) { all.push({ p: p, q: q }); });
+    });
+    all.sort(function (a, b) { return b.q.createdAt - a.q.createdAt; });
+    all = all.slice(0, RECENT_LIMIT);
+    // Keep the reader's place when the list refreshes.
+    var keep = recentStrip.scrollLeft;
+    recentStrip.textContent = '';
+    all.forEach(function (it) { recentStrip.appendChild(recentCard(it.p, it.q)); });
+    recentStrip.scrollLeft = keep;
+    recentStrip.hidden = !all.length;
+    recentEmpty.hidden = all.length > 0;
+    updateRecentArrows();
+  }
+  function updateRecentArrows() {
+    var max = recentStrip.scrollWidth - recentStrip.clientWidth;
+    $('recent-prev').disabled = recentStrip.scrollLeft <= 2;
+    $('recent-next').disabled = recentStrip.scrollLeft >= max - 2;
+    $('recent-prev').parentNode.hidden = max <= 2;
+  }
+  $('recent-prev').addEventListener('click', function () {
+    recentStrip.scrollBy({ left: -recentStrip.clientWidth * 0.8, behavior: 'smooth' });
+  });
+  $('recent-next').addEventListener('click', function () {
+    recentStrip.scrollBy({ left: recentStrip.clientWidth * 0.8, behavior: 'smooth' });
+  });
+  recentStrip.addEventListener('scroll', updateRecentArrows);
+  window.addEventListener('resize', updateRecentArrows);
+
   function renderHome() {
     var list = state.profiles;
+    renderRecent();
     paintName(hubNameEl, state.hubName);
     hubIntroEl.textContent = state.hubIntro;
     hubCount.textContent = plural(list.length, 'profile');
@@ -1377,6 +1452,7 @@
 
   function projectCard(p, editable) {
     var card = make('article', 'project');
+    card.id = 'project-' + p.id;
     var title = make('h3', 'project-title');
     var href = cleanLink(p.link);
     if (href) {

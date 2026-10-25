@@ -17,13 +17,14 @@
     bangs: ['None', 'Straight', 'Side', 'Wispy'],
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69'],
+    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones'],
     glasses: ['None', 'Glasses', 'Shades'],
     face: ['Smile', 'Grin', 'Cool'],
     bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
   };
-  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'top', 'headwear', 'glasses', 'face', 'bg'];
-  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0 };
+  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg'];
+  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0 };
   function normalizeCharacter(src) {
     var c = {};
     src = src && typeof src === 'object' ? src : {};
@@ -233,6 +234,63 @@
     }).join('');
   }
 
+  // Shoulders, neck and clothing. Kinds: 0 Tee, 1 Hoodie, 2 Sweater, 3 Shirt, 4 Jacket, 5 Overalls.
+  // The neck is drawn here too, so collars and hoods can sit in front of or behind it.
+  var SHOULDERS = 'M18 120 C18 94 38 86 60 86 C82 86 102 94 102 120 Z';
+  function drawClothing(add, kind, color, skin) {
+    var dark = shade(color, -0.22);
+    var light = shade(color, 0.4);
+    var neck = function () { add('rect', { x: 52, y: 72, width: 16, height: 16, rx: 6, fill: skin }); };
+
+    if (kind === 5) { // Overalls: a light shirt underneath, bib and straps in the clothing color
+      add('path', { d: SHOULDERS, fill: '#FBF7F2' });
+      neck();
+      add('path', { d: 'M50 87 Q60 95 70 87', fill: 'none', stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 3, 'stroke-linecap': 'round' });
+      add('path', { d: 'M43 99 L77 99 L81 120 L39 120 Z', fill: color });
+      add('path', { d: 'M46 100 L40 88', stroke: color, 'stroke-width': 6, 'stroke-linecap': 'round' });
+      add('path', { d: 'M74 100 L80 88', stroke: color, 'stroke-width': 6, 'stroke-linecap': 'round' });
+      add('rect', { x: 53, y: 105, width: 14, height: 9, rx: 2, fill: 'none', stroke: dark, 'stroke-width': 1.5 });
+      add('circle', { cx: 46, cy: 101, r: 2.2, fill: '#F6C945' });
+      add('circle', { cx: 74, cy: 101, r: 2.2, fill: '#F6C945' });
+      return;
+    }
+
+    add('path', { d: SHOULDERS, fill: color });
+    if (kind === 1) { // Hoodie: hood bunched behind the neck, drawstrings and a front pocket
+      add('path', { d: 'M38 91 Q41 79 60 79 Q79 79 82 91 Q71 86 60 86 Q49 86 38 91 Z', fill: dark });
+      neck();
+      add('path', { d: 'M48 88 Q60 97 72 88', fill: 'none', stroke: dark, 'stroke-width': 3, 'stroke-linecap': 'round' });
+      add('path', { d: 'M55 93 L54 106', stroke: light, 'stroke-width': 2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M65 93 L66 106', stroke: light, 'stroke-width': 2, 'stroke-linecap': 'round' });
+      add('circle', { cx: 54, cy: 107, r: 1.8, fill: light });
+      add('circle', { cx: 66, cy: 107, r: 1.8, fill: light });
+      add('path', { d: 'M44 120 L46 111 Q60 107 74 111 L76 120 Z', fill: dark, opacity: 0.55 });
+      return;
+    }
+    neck();
+    if (kind === 0) { // Tee
+      add('path', { d: 'M50 87 Q60 96 70 87', fill: 'none', stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 3, 'stroke-linecap': 'round' });
+    }
+    if (kind === 2) { // Sweater: ribbed crew neck and a knit pattern
+      add('path', { d: 'M49 87 Q60 97 71 87', fill: 'none', stroke: dark, 'stroke-width': 4.5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M28 106 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4', fill: 'none', stroke: dark, 'stroke-width': 1.6, 'stroke-linejoin': 'round', opacity: 0.6 });
+      add('path', { d: 'M26 114 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4 l5 -4 l5 4', fill: 'none', stroke: dark, 'stroke-width': 1.6, 'stroke-linejoin': 'round', opacity: 0.6 });
+    }
+    if (kind === 3) { // Shirt: white pointed collar and buttons down the front
+      add('path', { d: 'M60 95 L60 120', stroke: dark, 'stroke-width': 1.2, opacity: 0.6 });
+      add('path', { d: 'M50 85 L60 95 L52 99 Z', fill: '#FFFFFF', stroke: dark, 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M70 85 L60 95 L68 99 Z', fill: '#FFFFFF', stroke: dark, 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      [102, 110, 118].forEach(function (y) { add('circle', { cx: 60, cy: y, r: 1.6, fill: dark }); });
+    }
+    if (kind === 4) { // Jacket: open over a white tee, with lapels
+      add('path', { d: 'M50 87 Q60 95 70 87 L66 120 L54 120 Z', fill: '#FFFFFF' });
+      add('path', { d: 'M50 87 L54 120', stroke: dark, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M70 87 L66 120', stroke: dark, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+      add('path', { d: 'M49 87 L45 96 L52 101 Z', fill: dark });
+      add('path', { d: 'M71 87 L75 96 L68 101 Z', fill: dark });
+    }
+  }
+
   function renderCharacter(c, label) {
     var svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 120 120');
@@ -293,10 +351,8 @@
       });
     }
 
-    // Shoulders, neck, ears, head
-    add('path', { d: 'M18 120 C18 94 38 86 60 86 C82 86 102 94 102 120 Z', fill: top });
-    add('rect', { x: 52, y: 72, width: 16, height: 16, rx: 6, fill: skin });
-    add('path', { d: 'M50 87 Q60 96 70 87', fill: 'none', stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 3, 'stroke-linecap': 'round' });
+    // Shoulders and clothing, in the chosen clothing color
+    drawClothing(add, c.outfit, top, skin);
     add('circle', { cx: 36.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 83.5, cy: 59, r: 5, fill: skin });
     add('circle', { cx: 60, cy: 56, r: 24, fill: skin });
@@ -805,7 +861,7 @@
   var picDraft = null; // { character } while the character builder is open
   var PIC_GROUPS = [
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
-    ['Outfit', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
+    ['Clothing', 'outfit', 'chip'], ['Clothing color', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
     ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch']
   ];
 

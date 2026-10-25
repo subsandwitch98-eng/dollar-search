@@ -18,13 +18,13 @@
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#7B4FA0'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
       '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#F28C28'],
-    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband'],
+    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
-    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts'],
-    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish'],
+    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb'],
+    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy'],
     petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
   };
   var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame', 'pet', 'petColor'];
@@ -467,6 +467,29 @@
         add('circle', { cx: fx(x + 1.3), cy: fx(y - 0.6), r: 0.6, fill: '#3A2A30' });
         add('ellipse', { cx: fx(x), cy: fx(y + 1), rx: 0.7, ry: 0.9, fill: '#3A2A30' });
       });
+    } else if (kind === 10) { // Star Shop Halloween: a cream ring of candy corns pointing outward
+      ring(M, '#FFF1D6', FRAME_WIDTH);
+      ring(59.3, '#F7B267', 1.2);
+      around(10, M, 0, function (x, y, deg) {
+        var t = 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ')';
+        add('polygon', { points: '-3.6,3.8 3.6,3.8 2.4,1 -2.4,1', fill: '#F6C945', transform: t });
+        add('polygon', { points: '-2.4,1 2.4,1 1.2,-1.8 -1.2,-1.8', fill: '#F28C28', transform: t });
+        add('polygon', { points: '-1.2,-1.8 1.2,-1.8 0,-4.4', fill: '#FFFDF7', stroke: '#F2D3AE', 'stroke-width': 0.4, transform: t });
+      });
+    } else if (kind === 11) { // Star Shop Halloween: a dusky spiderweb ring with two little spiders
+      ring(M, '#3B2E5A', FRAME_WIDTH);
+      [FRAME_INNER + 2, M, 58].forEach(function (r) { ring(r, '#CFC3E8', 0.5); });
+      around(16, M, 0, function (x, y, deg) {
+        var a = (deg - 90) * Math.PI / 180;
+        add('path', { d: 'M' + fx(60 + Math.cos(a) * FRAME_INNER) + ' ' + fx(60 + Math.sin(a) * FRAME_INNER) + ' L' + fx(60 + Math.cos(a) * 60) + ' ' + fx(60 + Math.sin(a) * 60), stroke: '#CFC3E8', 'stroke-width': 0.5 });
+      });
+      [[40, 7], [220, 9]].forEach(function (sp) {
+        var a = (sp[0] - 90) * Math.PI / 180, x = 60 + Math.cos(a) * M, y = 60 + Math.sin(a) * M;
+        add('path', { d: 'M' + fx(x - 4) + ' ' + fx(y - 2) + ' L' + fx(x + 4) + ' ' + fx(y + 2) + ' M' + fx(x - 4) + ' ' + fx(y + 2) + ' L' + fx(x + 4) + ' ' + fx(y - 2) + ' M' + fx(x - 4.4) + ' ' + fx(y) + ' L' + fx(x + 4.4) + ' ' + fx(y), stroke: '#1E1A24', 'stroke-width': 0.8, 'stroke-linecap': 'round' });
+        add('circle', { cx: fx(x), cy: fx(y), r: 2.6, fill: '#1E1A24' });
+        add('circle', { cx: fx(x - 0.9), cy: fx(y - 0.5), r: 0.6, fill: '#FFFDF7' });
+        add('circle', { cx: fx(x + 0.9), cy: fx(y - 0.5), r: 0.6, fill: '#FFFDF7' });
+      });
     }
   }
 
@@ -488,6 +511,16 @@
       add('rect', { x: 53, y: 105, width: 14, height: 9, rx: 2, fill: 'none', stroke: dark, 'stroke-width': 1.5 });
       add('circle', { cx: 46, cy: 101, r: 2.2, fill: '#F6C945' });
       add('circle', { cx: 74, cy: 101, r: 2.2, fill: '#F6C945' });
+      return;
+    }
+    if (kind === 6) { // Star Shop Halloween: vampire cape with a tall collar lined in the clothing color
+      add('path', { d: 'M40 92 L30 70 L48 82 Z', fill: color, stroke: '#1E1824', 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M80 92 L90 70 L72 82 Z', fill: color, stroke: '#1E1824', 'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+      add('path', { d: SHOULDERS, fill: '#2B2233' });
+      neck();
+      add('path', { d: 'M51 87 L60 102 L69 87 Q60 92 51 87 Z', fill: '#FFFDF7' });
+      add('path', { d: 'M51 87 L45 120 M69 87 L75 120', fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linecap': 'round' });
+      add('circle', { cx: 60, cy: 95, r: 2.2, fill: '#E05A5A' });
       return;
     }
 
@@ -949,6 +982,23 @@
       add('circle', { cx: 59, cy: 27.6, r: 0.6, fill: '#F6C945' });
       add('circle', { cx: 61, cy: 27.6, r: 0.6, fill: '#F6C945' });
     }
+    // More Halloween headwear: 14 Devil horns, 15 Candy corn crown.
+    if (c.headwear === 14) { // Two little curved red horns on a headband
+      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#B83B3B', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M44 33 Q39 25 43 17 Q46.5 26 51 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M76 33 Q81 25 77 17 Q73.5 26 69 30.5 Z', fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
+      add('path', { d: 'M44.5 27 Q43.5 23.5 44 21', fill: 'none', stroke: '#F7A8A8', 'stroke-width': 1, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 15) { // A band of five candy corns
+      add('path', { d: 'M35 46 Q37 29 60 28 Q83 29 85 46', fill: 'none', stroke: '#F28C28', 'stroke-width': 2.6, 'stroke-linecap': 'round' });
+      [[40, 39, -38], [49, 32, -16], [60, 29.5, 0], [71, 32, 16], [80, 39, 38]].forEach(function (cc) {
+        var t = 'rotate(' + cc[2] + ' ' + cc[0] + ' ' + cc[1] + ')';
+        var x = cc[0], y = cc[1];
+        add('polygon', { points: (x - 3.6) + ',' + y + ' ' + (x + 3.6) + ',' + y + ' ' + (x + 2.4) + ',' + (y - 2.8) + ' ' + (x - 2.4) + ',' + (y - 2.8), fill: '#F6C945', transform: t });
+        add('polygon', { points: (x - 2.4) + ',' + (y - 2.8) + ' ' + (x + 2.4) + ',' + (y - 2.8) + ' ' + (x + 1.2) + ',' + (y - 5.6) + ' ' + (x - 1.2) + ',' + (y - 5.6), fill: '#F28C28', transform: t });
+        add('polygon', { points: (x - 1.2) + ',' + (y - 5.6) + ' ' + (x + 1.2) + ',' + (y - 5.6) + ' ' + x + ',' + (y - 8.2), fill: '#FFFDF7', transform: t });
+      });
+    }
     return svg;
   }
   // The pet is its own little picture, shown only in the portfolio scene beside the character (not in the character itself).
@@ -1045,6 +1095,41 @@
       add('path', { d: 'M-9.5 0 L-14.5 2 L-9.5 3.6 Z', fill: '#F2A541', stroke: '#C77F1E', 'stroke-width': 0.6 });
       add('circle', { cx: -4.5, cy: -1.5, r: 1.4, fill: ink });
       add('circle', { cx: -4, cy: 2.5, r: 1.5, fill: pink, opacity: 0.6 });
+    } else if (kind === 7) { // Star Shop Halloween: a little purple bat with tiny fangs
+      add('path', { d: 'M-6 -1 Q-12 -9 -17 -4 Q-14 -2 -14.5 2 Q-12 0 -10 4 Q-8.5 1 -5.5 3 Z', fill: '#3A2E4F' });
+      add('path', { d: 'M6 -1 Q12 -9 17 -4 Q14 -2 14.5 2 Q12 0 10 4 Q8.5 1 5.5 3 Z', fill: '#3A2E4F' });
+      add('path', { d: 'M-5 -5 L-6 -12 L-1.5 -7.5 Z M5 -5 L6 -12 L1.5 -7.5 Z', fill: '#4A3A63' });
+      add('circle', { cx: 0, cy: 0, r: 8, fill: '#4A3A63' });
+      add('circle', { cx: -3, cy: -1.5, r: 1.8, fill: '#FFF6F0' });
+      add('circle', { cx: 3, cy: -1.5, r: 1.8, fill: '#FFF6F0' });
+      add('circle', { cx: -2.8, cy: -1.2, r: 0.9, fill: '#3A2A30' });
+      add('circle', { cx: 3.2, cy: -1.2, r: 0.9, fill: '#3A2A30' });
+      add('path', { d: 'M-1.5 3 L-0.9 4.8 L-0.3 3 Z M0.3 3 L0.9 4.8 L1.5 3 Z', fill: '#FFFDF7' });
+      add('circle', { cx: -5, cy: 2, r: 1.3, fill: pink, opacity: 0.6 });
+      add('circle', { cx: 5, cy: 2, r: 1.3, fill: pink, opacity: 0.6 });
+      add('path', { d: 'M-2.5 8 L-2.5 11 M2.5 8 L2.5 11', stroke: '#3A2E4F', 'stroke-width': 1.4, 'stroke-linecap': 'round' });
+    } else if (kind === 8) { // Star Shop Halloween: a friendly ghost with a bow in the pet color
+      add('path', { d: 'M-10 13 L-10 -3 A10 10 0 0 1 10 -3 L10 13 L6.7 10.5 L3.3 13 L0 10.5 L-3.3 13 L-6.7 10.5 Z', fill: '#FFFDF7', stroke: '#D9CCE3', 'stroke-width': 1 });
+      add('path', { d: 'M3 -11 L9 -14 L9 -8 Z M3 -11 L-3 -14 L-3 -8 Z', fill: color, stroke: line, 'stroke-width': 0.6, transform: 'translate(3 0)' });
+      add('circle', { cx: 6, cy: -11, r: 1.4, fill: color, stroke: line, 'stroke-width': 0.6 });
+      add('ellipse', { cx: -3.5, cy: -3, rx: 1.4, ry: 1.9, fill: '#3A2A30' });
+      add('ellipse', { cx: 3.5, cy: -3, rx: 1.4, ry: 1.9, fill: '#3A2A30' });
+      add('ellipse', { cx: 0, cy: 2.2, rx: 1.2, ry: 1.5, fill: '#3A2A30' });
+      add('circle', { cx: -6, cy: 0.5, r: 1.5, fill: pink, opacity: 0.55 });
+      add('circle', { cx: 6, cy: 0.5, r: 1.5, fill: pink, opacity: 0.55 });
+    } else if (kind === 9) { // Star Shop Halloween: a little pumpkin buddy with feet
+      add('ellipse', { cx: -4, cy: 13, rx: 2.6, ry: 1.4, fill: '#C9661A' });
+      add('ellipse', { cx: 4, cy: 13, rx: 2.6, ry: 1.4, fill: '#C9661A' });
+      add('ellipse', { cx: -6, cy: 4, rx: 7, ry: 8.5, fill: '#E07A1F' });
+      add('ellipse', { cx: 6, cy: 4, rx: 7, ry: 8.5, fill: '#E07A1F' });
+      add('ellipse', { cx: 0, cy: 3.5, rx: 8.5, ry: 9, fill: '#F28C28' });
+      add('path', { d: 'M-5 -4 Q-6.5 3.5 -5 11.5 M5 -4 Q6.5 3.5 5 11.5', fill: 'none', stroke: '#C9661A', 'stroke-width': 0.9, 'stroke-linecap': 'round' });
+      add('rect', { x: -1.5, y: -9, width: 3, height: 4.5, rx: 1, fill: '#6B8E3A' });
+      add('ellipse', { cx: 4, cy: -7.5, rx: 3.4, ry: 1.6, fill: '#8BBF4A', transform: 'rotate(-25 4 -7.5)' });
+      add('path', { d: 'M-4.4 1.6 L-2.8 -1.2 L-1.2 1.6 Z M1.2 1.6 L2.8 -1.2 L4.4 1.6 Z', fill: '#5A2E0E' });
+      add('path', { d: 'M-4 5 Q0 8.6 4 5', fill: 'none', stroke: '#5A2E0E', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('circle', { cx: -6, cy: 5, r: 1.4, fill: pink, opacity: 0.55 });
+      add('circle', { cx: 6, cy: 5, r: 1.4, fill: pink, opacity: 0.55 });
     } else if (kind === 6) { // Fish in a round bowl
       add('circle', { cx: 0, cy: 2, r: 12.5, fill: '#DDF0FA', stroke: '#8EC5E8', 'stroke-width': 1.2 });
       add('path', { d: 'M-11 -2 Q0 1 11 -2 L11 2 A12.5 12.5 0 0 1 -11 2 Z', fill: '#BDE3F5', opacity: 0.7 });
@@ -1819,11 +1904,11 @@
   // The list of pet achievements on the Pets tab: each pet, its task and how far along you are.
   function petGoalsList(p) {
     var box = make('div', 'pet-goals');
-    var unlocked = CHAR.pet.filter(function (_, i) { return i && petProgress(p, i).unlocked; }).length;
-    box.appendChild(make('p', 'edit-label', 'Pet achievements · ' + unlocked + ' of ' + (CHAR.pet.length - 1) + ' unlocked'));
+    var unlocked = CHAR.pet.filter(function (_, i) { return PET_UNLOCKS[i] && petProgress(p, i).unlocked; }).length;
+    box.appendChild(make('p', 'edit-label', 'Pet achievements · ' + unlocked + ' of ' + Object.keys(PET_UNLOCKS).length + ' unlocked'));
     var list = make('ul', 'pet-goal-list');
     CHAR.pet.forEach(function (name, i) {
-      if (!i) return;
+      if (!PET_UNLOCKS[i]) return; // Star Shop pets have no achievement
       var g = petProgress(p, i);
       var li = make('li', 'pet-goal' + (g.unlocked ? ' done' : ''));
       var icon = make('span', 'pet-goal-icon');
@@ -1858,7 +1943,7 @@
     list.textContent = '';
     var done = 0;
     CHAR.pet.forEach(function (petName, i) {
-      if (!i) return;
+      if (!PET_UNLOCKS[i]) return; // Star Shop pets have no achievement
       var g = petProgress(p, i);
       if (g.unlocked) done++;
       var li = make('li', 'achievement' + (g.unlocked ? ' done' : ''));
@@ -1883,7 +1968,7 @@
       li.appendChild(make('p', 'achievement-reward', (g.unlocked ? 'Unlocked the ' : 'Unlocks the ') + petName.toLowerCase()));
       list.appendChild(li);
     });
-    $('achievements-sub').textContent = done + ' of ' + (CHAR.pet.length - 1) + ' unlocked. Each achievement unlocks a pet to pick in Edit character.';
+    $('achievements-sub').textContent = done + ' of ' + Object.keys(PET_UNLOCKS).length + ' unlocked. Each achievement unlocks a pet to pick in Edit character.';
   }
 
   // The Achievements pop-up opens from the Achievements link at the top of a portfolio.
@@ -1919,7 +2004,16 @@
     { id: 'pumpkin-hat', name: 'Pumpkin hat', kind: 'Headwear', key: 'headwear', index: 12, price: 3 },
     { id: 'witch-hat', name: 'Witch hat', kind: 'Headwear', key: 'headwear', index: 11, price: 4 },
     { id: 'ghost-frame', name: 'Ghost frame', kind: 'Frame', key: 'frame', index: 9, price: 4 },
-    { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 }
+    { id: 'pumpkin-frame', name: 'Pumpkin patch frame', kind: 'Frame', key: 'frame', index: 8, price: 5 },
+    { id: 'midnight-bg', name: 'Midnight background', kind: 'Background', key: 'bg', index: 6, price: 1 },
+    { id: 'devil-horns', name: 'Devil horns', kind: 'Headwear', key: 'headwear', index: 14, price: 2 },
+    { id: 'candy-crown', name: 'Candy corn crown', kind: 'Headwear', key: 'headwear', index: 15, price: 3 },
+    { id: 'candy-frame', name: 'Candy corn frame', kind: 'Frame', key: 'frame', index: 10, price: 3 },
+    { id: 'vampire-cape', name: 'Vampire cape', kind: 'Clothing', key: 'outfit', index: 6, price: 4 },
+    { id: 'web-frame', name: 'Spiderweb frame', kind: 'Frame', key: 'frame', index: 11, price: 4 },
+    { id: 'bat-pet', name: 'Bat buddy', kind: 'Pet', key: 'pet', index: 7, price: 5 },
+    { id: 'ghost-pet', name: 'Ghost pet', kind: 'Pet', key: 'pet', index: 8, price: 5 },
+    { id: 'pumpkin-pet', name: 'Pumpkin buddy', kind: 'Pet', key: 'pet', index: 9, price: 6 }
   ];
   // The Halloween items are limited: they leave when October 31, 2026 ends (midnight US Eastern).
   // Must match the date in buy_shop_item() in supabase/star-shop.sql.
@@ -1993,8 +2087,9 @@
       // A preview of your own character wearing the item.
       var look = normalizeCharacter(base);
       look[item.key] = item.index;
-      var pic = make('span', 'avatar shop-avatar');
-      pic.appendChild(pictureNode({ mode: 'character', character: look }, item.name));
+      var pic = make('span', 'avatar shop-avatar' + (item.key === 'pet' ? ' shop-pet' : ''));
+      // Pets aren't part of the character picture, so they're previewed on their own.
+      pic.appendChild(item.key === 'pet' ? renderPet(look) : pictureNode({ mode: 'character', character: look }, item.name));
       li.appendChild(pic);
       li.appendChild(make('span', 'shop-kind', item.kind));
       li.appendChild(make('h3', 'shop-name', item.name));
@@ -2044,11 +2139,13 @@
     if (currentId !== mp.id) showProfile(mp.id, true);
     if (picForm.hidden) picBtn.click();
     picDraft.character[item.key] = item.index;
-    picTab = 'character';
+    var isPet = item.key === 'pet';
+    picTab = isPet ? 'pets' : 'character';
     buildPicForm(null);
     var label = $('pic-label-' + item.key);
     if (label) label.parentNode.scrollIntoView({ block: 'center' });
-    showToast('Wearing the ' + item.name.toLowerCase() + '. Click Save character to keep it.');
+    showToast((isPet ? 'Your ' + item.name.toLowerCase() + ' is here. ' : 'Wearing the ' + item.name.toLowerCase() + '. ') +
+      'Click Save character to keep it.');
   }
   function buyItem(item) {
     if (!shopReady || !shopOpen() || buying || starBalance() < item.price) return;
@@ -2244,7 +2341,7 @@
     shuffle.addEventListener('click', function () {
       PIC_GROUPS.filter(function (g) { return groupTab(g) === picTab; }).forEach(function (g) {
         var choices = CHAR[g[1]].map(function (_, i) { return i; });
-        if (g[1] === 'pet') choices = choices.filter(function (i) { return !i || petProgress(p, i).unlocked; });
+        if (g[1] === 'pet') choices = choices.filter(function (i) { return !PET_UNLOCKS[i] || petProgress(p, i).unlocked; });
         choices = choices.filter(function (i) { var s = shopItemFor(g[1], i); return !s || ownsItem(s); });
         picDraft.character[g[1]] = choices[Math.floor(Math.random() * choices.length)];
       });

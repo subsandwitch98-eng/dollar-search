@@ -421,6 +421,15 @@ begin
     when 'witch-hat' then 4
     when 'ghost-frame' then 4
     when 'pumpkin-frame' then 5
+    when 'midnight-bg' then 1
+    when 'devil-horns' then 2
+    when 'candy-crown' then 3
+    when 'candy-frame' then 3
+    when 'vampire-cape' then 4
+    when 'web-frame' then 4
+    when 'bat-pet' then 5
+    when 'ghost-pet' then 5
+    when 'pumpkin-pet' then 6
     else null
   end;
   if cost is null then

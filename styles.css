@@ -1004,3 +1004,7 @@ img { max-width: 100%; }
 }
 .wand-spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #F6C945; }
 .wand-spark.pink { background: var(--accent); }
+
+/* Star Shop pets are previewed on their own in the shop */
+.avatar.shop-avatar.shop-pet { background: #FBE3E6; }
+.avatar.shop-avatar.shop-pet svg { width: 70%; height: 70%; margin: auto; overflow: visible; }

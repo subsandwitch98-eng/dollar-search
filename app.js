@@ -1428,17 +1428,37 @@
   var bellBadge = $('bell-badge');
   var notifPanel = $('notif-panel');
 
+  // Two kinds of notification: new research from profiles you follow, and comments or tips
+  // someone else leaves on your research. Each item: { time, profile, project, who, what, comment }.
+  function snippet(text) {
+    var t = text.replace(/\s+/g, ' ').trim();
+    return t.length > 80 ? t.slice(0, 77) + '…' : t;
+  }
   function collectNotifs() {
     if (!me) return [];
     var items = [];
+    var projectsById = {};
     state.profiles.forEach(function (p) {
+      p.projects.forEach(function (q) { projectsById[q.id] = { profile: p, project: q }; });
       var f = mine(state.follows, p.id);
       if (!f) return;
       p.projects.forEach(function (q) {
-        if (q.createdAt > f.since) items.push({ profile: p, project: q });
+        if (q.createdAt > f.since) {
+          items.push({ time: q.createdAt, profile: p, project: q, who: p.name, what: 'Added new research: ' + q.title });
+        }
       });
     });
-    items.sort(function (a, b) { return b.project.createdAt - a.project.createdAt; });
+    state.comments.forEach(function (c) {
+      var target = projectsById[c.projectId];
+      if (!target || target.profile.ownerId !== me.id || c.userId === me.id) return;
+      var label = c.kind === 'tip' ? 'left a tip on ' : 'commented on ';
+      items.push({
+        time: c.createdAt, profile: target.profile, project: target.project, comment: true,
+        who: authorName(c.userId),
+        what: label + target.project.title + ': “' + snippet(c.body) + '”'
+      });
+    });
+    items.sort(function (a, b) { return b.time - a.time; });
     return items.slice(0, 30);
   }
   function timeAgo(t) {
@@ -1453,7 +1473,7 @@
     var show = !!client && !!me && loaded && !loadError;
     bellBtn.hidden = !show;
     if (!show) { closeNotifs(); return; }
-    var unread = collectNotifs().filter(function (n) { return n.project.createdAt > seenAt; }).length;
+    var unread = collectNotifs().filter(function (n) { return n.time > seenAt; }).length;
     bellBadge.textContent = unread > 9 ? '9+' : String(unread);
     bellBadge.hidden = !unread;
     bellBtn.setAttribute('aria-label', unread ? 'Notifications, ' + unread + ' new' : 'Notifications');
@@ -1465,20 +1485,23 @@
     if (!items.length) {
       var following = state.follows.some(function (f) { return f.userId === me.id; });
       notifPanel.appendChild(make('p', 'notif-empty', following
-        ? 'Nothing new yet. When a profile you follow adds research, it shows up here.'
-        : 'Follow a profile to hear when it adds new research.'));
+        ? 'Nothing new yet. New research from profiles you follow, and comments or tips on your research, show up here.'
+        : 'Comments and tips on your research show up here. Follow a profile to also hear when it adds new research.'));
       return;
     }
     items.forEach(function (n) {
-      var b = make('button', 'notif-item' + (n.project.createdAt > lastSeen ? ' unread' : ''));
+      var b = make('button', 'notif-item' + (n.comment ? ' notif-comment' : '') + (n.time > lastSeen ? ' unread' : ''));
       b.type = 'button';
-      b.appendChild(make('span', 'notif-who', n.profile.name));
-      b.appendChild(make('span', 'notif-what', 'Added new research: ' + n.project.title));
-      b.appendChild(make('span', 'notif-when', timeAgo(n.project.createdAt)));
+      b.appendChild(make('span', 'notif-who', n.who));
+      b.appendChild(make('span', 'notif-what', n.what));
+      b.appendChild(make('span', 'notif-when', timeAgo(n.time)));
       b.addEventListener('click', function () {
         closeNotifs();
+        // A comment notification opens that card's comments; research opens the Research section.
+        if (n.comment) commentsOpen[n.project.id] = true;
         showProfile(n.profile.id, true);
-        $('research').scrollIntoView();
+        var target = n.comment ? $('comments-' + n.project.id) : $('research');
+        (target || $('research')).scrollIntoView({ block: 'center' });
       });
       notifPanel.appendChild(b);
     });
@@ -1489,7 +1512,7 @@
     notifPanel.hidden = false;
     bellBtn.setAttribute('aria-expanded', 'true');
     // Opening the bell marks everything in it as seen.
-    var newest = collectNotifs().reduce(function (m, n) { return Math.max(m, n.project.createdAt); }, 0);
+    var newest = collectNotifs().reduce(function (m, n) { return Math.max(m, n.time); }, 0);
     if (newest > seenAt) {
       seenAt = newest;
       renderBell();

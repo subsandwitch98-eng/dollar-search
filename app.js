@@ -45,7 +45,7 @@
   }
 
   // ---- State, loaded from the database ----
-  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [] };
+  var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [] };
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -73,10 +73,11 @@
       client.from('projects').select('id, profile_id, title, link, description, sources, created_at').order('created_at'),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
-      client.from('project_likes').select('user_id, project_id')
+      client.from('project_likes').select('user_id, project_id'),
+      client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at')
     ]).then(function (res) {
-      // Research likes are optional: if that table isn't set up yet, the rest of the site still loads.
-      res.forEach(function (r, i) { if (r.error && i !== 5) throw r.error; });
+      // Research likes and comments are optional: if their tables aren't set up yet, the rest of the site still loads.
+      res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
       if (res[0].data) {
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
@@ -95,6 +96,13 @@
       });
       state.projectLikes = res[5].error ? [] : res[5].data.map(function (l) {
         return { userId: l.user_id, projectId: l.project_id };
+      });
+      commentsReady = !res[6].error;
+      state.comments = res[6].error ? [] : res[6].data.map(function (c) {
+        return {
+          id: c.id, projectId: c.project_id, userId: c.user_id, kind: c.kind === 'tip' ? 'tip' : 'comment',
+          body: c.body || '', createdAt: Date.parse(c.created_at) || 0
+        };
       });
       if (!me) { isAdmin = false; seenAt = 0; return; }
       return Promise.all([
@@ -998,6 +1006,25 @@
       like.addEventListener('click', function () { toggleProjectLike(p); });
     }
     tools.appendChild(like);
+
+    // Comments and tips: open a panel under the card.
+    var comments = state.comments.filter(function (c) { return c.projectId === p.id; });
+    var open = !!commentsOpen[p.id];
+    var talk = make('button', 'card-like card-comment');
+    talk.type = 'button';
+    talk.setAttribute('aria-expanded', open ? 'true' : 'false');
+    talk.setAttribute('aria-controls', 'comments-' + p.id);
+    talk.setAttribute('aria-label', plural(comments.length, 'comment') + ' on ' + p.title);
+    talk.appendChild(bubbleIcon());
+    talk.appendChild(make('span', null, String(comments.length)));
+    talk.addEventListener('click', function () {
+      commentsOpen[p.id] = !commentsOpen[p.id];
+      renderProjects();
+      var box = $('comment-input-' + p.id);
+      if (commentsOpen[p.id] && box) box.focus();
+    });
+    tools.appendChild(talk);
+
     if (editable) {
       var edit = make('button', 'mini-btn', 'Edit');
       edit.type = 'button';
@@ -1005,7 +1032,146 @@
       tools.appendChild(edit);
     }
     card.appendChild(tools);
+    if (open) card.appendChild(commentsPanel(p, comments, editable));
     return card;
+  }
+
+  // ---- Comments and tips on research ----
+  var commentsReady = true;  // false until the comments table exists in Supabase
+  var commentsOpen = {};     // research id -> panel open, for this visit
+  var commentDrafts = {};    // research id -> unsent text, kept across re-renders
+  var commentKinds = {};     // research id -> 'comment' or 'tip'
+  var postingComment = null;
+  var armedDelete = null;    // comment id waiting for a second click to delete
+
+  function bubbleIcon() {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('class', 'card-comment-icon');
+    var path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4h0A2.5 2.5 0 0 1 4 13.5Z');
+    svg.appendChild(path);
+    return svg;
+  }
+  // Commenters are named by their portfolio, if they have one.
+  function authorName(userId) {
+    for (var i = 0; i < state.profiles.length; i++) {
+      if (state.profiles[i].ownerId === userId) return state.profiles[i].name;
+    }
+    return 'A Dollar Search member';
+  }
+
+  function commentsPanel(p, comments, editable) {
+    var panel = make('div', 'comments');
+    panel.id = 'comments-' + p.id;
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Comments on ' + p.title);
+
+    if (!commentsReady) {
+      panel.appendChild(make('p', 'comments-empty', 'Comments are not switched on for this site yet.'));
+      return panel;
+    }
+    if (!comments.length) {
+      panel.appendChild(make('p', 'comments-empty', editable ? 'No comments on this research yet.' : 'No comments yet. Leave the first one.'));
+    } else {
+      var list = make('ul', 'comment-list');
+      comments.forEach(function (c) {
+        var li = make('li', 'comment');
+        var head = make('div', 'comment-head');
+        head.appendChild(make('span', 'comment-author', authorName(c.userId)));
+        if (c.kind === 'tip') head.appendChild(make('span', 'comment-tip', 'Tip'));
+        head.appendChild(make('span', 'comment-when', timeAgo(c.createdAt)));
+        li.appendChild(head);
+        li.appendChild(make('p', 'comment-body', c.body));
+        if (me && (c.userId === me.id || editable || isAdmin)) {
+          var del = make('button', 'link-btn comment-delete', armedDelete === c.id ? 'Click again to delete' : 'Delete');
+          del.type = 'button';
+          del.addEventListener('click', function () {
+            if (armedDelete !== c.id) { armedDelete = c.id; renderProjects(); return; }
+            armedDelete = null;
+            del.disabled = true;
+            client.from('project_comments').delete().eq('id', c.id).then(function (res) {
+              if (res.error) { del.disabled = false; del.textContent = dbMessage(res.error); return; }
+              state.comments = state.comments.filter(function (x) { return x.id !== c.id; });
+              renderProjects();
+              refresh();
+            });
+          });
+          li.appendChild(del);
+        }
+        list.appendChild(li);
+      });
+      panel.appendChild(list);
+    }
+
+    if (!me) {
+      var signIn = make('button', 'link-btn', 'Sign in to leave a comment or tip');
+      signIn.type = 'button';
+      signIn.addEventListener('click', function () { openAuth('signin', 'Sign in to comment on research.'); });
+      panel.appendChild(signIn);
+      return panel;
+    }
+    if (editable) {
+      panel.appendChild(make('p', 'comments-note', "You can't comment on your own research."));
+      return panel;
+    }
+
+    var f = make('form', 'comment-form');
+    var kind = commentKinds[p.id] || 'comment';
+    var kinds = make('div', 'card-tabs');
+    kinds.setAttribute('role', 'group');
+    kinds.setAttribute('aria-label', 'Type of note');
+    [['comment', 'Comment'], ['tip', 'Tip']].forEach(function (k) {
+      var b = make('button', 'card-tab', k[1]);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', kind === k[0] ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        commentKinds[p.id] = k[0];
+        Array.prototype.forEach.call(kinds.children, function (x) {
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+        });
+        box.placeholder = k[0] === 'tip' ? 'Share a tip to improve this research…' : 'Write a comment…';
+      });
+      kinds.appendChild(b);
+    });
+    var box = make('textarea');
+    box.id = 'comment-input-' + p.id;
+    box.rows = 3;
+    box.maxLength = 500;
+    box.placeholder = kind === 'tip' ? 'Share a tip to improve this research…' : 'Write a comment…';
+    box.setAttribute('aria-label', 'Your comment or tip');
+    box.value = commentDrafts[p.id] || '';
+    box.addEventListener('input', function () { commentDrafts[p.id] = box.value; });
+    var row = make('div', 'edit-actions');
+    var post = make('button', 'btn btn-solid', 'Post');
+    post.type = 'submit';
+    post.disabled = postingComment === p.id;
+    row.appendChild(post);
+    var statusEl = statusLine('');
+    f.appendChild(kinds);
+    f.appendChild(box);
+    f.appendChild(row);
+    f.appendChild(statusEl);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = box.value.trim();
+      if (!text) { statusEl.textContent = 'Write something before posting.'; box.focus(); return; }
+      postingComment = p.id;
+      post.disabled = true;
+      statusEl.textContent = 'Posting…';
+      client.from('project_comments').insert({ project_id: p.id, kind: commentKinds[p.id] || 'comment', body: text })
+        .then(function (res) {
+          postingComment = null;
+          post.disabled = false;
+          if (res.error) { statusEl.textContent = dbMessage(res.error); return; }
+          commentDrafts[p.id] = '';
+          box.value = '';
+          refresh();
+        });
+    });
+    panel.appendChild(f);
+    return panel;
   }
 
   var likingProject = null; // the research project whose like is being saved
@@ -1515,7 +1681,8 @@
 
   // ---- Putting it together ----
   function busy() {
-    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden;
+    var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; });
+    return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment;
   }
   var routed = false;
   function renderAll() {

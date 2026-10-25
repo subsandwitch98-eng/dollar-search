@@ -22,10 +22,11 @@
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk'],
-    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7']
+    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow']
   };
-  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg'];
-  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0 };
+  var CHAR_KEYS = ['skin', 'hairStyle', 'bangs', 'hairColor', 'outfit', 'top', 'headwear', 'glasses', 'face', 'bg', 'frame'];
+  var DEFAULT_CHAR = { skin: 1, hairStyle: 0, bangs: 0, hairColor: 1, outfit: 0, top: 0, headwear: 1, glasses: 0, face: 0, bg: 0, frame: 0 };
   function normalizeCharacter(src) {
     var c = {};
     src = src && typeof src === 'object' ? src : {};
@@ -233,6 +234,90 @@
       var v = Math.round(amount < 0 ? ch * (1 + amount) : ch + (255 - ch) * amount);
       return ('0' + v.toString(16)).slice(-2);
     }).join('');
+  }
+
+  // Frames around the edge of the round picture (radius 60), drawn last so they sit in front of everything.
+  // Kinds: 0 None, 1 Hearts, 2 Stars, 3 Lace, 4 Flowers, 5 Rainbow, 6 Sparkles, 7 Bow.
+  var HEART = 'M0 0.9 C-0.4 0.6 -1 0.2 -1 -0.3 C-1 -0.75 -0.6 -1 -0.3 -1 C-0.1 -1 0 -0.85 0 -0.7 C0 -0.85 0.1 -1 0.3 -1 C0.6 -1 1 -0.75 1 -0.3 C1 0.2 0.4 0.6 0 0.9 Z';
+  function fx(n) { return n.toFixed(1); }
+  function starPoints(cx, cy, r) {
+    var pts = [];
+    for (var i = 0; i < 10; i++) {
+      var a = Math.PI / 5 * i - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+      pts.push(fx(cx + Math.cos(a) * rr) + ',' + fx(cy + Math.sin(a) * rr));
+    }
+    return pts.join(' ');
+  }
+  function sparklePath(x, y, r) {
+    var k = r * 0.28;
+    return 'M' + fx(x) + ' ' + fx(y - r) + ' Q' + fx(x + k) + ' ' + fx(y - k) + ' ' + fx(x + r) + ' ' + fx(y) +
+      ' Q' + fx(x + k) + ' ' + fx(y + k) + ' ' + fx(x) + ' ' + fx(y + r) +
+      ' Q' + fx(x - k) + ' ' + fx(y + k) + ' ' + fx(x - r) + ' ' + fx(y) +
+      ' Q' + fx(x - k) + ' ' + fx(y - k) + ' ' + fx(x) + ' ' + fx(y - r) + ' Z';
+  }
+  function drawFrame(add, kind) {
+    if (!kind) return;
+    // Calls fn(x, y, degrees, i) for n evenly spaced points on a circle of radius r; 0 degrees is the top.
+    function around(n, r, start, fn) {
+      for (var i = 0; i < n; i++) {
+        var deg = start + 360 / n * i, a = (deg - 90) * Math.PI / 180;
+        fn(60 + Math.cos(a) * r, 60 + Math.sin(a) * r, deg, i);
+      }
+    }
+    function ring(r, color, w) { add('circle', { cx: 60, cy: 60, r: r, fill: 'none', stroke: color, 'stroke-width': w }); }
+    if (kind === 1) { // Hearts
+      ring(55, '#F7C8D4', 7);
+      around(8, 55, 0, function (x, y, deg) {
+        add('path', { d: HEART, fill: '#E26D8E', stroke: '#FFFFFF', 'stroke-width': 0.18, transform: 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ') scale(5.5)' });
+      });
+    } else if (kind === 2) { // Stars
+      ring(55, '#FBE7A6', 6);
+      around(10, 55, 0, function (x, y, deg, i) {
+        add('polygon', { points: starPoints(x, y, i % 2 ? 4.2 : 6.5), fill: '#F6C945', stroke: '#E0A82E', 'stroke-width': 1, 'stroke-linejoin': 'round' });
+      });
+    } else if (kind === 3) { // Lace: a white band with a scalloped inner edge and pink dots
+      ring(56, '#FFFFFF', 8);
+      around(24, 51.5, 7.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 4, fill: '#FFFFFF' }); });
+      ring(59.2, '#F2B8C6', 1.6);
+      around(24, 56, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#E58FA8' }); });
+    } else if (kind === 4) { // Flowers on a vine
+      ring(55, '#9BD3AE', 3);
+      around(8, 55, 22.5, function (x, y, deg) {
+        add('ellipse', { cx: fx(x), cy: fx(y), rx: 4, ry: 2, fill: '#6DBB8A', transform: 'rotate(' + deg + ' ' + fx(x) + ' ' + fx(y) + ')' });
+      });
+      var petals = ['#F7A8C0', '#B9A6E8', '#FFFFFF', '#F4D35E'];
+      around(8, 55, 0, function (x, y, deg, i) {
+        for (var p = 0; p < 5; p++) {
+          var a = Math.PI * 2 / 5 * p + deg * Math.PI / 180;
+          add('circle', { cx: fx(x + Math.cos(a) * 3.6), cy: fx(y + Math.sin(a) * 3.6), r: 3.4, fill: petals[i % 4], stroke: 'rgba(0,0,0,0.12)', 'stroke-width': 0.5 });
+        }
+        add('circle', { cx: fx(x), cy: fx(y), r: 2.3, fill: i % 4 === 3 ? '#F29E4C' : '#F6C945' });
+      });
+    } else if (kind === 5) { // Rainbow with two little clouds
+      ['#F4A3A8', '#F8C88A', '#F6E08E', '#A8DDB5', '#9CCBEE', '#BBA9E6'].forEach(function (col, i) { ring(58 - i * 2.4, col, 2.6); });
+      [[23, 97], [97, 97]].forEach(function (c) {
+        add('ellipse', { cx: c[0], cy: c[1] + 3, rx: 9, ry: 3.5, fill: '#FFFFFF' });
+        [[-5, 1, 4.5], [0, -2, 5.5], [5, 1, 4.5]].forEach(function (b) {
+          add('circle', { cx: c[0] + b[0], cy: c[1] + b[1], r: b[2], fill: '#FFFFFF' });
+        });
+      });
+    } else if (kind === 6) { // Sparkles
+      ring(55, '#E4DAFA', 7);
+      around(8, 55, 0, function (x, y, deg, i) {
+        add('path', { d: sparklePath(x, y, i % 2 ? 4.5 : 7), fill: i % 2 ? '#F29BB2' : '#F6C945' });
+      });
+      around(8, 55, 22.5, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.4, fill: '#FFFFFF' }); });
+    } else if (kind === 7) { // Polka-dot ribbon with a big bow at the bottom
+      ring(55, '#F7C8D4', 7);
+      around(24, 55, 0, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1.3, fill: '#FFFFFF' }); });
+      add('path', { d: 'M58 111 L52 120 L56.5 120 L60 113 Z', fill: '#C25F7E' });
+      add('path', { d: 'M62 111 L68 120 L63.5 120 L60 113 Z', fill: '#C25F7E' });
+      add('path', { d: 'M60 110 C52 102 42 104 44 111 C46 117 54 115 60 110 Z', fill: '#E26D8E' });
+      add('path', { d: 'M60 110 C68 102 78 104 76 111 C74 117 66 115 60 110 Z', fill: '#E26D8E' });
+      add('path', { d: 'M57 109 C52 106 48 107 48 110', fill: 'none', stroke: '#C25F7E', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M63 109 C68 106 72 107 72 110', fill: 'none', stroke: '#C25F7E', 'stroke-width': 1.2, 'stroke-linecap': 'round' });
+      add('circle', { cx: 60, cy: 110, r: 3.4, fill: '#C25F7E' });
+    }
   }
 
   // Shoulders, neck and clothing. Kinds: 0 Tee, 1 Hoodie, 2 Sweater, 3 Shirt, 4 Jacket, 5 Overalls.
@@ -633,6 +718,7 @@
         add('circle', { cx: fl[0], cy: fl[1], r: 1.6, fill: '#F6C945' });
       });
     }
+    drawFrame(add, c.frame);
     return svg;
   }
   function pictureNode(avatar, name) {
@@ -1013,7 +1099,7 @@
   var PIC_GROUPS = [
     ['Skin', 'skin', 'swatch'], ['Hair', 'hairStyle', 'chip'], ['Bangs', 'bangs', 'chip'], ['Hair color', 'hairColor', 'swatch'],
     ['Clothing', 'outfit', 'chip'], ['Clothing color', 'top', 'swatch'], ['Headwear', 'headwear', 'chip'], ['Glasses', 'glasses', 'chip'],
-    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch']
+    ['Face', 'face', 'chip'], ['Background', 'bg', 'swatch'], ['Frame', 'frame', 'chip']
   ];
 
   function paintPortrait(avatar, name) {

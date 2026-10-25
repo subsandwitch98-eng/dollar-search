@@ -11,6 +11,7 @@ window.DOLLAR_SEARCH_CONFIG = {
     'f5a93142-7bf7-4cae-834c-ebfe4ef78a51', // $ubway's Subway
     '2ab64137-3e43-4c2a-9fc3-62b1c2a26188', // The One and Only Ramko
     'e218a1b2-63f5-4c31-b7f1-dc7af94d1965', // Purplelicious Sudiksha
-    'd85d9644-8f3a-408c-ad73-4c5539d0812e'  // Promprompromise
+    'd85d9644-8f3a-408c-ad73-4c5539d0812e', // Promprompromise
+    '71767f0d-6a43-4455-b325-b99b6804f70c'  // Soph_Soph
   ]
 };

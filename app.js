@@ -17,7 +17,7 @@
     bangs: ['None', 'Straight', 'Side', 'Wispy'],
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
-      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC'],
+      '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C'],
     outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls'],
     headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],

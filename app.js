@@ -1054,9 +1054,11 @@
     svg.appendChild(path);
     return svg;
   }
-  // A deleted comment shrinks to a point, becomes a gold shooting star and streaks off the top
-  // of the screen while the gap it leaves closes. Resolves when the star is gone.
-  function shootingStarAway(el) {
+
+  // A deleted comment gets a tap from a magic wand: the wand swoops in and taps it, a gold star
+  // forms where it touched with a little burst of sparkles, and the comment vanishes while the
+  // gap it leaves closes. Resolves when the effect is finished.
+  function wandTapAway(el) {
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce || !el.animate) {
       el.style.transition = 'opacity 0.2s';
@@ -1064,42 +1066,68 @@
       return new Promise(function (done) { setTimeout(done, 200); });
     }
     var rect = el.getBoundingClientRect();
-    var x = rect.left + rect.width / 2;
+    // Tap a little right of the comment's middle.
+    var x = rect.left + rect.width * 0.62;
     var y = rect.top + rect.height / 2;
-    // Fly up and to the right, past the edge of the window.
-    var dx = window.innerWidth - x + 220;
-    var dy = -(y + 220);
-    var angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
+    var fx = make('div', 'wand-fx');
+    fx.setAttribute('aria-hidden', 'true');
+    fx.style.left = x + 'px';
+    fx.style.top = y + 'px';
+    var wand = make('div', 'wand');
+    wand.appendChild(make('span', 'wand-stick'));
+    wand.appendChild(make('span', 'wand-tip'));
+    var star = make('span', 'wand-star');
+    fx.appendChild(star);
+    var sparks = [];
+    for (var i = 0; i < 6; i++) {
+      var sp = make('span', 'wand-spark' + (i % 2 ? ' pink' : ''));
+      fx.appendChild(sp);
+      sparks.push(sp);
+    }
+    fx.appendChild(wand);
+    document.body.appendChild(fx);
+
+    function pose(px, py, deg) { return 'translate(' + px + 'px, ' + py + 'px) rotate(' + deg + 'deg)'; }
+    var wandAnim = wand.animate([
+      { transform: pose(80, -80, -40), opacity: 0, offset: 0 },
+      { transform: pose(10, -10, -40), opacity: 1, offset: 0.28 },
+      { transform: pose(0, 0, -22), opacity: 1, offset: 0.4 },
+      { transform: pose(8, -8, -48), opacity: 1, offset: 0.55 },
+      { transform: pose(70, -70, -40), opacity: 0, offset: 1 }
+    ], { duration: 1150, easing: 'ease-in-out', fill: 'forwards' });
+
+    // The star forms at the moment of the tap, then fades.
+    star.animate([
+      { transform: 'scale(0) rotate(-120deg)', opacity: 0 },
+      { transform: 'scale(1.35) rotate(0deg)', opacity: 1, offset: 0.35 },
+      { transform: 'scale(1) rotate(10deg)', opacity: 1, offset: 0.65 },
+      { transform: 'scale(0.6) rotate(25deg)', opacity: 0 }
+    ], { duration: 950, delay: 430, easing: 'ease-out', fill: 'both' });
+    sparks.forEach(function (sp, i) {
+      var a = (i / sparks.length) * Math.PI * 2 - Math.PI / 2;
+      var r = 30 + (i % 2) * 10;
+      sp.animate([
+        { transform: 'translate(0, 0) scale(0.4)', opacity: 0 },
+        { transform: 'translate(' + Math.cos(a) * r * 0.6 + 'px, ' + Math.sin(a) * r * 0.6 + 'px) scale(1)', opacity: 1, offset: 0.4 },
+        { transform: 'translate(' + Math.cos(a) * r + 'px, ' + Math.sin(a) * r + 'px) scale(0.3)', opacity: 0 }
+      ], { duration: 650, delay: 450, easing: 'ease-out', fill: 'both' });
+    });
+
+    // The comment vanishes as the star appears, then the gap closes.
     el.animate([
       { transform: 'scale(1)', opacity: 1, filter: 'blur(0)' },
-      { transform: 'scale(0.12)', opacity: 0, filter: 'blur(3px)' }
-    ], { duration: 380, easing: 'cubic-bezier(0.5, 0, 0.75, 0)', fill: 'forwards' }).finished.then(function () {
-      // Close the gap left in the list.
+      { transform: 'scale(0.85)', opacity: 0, filter: 'blur(4px)' }
+    ], { duration: 320, delay: 440, easing: 'ease-in', fill: 'both' }).finished.then(function () {
       el.animate([
         { height: el.offsetHeight + 'px' },
         { height: '0px', paddingTop: '0px', paddingBottom: '0px', borderWidth: '0px', marginTop: '-0.6rem' }
       ], { duration: 280, easing: 'ease-in-out', fill: 'forwards' });
     });
 
-    var star = make('div', 'shooting-star');
-    star.setAttribute('aria-hidden', 'true');
-    star.appendChild(make('span', 'shooting-star-tail'));
-    star.appendChild(make('span', 'shooting-star-glow'));
-    star.appendChild(make('span', 'shooting-star-core'));
-    star.style.left = x + 'px';
-    star.style.top = y + 'px';
-    document.body.appendChild(star);
-    function at(px, py, scale) {
-      return 'translate(' + px + 'px, ' + py + 'px) rotate(' + angle + 'deg) scale(' + scale + ')';
-    }
-    return star.animate([
-      { transform: at(0, 0, 0.2), opacity: 0, offset: 0 },
-      { transform: at(0, 0, 1.3), opacity: 1, offset: 0.22 },
-      { transform: at(dx * 0.08, dy * 0.08, 1), opacity: 1, offset: 0.38 },
-      { transform: at(dx, dy, 0.55), opacity: 0, offset: 1 }
-    ], { duration: 1250, delay: 260, easing: 'cubic-bezier(0.45, 0, 0.7, 1)', fill: 'forwards' })
-      .finished.then(function () { star.remove(); });
+    return wandAnim.finished.then(function () {
+      return new Promise(function (done) { setTimeout(done, 300); });
+    }).then(function () { fx.remove(); });
   }
 
   // Commenters are named by their portfolio, if they have one.
@@ -1139,9 +1167,9 @@
             if (armedDelete !== c.id) { armedDelete = c.id; renderProjects(); return; }
             armedDelete = null;
             del.disabled = true;
-            // The star flies while the delete is saved; the list updates once both are done.
+            // The wand works its magic while the delete is saved; the list updates once both are done.
             Promise.all([
-              shootingStarAway(li),
+              wandTapAway(li),
               client.from('project_comments').delete().eq('id', c.id)
             ]).then(function (results) {
               var res = results[1];

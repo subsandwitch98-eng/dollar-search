@@ -575,17 +575,21 @@ img { max-width: 100%; }
 }
 .comment-form .edit-actions .btn { padding: 0.5rem 1.1rem; font-size: 0.95rem; }
 
-/* A deleted comment turns into a shooting star and flies away */
-.shooting-star { position: fixed; z-index: 60; width: 0; height: 0; pointer-events: none; }
-.shooting-star-tail {
-  position: absolute; right: 0; top: -2px; width: 150px; height: 4px; border-radius: 999px;
-  background: linear-gradient(to left, rgba(246, 201, 69, 0.95), rgba(255, 229, 138, 0.45) 45%, rgba(255, 229, 138, 0));
+/* Deleting a comment: a magic wand taps it, a gold star forms and the comment vanishes */
+.wand-fx { position: fixed; z-index: 60; width: 0; height: 0; pointer-events: none; }
+.wand { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.wand-stick {
+  position: absolute; left: 0; top: -4px; width: 96px; height: 8px; border-radius: 999px;
+  background: #4A2F37;
 }
-.shooting-star-glow {
-  position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 229, 138, 0.85), rgba(255, 229, 138, 0) 70%);
+.wand-tip {
+  position: absolute; left: -2px; top: -5px; width: 18px; height: 10px; border-radius: 999px;
+  background: #FFFFFF; box-shadow: inset -4px 0 0 #F6CDD8;
 }
-.shooting-star-core {
-  position: absolute; left: -13px; top: -13px; width: 26px; height: 26px; background: #F6C945;
+.wand-star {
+  position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; background: #F6C945;
   clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  filter: drop-shadow(0 0 6px #FFE58A);
 }
+.wand-spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #F6C945; }
+.wand-spark.pink { background: var(--accent); }

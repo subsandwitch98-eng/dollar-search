@@ -2678,10 +2678,16 @@
 
   function current() { return findProfile(currentId); }
 
+  // The page's description (what search engines and link previews show), kept in step with the page.
+  var HOME_DESCRIPTION = document.querySelector('meta[name="description"]').getAttribute('content');
+  function setDescription(text) {
+    document.querySelector('meta[name="description"]').setAttribute('content', text.slice(0, 300));
+  }
   function renderProfile() {
     var p = current();
     if (!p) return;
-    document.title = p.name + ' · ' + state.hubName;
+    document.title = p.name + ' · ' + state.hubName + ' research portfolio';
+    setDescription(p.name + ' on ' + state.hubName + (p.description ? ': ' + p.description.replace(/[.!?\s]+$/, '') : '') + '. ' + plural(p.projects.length, 'research project') + '.');
     paintName(siteName, p.name);
     addNameBadges(siteName, p);
     lede.textContent = p.description;
@@ -6776,7 +6782,7 @@
   function renderHeader() {
     paintName($('brand-name'), state.hubName);
     $('footer-name').textContent = '© 2026 ' + state.hubName;
-    if (!currentId) document.title = state.hubName;
+    if (!currentId) { document.title = state.hubName + ': Research Portfolios by Friends'; setDescription(HOME_DESCRIPTION); }
     signinBtn.hidden = !client || !!me;
     account.hidden = !me;
     if (me) {

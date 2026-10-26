@@ -5353,10 +5353,97 @@
     // Longer descriptions (room for the research outline) once the database allows them.
     var descIn = textArea(statusReady ? 1500 : 400, isNew ? '' : p.description);
 
-    field('Title', titleIn, 'project-title-input')
-      .concat(field('Link to your research (optional)', linkIn, 'project-link-input'))
-      .concat(field('Description', descIn, 'project-desc-input'))
-      .forEach(function (node) { f.appendChild(node); });
+    var pdfFile = null;     // a new PDF picked, uploaded when saving
+    var removePdf = false;  // take the current PDF off when saving
+    var hasPdf = !isNew && !!p.pdf;
+    // How the research is shared: a link to it, an uploaded PDF, or just written here.
+    var shareMode = isNew ? 'link' : p.pdf ? 'pdf' : p.link ? 'link' : 'write';
+    field('Title', titleIn, 'project-title-input').forEach(function (node) { f.appendChild(node); });
+    if (pdfReady && me) {
+      f.appendChild(shareChoice());
+    } else {
+      field('Link to your research (optional)', linkIn, 'project-link-input').forEach(function (node) { f.appendChild(node); });
+    }
+    field('Description', descIn, 'project-desc-input').forEach(function (node) { f.appendChild(node); });
+
+    function shareChoice() {
+      var box = make('div', 'share-choice');
+      var label = make('span', 'edit-label', 'How are you sharing your research?');
+      label.id = 'project-share-label';
+      box.appendChild(label);
+      var chips = make('div', 'chips share-chips');
+      chips.setAttribute('role', 'radiogroup');
+      chips.setAttribute('aria-labelledby', label.id);
+      var linkPart = make('div', 'share-part');
+      field('Link to your research', linkIn, 'project-link-input').forEach(function (node) { linkPart.appendChild(node); });
+      linkPart.appendChild(make('p', 'pdf-info', 'A Google Doc, Slides, a video, or any web page. It shows right in the card when the site allows it.'));
+      var pdfPart = make('div', 'share-part');
+      var writePart = make('div', 'share-part');
+      writePart.appendChild(make('p', 'pdf-info', 'Write your research in the description below. The research outline can help.'));
+      [['link', 'Link to it'], ['pdf', 'Upload a PDF'], ['write', 'Just write it here']].forEach(function (o) {
+        var b = make('button', 'chip share-chip', o[1]);
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', shareMode === o[0] ? 'true' : 'false');
+        b.setAttribute('aria-pressed', shareMode === o[0] ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          shareMode = o[0];
+          Array.prototype.forEach.call(chips.children, function (x) {
+            x.setAttribute('aria-checked', x === b ? 'true' : 'false');
+            x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+          });
+          paint();
+        });
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+
+      // Upload a PDF: pick a file; it uploads when the card is saved.
+      var pdfField = make('div', 'pdf-field');
+      var pick = make('input', 'pdf-input');
+      pick.type = 'file';
+      pick.accept = 'application/pdf,.pdf';
+      pick.id = 'project-pdf-input';
+      var choose = make('label', 'btn btn-ghost pdf-choose', hasPdf ? 'Replace PDF' : 'Choose a PDF');
+      choose.htmlFor = pick.id;
+      var pdfInfo = make('span', 'pdf-info', hasPdf ? 'A PDF is attached to this research.' : 'Up to 10 MB. It shows right in the card.');
+      pdfField.appendChild(pick);
+      pdfField.appendChild(choose);
+      pdfField.appendChild(pdfInfo);
+      pdfPart.appendChild(pdfField);
+      pick.addEventListener('change', function () {
+        var file = pick.files && pick.files[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+          pick.value = '';
+          pdfInfo.textContent = 'That isn’t a PDF. Pick a file that ends in .pdf.';
+          return;
+        }
+        if (file.size > PDF_MAX) {
+          pick.value = '';
+          pdfInfo.textContent = 'That PDF is ' + (file.size / 1048576).toFixed(1) + ' MB. The limit is 10 MB.';
+          return;
+        }
+        pdfFile = file;
+        var size = file.size < 1048576 ? Math.max(1, Math.round(file.size / 1024)) + ' KB' : (file.size / 1048576).toFixed(1) + ' MB';
+        pdfInfo.textContent = 'Ready: ' + file.name + ' (' + size + '). It uploads when you save.';
+      });
+      // Switching away from a PDF that's already attached tells you it'll be taken off when you save.
+      var swapNote = make('p', 'pdf-info share-note');
+      box.appendChild(linkPart);
+      box.appendChild(pdfPart);
+      box.appendChild(writePart);
+      box.appendChild(swapNote);
+      function paint() {
+        linkPart.hidden = shareMode !== 'link';
+        pdfPart.hidden = shareMode !== 'pdf';
+        writePart.hidden = shareMode !== 'write';
+        swapNote.hidden = !(hasPdf && shareMode !== 'pdf');
+        swapNote.textContent = 'Saving this way takes off the PDF that’s attached now.';
+      }
+      paint();
+      return box;
+    }
     // The research outline fills the description with four short headings to answer.
     var outlineBtn = make('button', 'mini-btn outline-btn', 'Use the research outline');
     outlineBtn.type = 'button';
@@ -5455,55 +5542,6 @@
       field('Cover picture link (optional)', imageIn, 'project-image-input').forEach(function (node) { f.appendChild(node); });
     }
 
-    // A PDF of the research, uploaded right here and shown in the card.
-    var pdfFile = null;     // a new PDF picked, uploaded when saving
-    var removePdf = false;  // take the current PDF off when saving
-    if (pdfReady && me) {
-      var hasPdf = !isNew && !!p.pdf;
-      f.appendChild(make('span', 'edit-label', 'PDF of your research (optional)'));
-      var pdfField = make('div', 'pdf-field');
-      var pdfInfo = make('span', 'pdf-info', hasPdf ? 'A PDF is attached to this research.' : 'No PDF yet. Up to 10 MB.');
-      var pick = make('input', 'pdf-input');
-      pick.type = 'file';
-      pick.accept = 'application/pdf,.pdf';
-      pick.id = 'project-pdf-input';
-      var choose = make('label', 'mini-btn pdf-choose', hasPdf ? 'Replace PDF' : 'Upload a PDF');
-      choose.htmlFor = pick.id;
-      pdfField.appendChild(pick);
-      pdfField.appendChild(choose);
-      if (hasPdf) {
-        var takeOff = make('button', 'link-btn pdf-remove', 'Remove PDF');
-        takeOff.type = 'button';
-        takeOff.addEventListener('click', function () {
-          removePdf = true;
-          pdfFile = null;
-          pick.value = '';
-          pdfInfo.textContent = 'The PDF will be removed when you save.';
-        });
-        pdfField.appendChild(takeOff);
-      }
-      pdfField.appendChild(pdfInfo);
-      pick.addEventListener('change', function () {
-        var file = pick.files && pick.files[0];
-        if (!file) return;
-        if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
-          pick.value = '';
-          pdfInfo.textContent = 'That isn’t a PDF. Pick a file that ends in .pdf.';
-          return;
-        }
-        if (file.size > PDF_MAX) {
-          pick.value = '';
-          pdfInfo.textContent = 'That PDF is ' + (file.size / 1048576).toFixed(1) + ' MB. The limit is 10 MB.';
-          return;
-        }
-        pdfFile = file;
-        removePdf = false;
-        var size = file.size < 1048576 ? Math.max(1, Math.round(file.size / 1024)) + ' KB' : (file.size / 1048576).toFixed(1) + ' MB';
-        pdfInfo.textContent = 'Ready: ' + file.name + ' (' + size + '). It uploads when you save.';
-      });
-      f.appendChild(pdfField);
-    }
-
     // Sources: any number of name + link rows.
     var sourcesLabel = make('span', 'edit-label', 'Sources');
     sourcesLabel.id = 'project-sources-label';
@@ -5595,6 +5633,16 @@
       var d = descIn.value.trim();
       var link = cleanLink(linkIn.value);
       if (!t) { statusEl.textContent = 'Write a title before saving.'; titleIn.focus(); return; }
+      // Only the way you chose to share the research is saved: a link, a PDF, or neither.
+      if (pdfReady && me) {
+        if (shareMode !== 'link') link = '';
+        if (shareMode === 'pdf' && !pdfFile && !hasPdf) {
+          statusEl.textContent = 'Choose a PDF to upload, or pick another way to share your research.';
+          return;
+        }
+        removePdf = hasPdf && shareMode !== 'pdf';
+        if (shareMode !== 'pdf') pdfFile = null;
+      }
       if (link === null) {
         statusEl.textContent = 'That link does not look right. Paste the full web address, like https://example.com/my-paper.';
         linkIn.focus();

@@ -1710,3 +1710,7 @@ img { max-width: 100%; }
   .pdf-name { font-weight: 700; color: var(--button-fg); background: var(--blush); border-radius: 999px; padding: 0.05rem 0.55rem; }
   .pdf-open { font-weight: 700; color: var(--accent); }
   @media (max-width: 600px) { .pdf-view.in-card iframe { height: 18rem; } .pdf-view.in-reader iframe { height: 70vh; } }
+  .share-choice { display: grid; gap: 0.5rem; padding: 0.8rem 0.9rem; border-radius: 1rem; background: var(--bg); border: 1px solid var(--line); }
+  .share-part { display: grid; gap: 0.35rem; }
+  .share-part .edit-label { font-size: 0.72rem; }
+  .share-note { color: var(--accent); }

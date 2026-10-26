@@ -1612,3 +1612,13 @@ img { max-width: 100%; }
     .cal-item.plan .link-btn { margin-left: 1.8rem; min-height: 2.4rem; }
     .cal-item.plan .link-btn ~ .link-btn { margin-left: 0.6rem; }
   }
+
+  /* Private drafts */
+  .project.draft { border-style: dashed; border-color: var(--accent); background: repeating-linear-gradient(135deg, var(--surface) 0 14px, var(--bg) 14px 28px); }
+  .draft-tag {
+    align-self: flex-start; justify-self: start; font-size: 0.72rem; font-weight: 700; color: #fff; background: var(--accent);
+    border-radius: 999px; padding: 0.15rem 0.65rem; margin-bottom: 0.2rem;
+  }
+  .mini-btn.publish-btn { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .mini-btn.publish-btn:hover { background: var(--button-fg); }
+  .draft-note { font-size: 0.82rem; color: var(--muted); margin: -0.1rem 0 0.2rem; }

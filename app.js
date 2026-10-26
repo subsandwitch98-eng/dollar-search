@@ -70,6 +70,7 @@
   var pollsReady = false;     // research cards can have a quick poll
   var blocksReady = false;    // you can block people
   var calendarReady = false;  // your own plans can be added to the research calendar
+  var draftsReady = false;    // research can be saved as a private draft
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -88,7 +89,8 @@
   // True once the database has the newer research columns (tags, image, updated date, pinned card).
   var extrasReady = false;
   function toProject(r) {
-    var created = Date.parse(r.created_at) || 0;
+    // Research counts as posted when it was published (drafts: when they were started).
+    var created = Date.parse(r.published_at) || Date.parse(r.created_at) || 0;
     return {
       id: r.id, profileId: r.profile_id, title: r.title || '', link: r.link || '',
       description: r.description || '', sources: normalizeSources(r.sources),
@@ -96,7 +98,8 @@
       tags: Array.isArray(r.tags) ? r.tags.filter(function (t) { return TAGS.indexOf(t) >= 0; }).slice(0, 3) : [],
       image: typeof r.image === 'string' ? r.image : '',
       updatedAt: Date.parse(r.updated_at) || created,
-      status: r.status === 'in-progress' || r.status === 'finished' ? r.status : ''
+      status: r.status === 'in-progress' || r.status === 'finished' ? r.status : '',
+      draft: r.is_draft === true
     };
   }
   // Selects the newer columns too, falling back to the original ones if the database doesn't have them yet.
@@ -138,7 +141,8 @@
     return Promise.all([
       client.from('site_settings').select('hub_name, hub_intro').eq('id', 1).maybeSingle(),
       selectNewer('profiles', 'pinned_project', 'id, owner_id, name, description, email, avatar, created_at'),
-      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status', PROJECT_COLUMNS + ', tags, image, updated_at', PROJECT_COLUMNS]),
+      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at',
+        PROJECT_COLUMNS + ', tags, image, updated_at, status', PROJECT_COLUMNS + ', tags, image, updated_at', PROJECT_COLUMNS]),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
       client.from('project_likes').select('user_id, project_id, created_at'),
@@ -155,15 +159,18 @@
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
       }
-      extrasReady = !res[1].usedFallback && res[2].tier <= 1;
-      statusReady = res[2].tier === 0;
+      extrasReady = !res[1].usedFallback && res[2].tier <= 2;
+      statusReady = res[2].tier <= 1;
+      draftsReady = res[2].tier === 0;
       var projects = res[2].data.map(toProject);
       state.profiles = res[1].data.map(function (r) {
         return {
           id: r.id, ownerId: r.owner_id, name: r.name || 'Untitled profile',
           description: r.description || '', email: r.email || '', avatar: normalizeAvatar(r.avatar),
           pinnedProject: r.pinned_project || null,
-          projects: projects.filter(function (q) { return q.profileId === r.id; })
+          // Drafts are kept apart, so only the portfolio page (for its owner) ever shows them.
+          projects: projects.filter(function (q) { return q.profileId === r.id && !q.draft; }),
+          drafts: projects.filter(function (q) { return q.profileId === r.id && q.draft; })
         };
       });
       state.likes = res[3].data.map(function (l) { return { userId: l.user_id, profileId: l.profile_id }; });
@@ -458,7 +465,7 @@
   }
   function findProject(id) {
     for (var i = 0; i < state.profiles.length; i++) {
-      var q = state.profiles[i].projects.filter(function (x) { return x.id === id; })[0];
+      var q = state.profiles[i].projects.concat(state.profiles[i].drafts || []).filter(function (x) { return x.id === id; })[0];
       if (q) return q;
     }
     return null;
@@ -3976,10 +3983,24 @@
   function projectMeta(q) {
     var edited = q.updatedAt > q.createdAt + 60000;
     var line = make('p', 'project-meta', readMinutes(q) + ' min read · ' +
-      (edited ? 'Updated ' : 'Posted ') + timeAgo(edited ? q.updatedAt : q.createdAt).toLowerCase());
+      (edited ? 'Updated ' : q.draft ? 'Started ' : 'Posted ') + timeAgo(edited ? q.updatedAt : q.createdAt).toLowerCase());
     line.title = (edited ? 'Updated ' : 'Posted ') + exactTime(edited ? q.updatedAt : q.createdAt);
     return line;
   }
+  // ---- Drafts: research kept private until it's published ----
+  var publishing = null; // the draft being published
+  function publishDraft(q) {
+    if (publishing) return;
+    publishing = q.id;
+    renderProjects();
+    client.from('projects').update({ is_draft: false, published_at: new Date().toISOString() }).eq('id', q.id).then(function (res) {
+      publishing = null;
+      if (res.error) { showToast(dbMessage(res.error)); renderProjects(); return; }
+      showToast('Published! “' + q.title + '” is now public for everyone to see.');
+      refresh();
+    });
+  }
+
   // "In progress" or "Finished" on a research card.
   function statusTag(q) {
     if (!q.status) return null;
@@ -4260,8 +4281,12 @@
   }
 
   function projectCard(p, editable) {
-    var card = make('article', 'project' + (isPinned(p) ? ' pinned' : ''));
+    var card = make('article', 'project' + (isPinned(p) ? ' pinned' : '') + (p.draft ? ' draft' : ''));
     card.id = 'project-' + p.id;
+    if (p.draft) {
+      var teamSize = acceptedCollabs(p.id).length;
+      card.appendChild(make('span', 'draft-tag', 'Private draft · only you' + (teamSize ? ' and your collaborators' : '') + ' can see this'));
+    }
     var cover = projectImage(p);
     if (cover) card.appendChild(cover);
     if (isPinned(p)) card.appendChild(make('span', 'pin-tag', 'Pinned'));
@@ -4384,19 +4409,30 @@
 
     // Footer: research likes for everyone to see; only other people's research can be liked.
     var tools = make('div', 'project-tools');
-    tools.appendChild(researchLikeButton(p));
-
-    // Comments and tips: open a panel under the card.
+    // Drafts are private, so they have no likes, comments or saving until they're published.
     var comments = state.comments.filter(function (c) { return c.projectId === p.id; });
-    var open = !!commentsOpen[p.id];
-    tools.appendChild(researchCommentButton(p, comments.length, open, function () {
-      commentsOpen[p.id] = !commentsOpen[p.id];
-      renderProjects();
-      var box = $('comment-input-' + p.id);
-      if (commentsOpen[p.id] && box) box.focus();
-    }));
-    var save = researchSaveButton(p);
-    if (save) tools.appendChild(save);
+    var open = !p.draft && !!commentsOpen[p.id];
+    if (p.draft) {
+      if (mineToEdit) {
+        var publish = make('button', 'mini-btn publish-btn', publishing === p.id ? 'Publishing…' : 'Publish');
+        publish.type = 'button';
+        publish.disabled = publishing === p.id;
+        publish.title = 'Make this research public so everyone can see it';
+        publish.addEventListener('click', function () { publishDraft(p); });
+        tools.appendChild(publish);
+      }
+    } else {
+      tools.appendChild(researchLikeButton(p));
+      // Comments and tips: open a panel under the card.
+      tools.appendChild(researchCommentButton(p, comments.length, open, function () {
+        commentsOpen[p.id] = !commentsOpen[p.id];
+        renderProjects();
+        var box = $('comment-input-' + p.id);
+        if (commentsOpen[p.id] && box) box.focus();
+      }));
+      var save = researchSaveButton(p);
+      if (save) tools.appendChild(save);
+    }
 
     if (mineToEdit) {
       var edit = make('button', 'mini-btn', 'Edit');
@@ -4431,7 +4467,7 @@
       });
       tools.appendChild(notesBtn);
     }
-    var reacts = reactionRow(p);
+    var reacts = p.draft ? null : reactionRow(p);
     if (reacts) card.appendChild(reacts);
     card.appendChild(tools);
     if (team && notesOpen[p.id]) card.appendChild(notesPanel(p));
@@ -5124,6 +5160,36 @@
       f.appendChild(statusLabel);
       f.appendChild(statusChips);
     }
+    // Public, or a private draft that only you (and your collaborators) can see until you publish it.
+    var keepDraft = isNew ? false : !!p.draft;
+    var visibilityNote = make('p', 'draft-note');
+    function paintVisibility() {
+      visibilityNote.textContent = keepDraft
+        ? 'Only you can see a draft. Publish it whenever it’s ready.'
+        : 'Everyone can see it as soon as you save.';
+      if (save) save.textContent = keepDraft ? (isNew || !p.draft ? 'Save as draft' : 'Save draft') : (isNew || p.draft ? 'Publish' : 'Save');
+    }
+    if (draftsReady) {
+      var visLabel = make('span', 'edit-label', 'Who can see it');
+      visLabel.id = 'project-visibility-label';
+      var visChips = make('div', 'chips');
+      visChips.setAttribute('role', 'group');
+      visChips.setAttribute('aria-labelledby', visLabel.id);
+      [[false, 'Everyone (public)'], [true, 'Only me (private draft)']].forEach(function (v) {
+        var b = make('button', 'chip', v[1]);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', keepDraft === v[0] ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          keepDraft = v[0];
+          Array.prototype.forEach.call(visChips.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+          paintVisibility();
+        });
+        visChips.appendChild(b);
+      });
+      f.appendChild(visLabel);
+      f.appendChild(visChips);
+      f.appendChild(visibilityNote);
+    }
 
     // Topics (up to 3) and a cover picture, once the database has room for them.
     // Entering the weekly challenge starts a new card with that week's topic picked.
@@ -5197,6 +5263,7 @@
 
     var actions = make('div', 'edit-actions');
     var save = make('button', 'btn btn-solid', isNew ? 'Add project' : 'Save');
+    if (draftsReady) paintVisibility();
     save.type = 'submit';
     var cancel = make('button', 'btn btn-ghost', 'Cancel');
     cancel.type = 'button';
@@ -5283,6 +5350,11 @@
         row.image = image;
       }
       if (statusReady) row.status = pickedStatus;
+      if (draftsReady) {
+        row.is_draft = keepDraft;
+        // Publishing a draft makes it count as posted now.
+        if (!isNew && p.draft && !keepDraft) row.published_at = new Date().toISOString();
+      }
       setBusy(buttons, true);
       statusEl.textContent = 'Saving…';
       if (isNew) {
@@ -5311,7 +5383,8 @@
     var p = current();
     var editable = canEdit(p);
     // Research shared with this portfolio through an accepted collab shows after its own research.
-    var cards = p.projects.concat(collabProjectsFor(p));
+    // The owner's private drafts come first.
+    var cards = (editable ? p.drafts || [] : []).concat(p.projects).concat(collabProjectsFor(p));
     // The pinned card goes first.
     cards.sort(function (a, b) { return (isPinned(b) && b.profileId === p.id ? 1 : 0) - (isPinned(a) && a.profileId === p.id ? 1 : 0); });
     if (editingId === 'new' ? !editable : editingId !== null && !cards.some(function (q) {

@@ -1158,3 +1158,28 @@ create policy "your own calendar" on public.calendar_events for all to authentic
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 grant select, insert, delete on public.calendar_events to authenticated;
 grant update (day, title, project_id, done) on public.calendar_events to authenticated;
+
+-- ===========================================================================
+-- Private drafts (same as supabase/drafts.sql).
+-- ===========================================================================
+
+alter table public.projects add column if not exists is_draft boolean not null default false;
+-- When research was published. Older research counts as published when it was posted.
+alter table public.projects add column if not exists published_at timestamptz;
+update public.projects set published_at = created_at where published_at is null;
+alter table public.projects alter column published_at set default now();
+alter table public.projects alter column published_at set not null;
+grant update (title, link, description, sources, tags, image, status, is_draft, published_at) on public.projects to authenticated;
+
+-- Everyone can read published research. Drafts are readable only by the owner and accepted collaborators.
+drop policy if exists "projects readable" on public.projects;
+create policy "projects readable" on public.projects for select to anon, authenticated using (not is_draft);
+drop policy if exists "drafts readable by their team" on public.projects;
+create policy "drafts readable by their team" on public.projects for select to authenticated
+  using (
+    is_draft
+    and (
+      exists (select 1 from public.profiles p where p.id = profile_id and p.owner_id = auth.uid())
+      or public.is_collaborator(id)
+    )
+  );

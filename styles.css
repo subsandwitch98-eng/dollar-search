@@ -1692,3 +1692,5 @@ img { max-width: 100%; }
   .google-btn svg { width: 1.25rem; height: 1.25rem; flex: none; }
   .dialog .google-or { display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 0.8rem; color: var(--muted); }
   .google-or::before, .google-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .footer-links { display: inline-flex; gap: 1rem; align-items: center; }
+  .footer-links a.link-btn { text-decoration: none; }

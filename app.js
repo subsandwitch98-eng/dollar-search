@@ -3034,8 +3034,8 @@
     var soon = $('shop-upcoming');
     soon.textContent = '';
     if (!isSiteOwner()) return;
-    // Only the next two seasons, so the shop doesn't get too long.
-    SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).slice(0, 2).forEach(function (k) {
+    // Every season that hasn't started yet, in order.
+    SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).forEach(function (k) {
       var head = make('div', 'shop-soon-head');
       head.appendChild(make('span', 'shop-soon-tag', 'Coming soon'));
       head.appendChild(make('span', 'shop-soon-private', 'Only you can see this'));

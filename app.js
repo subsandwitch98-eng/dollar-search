@@ -71,6 +71,7 @@
   var blocksReady = false;    // you can block people
   var calendarReady = false;  // your own plans can be added to the research calendar
   var draftsReady = false;    // research can be saved as a private draft
+  var pdfReady = false;       // research cards can have an uploaded PDF
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -99,7 +100,8 @@
       image: typeof r.image === 'string' ? r.image : '',
       updatedAt: Date.parse(r.updated_at) || created,
       status: r.status === 'in-progress' || r.status === 'finished' ? r.status : '',
-      draft: r.is_draft === true
+      draft: r.is_draft === true,
+      pdf: typeof r.pdf === 'string' ? r.pdf : ''
     };
   }
   // Selects the newer columns too, falling back to the original ones if the database doesn't have them yet.
@@ -141,7 +143,8 @@
     return Promise.all([
       client.from('site_settings').select('hub_name, hub_intro').eq('id', 1).maybeSingle(),
       selectNewer('profiles', 'pinned_project', 'id, owner_id, name, description, email, avatar, created_at'),
-      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at',
+      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at, pdf',
+        PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at',
         PROJECT_COLUMNS + ', tags, image, updated_at, status', PROJECT_COLUMNS + ', tags, image, updated_at', PROJECT_COLUMNS]),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
@@ -159,9 +162,10 @@
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
       }
-      extrasReady = !res[1].usedFallback && res[2].tier <= 2;
-      statusReady = res[2].tier <= 1;
-      draftsReady = res[2].tier === 0;
+      extrasReady = !res[1].usedFallback && res[2].tier <= 3;
+      statusReady = res[2].tier <= 2;
+      draftsReady = res[2].tier <= 1;
+      pdfReady = res[2].tier === 0;
       var projects = res[2].data.map(toProject);
       state.profiles = res[1].data.map(function (r) {
         return {
@@ -2127,10 +2131,17 @@
     // It has its own spot that's only rebuilt for different research, so likes and comments don't reload it.
     var href = cleanLink(q.link);
     var previewSpot = $('reader-preview');
-    var previewKey = href ? q.id + ' ' + href : '';
+    var previewKey = href || q.pdf ? q.id + ' ' + href + ' ' + q.pdf : '';
     if (previewSpot.dataset.key !== previewKey) {
       previewSpot.textContent = '';
       previewSpot.dataset.key = previewKey;
+      // An uploaded PDF comes first, then the research's link.
+      if (q.pdf) {
+        var pdfBox = make('div', 'preview');
+        pdfBox.appendChild(make('h3', 'reader-head', 'The research (PDF)'));
+        pdfBox.appendChild(pdfFrame(q, 'in-reader'));
+        previewSpot.appendChild(pdfBox);
+      }
       if (href) previewSpot.appendChild(researchPreview(href));
     }
     // Everything after the preview goes in the second part of the reader.
@@ -4537,6 +4548,8 @@
 
     var about = make('div', 'tab-panel');
     about.appendChild(descriptionNode(p.description));
+    // An uploaded PDF shows right in the card.
+    if (p.pdf) about.appendChild(pdfFrame(p, 'in-card'));
     if (href) {
       // The linked website's home address, shown under the description.
       var site = make('a', 'project-site', hostOf(href));
@@ -5442,6 +5455,55 @@
       field('Cover picture link (optional)', imageIn, 'project-image-input').forEach(function (node) { f.appendChild(node); });
     }
 
+    // A PDF of the research, uploaded right here and shown in the card.
+    var pdfFile = null;     // a new PDF picked, uploaded when saving
+    var removePdf = false;  // take the current PDF off when saving
+    if (pdfReady && me) {
+      var hasPdf = !isNew && !!p.pdf;
+      f.appendChild(make('span', 'edit-label', 'PDF of your research (optional)'));
+      var pdfField = make('div', 'pdf-field');
+      var pdfInfo = make('span', 'pdf-info', hasPdf ? 'A PDF is attached to this research.' : 'No PDF yet. Up to 10 MB.');
+      var pick = make('input', 'pdf-input');
+      pick.type = 'file';
+      pick.accept = 'application/pdf,.pdf';
+      pick.id = 'project-pdf-input';
+      var choose = make('label', 'mini-btn pdf-choose', hasPdf ? 'Replace PDF' : 'Upload a PDF');
+      choose.htmlFor = pick.id;
+      pdfField.appendChild(pick);
+      pdfField.appendChild(choose);
+      if (hasPdf) {
+        var takeOff = make('button', 'link-btn pdf-remove', 'Remove PDF');
+        takeOff.type = 'button';
+        takeOff.addEventListener('click', function () {
+          removePdf = true;
+          pdfFile = null;
+          pick.value = '';
+          pdfInfo.textContent = 'The PDF will be removed when you save.';
+        });
+        pdfField.appendChild(takeOff);
+      }
+      pdfField.appendChild(pdfInfo);
+      pick.addEventListener('change', function () {
+        var file = pick.files && pick.files[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+          pick.value = '';
+          pdfInfo.textContent = 'That isn’t a PDF. Pick a file that ends in .pdf.';
+          return;
+        }
+        if (file.size > PDF_MAX) {
+          pick.value = '';
+          pdfInfo.textContent = 'That PDF is ' + (file.size / 1048576).toFixed(1) + ' MB. The limit is 10 MB.';
+          return;
+        }
+        pdfFile = file;
+        removePdf = false;
+        var size = file.size < 1048576 ? Math.max(1, Math.round(file.size / 1024)) + ' KB' : (file.size / 1048576).toFixed(1) + ' MB';
+        pdfInfo.textContent = 'Ready: ' + file.name + ' (' + size + '). It uploads when you save.';
+      });
+      f.appendChild(pdfField);
+    }
+
     // Sources: any number of name + link rows.
     var sourcesLabel = make('span', 'edit-label', 'Sources');
     sourcesLabel.id = 'project-sources-label';
@@ -5575,15 +5637,71 @@
         if (!isNew && p.draft && !keepDraft) row.published_at = new Date().toISOString();
       }
       setBusy(buttons, true);
-      statusEl.textContent = 'Saving…';
-      if (isNew) {
-        row.profile_id = current().id;
-        client.from('projects').insert(row).then(finish);
-      } else {
-        client.from('projects').update(row).eq('id', p.id).then(finish);
+      // A new PDF is uploaded first, then the card is saved with its address.
+      var oldPdf = isNew ? '' : p.pdf;
+      var ready = Promise.resolve();
+      if (pdfFile) {
+        statusEl.textContent = 'Uploading your PDF…';
+        ready = uploadPdf(pdfFile).then(function (url) { row.pdf = url; });
+      } else if (removePdf) {
+        row.pdf = '';
       }
+      ready.then(function () {
+        statusEl.textContent = 'Saving…';
+        if (isNew) {
+          row.profile_id = current().id;
+          return client.from('projects').insert(row);
+        }
+        return client.from('projects').update(row).eq('id', p.id);
+      }).then(function (res) {
+        // The old PDF is cleared out once the card no longer uses it.
+        if (!res.error && oldPdf && 'pdf' in row && row.pdf !== oldPdf) removeStoredPdf(oldPdf);
+        finish(res);
+      }, function (err) {
+        setBusy(buttons, false);
+        statusEl.textContent = 'Your PDF couldn’t be uploaded' + (err && /size|large/i.test(err.message || '') ? ': it’s bigger than 10 MB.' : '. Check your connection and try again.');
+      });
     });
     return f;
+  }
+
+  // ---- PDFs on research cards, stored in Supabase Storage (supabase/pdfs.sql) ----
+  var PDF_BUCKET = 'research-pdfs';
+  var PDF_MAX = 10 * 1024 * 1024;
+  function uploadPdf(file) {
+    var safe = file.name.replace(/\.pdf$/i, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'research';
+    var path = me.id + '/' + Date.now() + '-' + safe + '.pdf';
+    return client.storage.from(PDF_BUCKET).upload(path, file, { contentType: 'application/pdf', upsert: false }).then(function (res) {
+      if (res.error) throw res.error;
+      return client.storage.from(PDF_BUCKET).getPublicUrl(path).data.publicUrl;
+    });
+  }
+  // Removes a PDF from storage (only works for your own files; anything else is left alone).
+  function removeStoredPdf(url) {
+    var m = String(url).match(/\/research-pdfs\/(.+)$/);
+    if (m) client.storage.from(PDF_BUCKET).remove([decodeURIComponent(m[1])]).then(function () {});
+  }
+  // Phones often can't show a PDF inside a page, so they get Google's PDF viewer instead.
+  function pdfViewerUrl(url) {
+    var touch = window.matchMedia('(pointer: coarse)').matches;
+    return touch ? 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(url) : url + '#view=FitH';
+  }
+  function pdfFrame(q, cls) {
+    var box = make('div', 'pdf-view ' + (cls || ''));
+    var frame = make('iframe');
+    frame.src = pdfViewerUrl(q.pdf);
+    frame.title = 'PDF: ' + q.title;
+    frame.referrerPolicy = 'no-referrer';
+    box.appendChild(frame);
+    var bar = make('div', 'pdf-bar');
+    bar.appendChild(make('span', 'pdf-name', 'PDF'));
+    var open = make('a', 'pdf-open', 'Open full size ↗');
+    open.href = q.pdf;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    bar.appendChild(open);
+    box.appendChild(bar);
+    return box;
   }
 
   function addProjectCard() {

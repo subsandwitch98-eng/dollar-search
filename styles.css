@@ -1679,3 +1679,16 @@ img { max-width: 100%; }
   .preview-frame.image img { display: block; width: 100%; height: auto; }
   .preview-note { font-size: 0.8rem; color: var(--muted); margin: 0; }
   @media (max-width: 600px) { .preview-frame.doc, .preview-frame.page { height: 70vh; } }
+
+  /* Sign in with Google */
+  .google-row { display: grid; gap: 0.6rem; margin-top: 0.2rem; }
+  .google-btn {
+    display: flex; align-items: center; justify-content: center; gap: 0.65rem; width: 100%; min-height: 2.9rem; cursor: pointer;
+    font-family: var(--body); font-weight: 700; font-size: 1rem; color: #3C4043; background: #FFFFFF;
+    border: 1.5px solid #DADCE0; border-radius: 999px; padding: 0.55rem 1rem;
+  }
+  .google-btn:hover { background: #F8F9FA; border-color: #C6C9CE; }
+  .google-btn:disabled { opacity: 0.7; cursor: default; }
+  .google-btn svg { width: 1.25rem; height: 1.25rem; flex: none; }
+  .dialog .google-or { display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 0.8rem; color: var(--muted); }
+  .google-or::before, .google-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }

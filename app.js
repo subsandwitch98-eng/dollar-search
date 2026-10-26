@@ -6870,7 +6870,34 @@
     authSwitch.hidden = !m.switchTo;
     authForgot.hidden = !m.forgot;
     authStatus.textContent = '';
+    // Google sign-in, for signing in or making an account, once it's switched on in Supabase.
+    $('google-row').hidden = !googleReady || (mode !== 'signin' && mode !== 'signup');
+    $('google-text').textContent = mode === 'signup' ? 'Sign up with Google' : 'Continue with Google';
   }
+
+  // ---- Sign in with Google ----
+  // Supabase says which sign-in options are switched on; the Google button only shows when Google is.
+  var googleReady = false;
+  if (client) {
+    fetch(cfg.supabaseUrl.replace(/\/$/, '') + '/auth/v1/settings', { headers: { apikey: cfg.supabaseKey } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) {
+        googleReady = !!(s && s.external && s.external.google);
+        if (!authDialog.hidden) setAuthMode(authMode, authSub.textContent);
+      })
+      .catch(function () {});
+  }
+  $('google-btn').addEventListener('click', function () {
+    $('google-btn').disabled = true;
+    authStatus.textContent = 'Taking you to Google…';
+    // Google sends you back here, signed in.
+    client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: SITE_URL } }).then(function (res) {
+      if (res.error) {
+        $('google-btn').disabled = false;
+        authStatus.textContent = 'Google sign-in didn’t work. Try again, or use your email.';
+      }
+    });
+  });
   function openAuth(mode, note) {
     if (!client) return;
     authOpener = document.activeElement;

@@ -7,7 +7,7 @@
 -- Keep it kind: swear words and slurs are blocked everywhere; mean words are also blocked in
 -- comments, replies and messages. Keep in step with SWEARS and MEAN_WORDS in app.js.
 -- ---------------------------------------------------------------------------
-create or replace function public.is_unkind(t text, strict boolean)
+create or replace function public.is_unkind(t text, check_mean boolean)
 returns boolean
 language sql
 immutable
@@ -15,7 +15,7 @@ set search_path = ''
 as $$
   select coalesce(t, '') ~* ('\m(fuck\w*|shit\w*|bitch\w*|bastard\w*|asshole\w*|dick|dickhead\w*|cunt\w*|slut\w*|whore\w*|'
       || 'nigg\w*|fag|fags|faggot\w*|retard\w*|tranny|kys|kill yourself)\M')
-    or (strict and coalesce(t, '') ~* '\m(idiot\w*|stupid|dumb|dumbass|loser\w*|moron\w*|ugly|shut up|hate you)\M');
+    or (check_mean and coalesce(t, '') ~* '\m(idiot\w*|stupid|dumb|dumbass|loser\w*|moron\w*|ugly|shut up|hate you)\M');
 $$;
 
 -- One trigger for every table people write in. Only new or changed text is checked, so older posts
@@ -28,7 +28,7 @@ as $$
 declare
   fresh text;
   before_text text := '';
-  strict boolean := tg_table_name in ('project_comments', 'messages');
+  check_mean boolean := tg_table_name in ('project_comments', 'messages');
 begin
   fresh := concat_ws(' ', to_jsonb(new) ->> 'name', to_jsonb(new) ->> 'description', to_jsonb(new) ->> 'title',
     to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options');
@@ -37,7 +37,7 @@ begin
       to_jsonb(old) ->> 'body', to_jsonb(old) ->> 'question', to_jsonb(old) ->> 'options');
     if fresh = before_text then return new; end if;
   end if;
-  if public.is_unkind(fresh, strict) then
+  if public.is_unkind(fresh, check_mean) then
     raise exception 'Please keep it kind. Try saying that another way.';
   end if;
   return new;
@@ -89,14 +89,14 @@ language plpgsql
 set search_path = ''
 as $$
 declare
-  other uuid;
+  other_user uuid;
 begin
   if tg_table_name = 'messages' then
-    other := new.to_user;
+    other_user := new.to_user;
   else
-    select p.owner_id into other from public.projects r join public.profiles p on p.id = r.profile_id where r.id = new.project_id;
+    select p.owner_id into other_user from public.projects r join public.profiles p on p.id = r.profile_id where r.id = new.project_id;
   end if;
-  if other is not null and public.is_blocked(auth.uid(), other) then
+  if other_user is not null and public.is_blocked(auth.uid(), other_user) then
     raise exception 'You can''t do that because one of you has blocked the other.';
   end if;
   return new;

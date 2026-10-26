@@ -72,7 +72,7 @@
   var calendarReady = false;  // your own plans can be added to the research calendar
   var draftsReady = false;    // research can be saved as a private draft
   var pdfReady = false;       // research cards can have an uploaded PDF
-  var feedbackReady = false;  // people can ask for feedback on their research
+  var feedbackReady = false;  // people can send feedback about the website
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -156,7 +156,7 @@
       client.from('project_reactions').select('user_id, project_id, kind, created_at'),
       client.from('polls').select('project_id, question, options, created_at'),
       client.from('poll_votes').select('project_id, user_id, choice, created_at'),
-      client.from('feedback_requests').select('id, user_id, project_id, note, closed, created_at').order('created_at', { ascending: false })
+      client.from('site_feedback').select('id, user_id, kind, body, name, created_at').order('created_at', { ascending: false })
     ]).then(function (res) {
       // Research likes, comments and collabs are optional: if their tables aren't set up yet, the rest of the site still loads.
       res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
@@ -205,10 +205,10 @@
       state.votes = pollsReady ? res[10].data.map(function (v) {
         return { projectId: v.project_id, userId: v.user_id, choice: v.choice, at: Date.parse(v.created_at) || 0 };
       }) : [];
-      // Requests for feedback on research (the Feedback wanted section on the home screen).
+      // Feedback about the website (the Send feedback box on the home screen). Only admins get rows back.
       feedbackReady = !res[11].error;
       state.feedback = res[11].error ? [] : res[11].data.map(function (f) {
-        return { id: f.id, userId: f.user_id, projectId: f.project_id, note: f.note || '', closed: !!f.closed, at: Date.parse(f.created_at) || 0 };
+        return { id: f.id, userId: f.user_id, kind: f.kind, body: f.body || '', name: f.name || '', at: Date.parse(f.created_at) || 0 };
       });
       collabsReady = !res[7].error;
       state.collabs = res[7].error ? [] : res[7].data.map(function (c) {
@@ -2453,158 +2453,152 @@
     if (titleIn) titleIn.closest('.project').scrollIntoView({ block: 'center' });
   });
 
-  // ---- Home: Feedback wanted. People ask for feedback on their research; others answer with comments and tips. ----
-  var FEEDBACK_LIMIT = 12;
-  var feedbackFormOpen = false;
-  var feedbackDraft = { projectId: '', note: '' };
-  var askingFeedback = false;
-  function openFeedbackRequests() {
-    return state.feedback.filter(function (f) { return !f.closed && findProject(f.projectId) && !findProject(f.projectId).draft; });
+  // ---- Home: Send feedback. Anyone can tell the Dollar Search team what they think of the website. ----
+  // Only site admins can read what's sent; they see it right under the form.
+  var FEEDBACK_KINDS = [
+    ['idea', '💡 An idea'],
+    ['problem', '🐞 Something’s not working'],
+    ['love', '💖 Something I love'],
+    ['other', '💬 Something else']
+  ];
+  var feedbackDraft = { kind: 'idea', body: '', name: '' };
+  var sendingFeedback = false;
+  var feedbackSent = false;
+  function feedbackKindLabel(key) {
+    var k = FEEDBACK_KINDS.filter(function (o) { return o[0] === key; })[0];
+    return k ? k[1] : FEEDBACK_KINDS[3][1];
   }
   function renderFeedback() {
-    var section = $('feedback-wanted');
+    var section = $('site-feedback');
     section.hidden = !client || !loaded || !!loadError || !feedbackReady;
     if (section.hidden) return;
-    renderFeedbackAsk();
-    var list = $('feedback-list');
-    list.textContent = '';
-    var open = openFeedbackRequests().filter(function (f) { return !isBlockedByMe(f.userId); }).slice(0, FEEDBACK_LIMIT);
-    $('feedback-empty').hidden = open.length > 0;
-    open.forEach(function (f) {
-      var q = findProject(f.projectId);
-      var owner = findProfile(q.profileId);
-      var li = make('li', 'feedback-item');
-      var head = make('div', 'feedback-head');
-      var pic = owner ? pictureNode(owner.avatar, owner.name) : null;
-      var avatar = make('span', 'avatar feedback-avatar', pic ? null : (owner ? owner.name.charAt(0).toUpperCase() : '?'));
-      if (pic) avatar.appendChild(pic);
-      avatar.setAttribute('aria-hidden', 'true');
-      head.appendChild(avatar);
-      var who = make('span', 'feedback-who');
-      var nm = make('span', 'feedback-name');
-      paintName(nm, owner ? owner.name : 'A Dollar Search member');
-      who.appendChild(nm);
-      who.appendChild(make('span', 'feedback-when', 'Asked ' + timeAgo(f.at).toLowerCase()));
-      head.appendChild(who);
-      li.appendChild(head);
-      li.appendChild(make('h3', 'feedback-title', q.title));
-      if (f.note) li.appendChild(make('p', 'feedback-note', '“' + f.note + '”'));
-      // How much feedback it's had since asking.
-      var replies = state.comments.filter(function (c) { return c.projectId === q.id && c.createdAt >= f.at && c.userId !== f.userId; }).length;
-      var foot = make('div', 'feedback-foot');
-      foot.appendChild(make('span', 'feedback-count', replies ? (replies === 1 ? '1 reply' : replies + ' replies') + ' so far' : 'No replies yet'));
-      var mine = me && f.userId === me.id;
-      if (mine) {
-        var done = make('button', 'mini-btn', 'Got my feedback ✓');
-        done.type = 'button';
-        done.title = 'Take this off the list';
-        done.addEventListener('click', function () { closeFeedback(f); });
-        foot.appendChild(done);
-      } else {
-        var give = make('button', 'btn btn-solid feedback-give', 'Give feedback');
-        give.type = 'button';
-        give.addEventListener('click', function () { openReader(q.id); });
-        foot.appendChild(give);
-      }
-      li.appendChild(foot);
-      li.addEventListener('click', function (e) {
-        if (e.target.closest('button')) return;
-        openReader(q.id);
-      });
-      list.appendChild(li);
-    });
+    renderFeedbackForm();
+    renderFeedbackInbox();
   }
-  // The "Ask for feedback" button and its little form.
-  function renderFeedbackAsk() {
-    var box = $('feedback-ask');
+  function renderFeedbackForm() {
+    var box = $('feedback-box');
     box.textContent = '';
-    if (!me) {
-      var signIn = make('button', 'btn btn-ghost', 'Sign in to ask for feedback');
-      signIn.type = 'button';
-      signIn.addEventListener('click', function () { openAuth('signin', 'Sign in to ask for feedback on your research.'); });
-      box.appendChild(signIn);
-      return;
-    }
-    var mp = myProfile();
-    var mine = mp ? mp.projects : [];
-    if (!mine.length) {
-      box.appendChild(make('p', 'feedback-hint', 'Post some research on your portfolio, then come back here to ask for feedback on it.'));
-      return;
-    }
-    if (!feedbackFormOpen) {
-      var ask = make('button', 'btn btn-solid', 'Ask for feedback');
-      ask.type = 'button';
-      ask.addEventListener('click', function () { feedbackFormOpen = true; renderFeedbackAsk(); var s = $('feedback-pick'); if (s) s.focus(); });
-      box.appendChild(ask);
+    if (feedbackSent) {
+      var thanks = make('div', 'feedback-thanks');
+      thanks.appendChild(make('p', 'feedback-thanks-title', 'Thank you! 💌'));
+      thanks.appendChild(make('p', 'feedback-hint', 'Your feedback was sent to the Dollar Search team.'));
+      var more = make('button', 'btn btn-ghost', 'Send more feedback');
+      more.type = 'button';
+      more.addEventListener('click', function () { feedbackSent = false; renderFeedbackForm(); var t = $('feedback-body'); if (t) t.focus(); });
+      thanks.appendChild(more);
+      box.appendChild(thanks);
       return;
     }
     var f = make('form', 'feedback-form');
-    var pickLabel = make('label', 'edit-label', 'Which research?');
-    pickLabel.htmlFor = 'feedback-pick';
-    var pick = make('select');
-    pick.id = 'feedback-pick';
-    mine.forEach(function (q) {
-      var o = make('option', null, q.title);
-      o.value = q.id;
-      pick.appendChild(o);
+    var kindLabel = make('span', 'edit-label', 'What’s it about?');
+    kindLabel.id = 'feedback-kind-label';
+    var chips = make('div', 'chips');
+    chips.setAttribute('role', 'radiogroup');
+    chips.setAttribute('aria-labelledby', kindLabel.id);
+    FEEDBACK_KINDS.forEach(function (o) {
+      var b = make('button', 'chip', o[1]);
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', feedbackDraft.kind === o[0] ? 'true' : 'false');
+      b.setAttribute('aria-pressed', feedbackDraft.kind === o[0] ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        feedbackDraft.kind = o[0];
+        Array.prototype.forEach.call(chips.children, function (x) {
+          x.setAttribute('aria-checked', x === b ? 'true' : 'false');
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+        });
+      });
+      chips.appendChild(b);
     });
-    if (feedbackDraft.projectId && mine.some(function (q) { return q.id === feedbackDraft.projectId; })) pick.value = feedbackDraft.projectId;
-    pick.addEventListener('change', function () { feedbackDraft.projectId = pick.value; });
-    var noteLabel = make('label', 'edit-label', 'What would you like feedback on? (optional)');
-    noteLabel.htmlFor = 'feedback-note';
-    var note = make('textarea');
-    note.id = 'feedback-note';
-    note.rows = 2;
-    note.maxLength = 200;
-    note.placeholder = 'For example: Is my conclusion clear? Are my sources good enough?';
-    note.value = feedbackDraft.note;
-    note.addEventListener('input', function () { feedbackDraft.note = note.value; });
+    var bodyLabel = make('label', 'edit-label', 'Your feedback');
+    bodyLabel.htmlFor = 'feedback-body';
+    var body = make('textarea');
+    body.id = 'feedback-body';
+    body.rows = 4;
+    body.maxLength = 500;
+    body.placeholder = 'Tell us what you think of Dollar Search, what you’d like added, or anything that isn’t working.';
+    body.value = feedbackDraft.body;
+    body.addEventListener('input', function () { feedbackDraft.body = body.value; });
+    f.appendChild(kindLabel);
+    f.appendChild(chips);
+    f.appendChild(bodyLabel);
+    f.appendChild(body);
+    var nameIn = null;
+    if (me) {
+      f.appendChild(make('p', 'feedback-hint', 'Sending as ' + (ownerName(me.id) || 'you') + '.'));
+    } else {
+      var nameLabel = make('label', 'edit-label', 'Your name (optional)');
+      nameLabel.htmlFor = 'feedback-name';
+      nameIn = make('input');
+      nameIn.id = 'feedback-name';
+      nameIn.maxLength = 60;
+      nameIn.autocomplete = 'nickname';
+      nameIn.value = feedbackDraft.name;
+      nameIn.addEventListener('input', function () { feedbackDraft.name = nameIn.value; });
+      f.appendChild(nameLabel);
+      f.appendChild(nameIn);
+    }
     var actions = make('div', 'edit-actions');
-    var send = make('button', 'btn btn-solid', askingFeedback ? 'Posting…' : 'Ask for feedback');
+    var send = make('button', 'btn btn-solid', sendingFeedback ? 'Sending…' : 'Send feedback');
     send.type = 'submit';
-    send.disabled = askingFeedback;
-    var cancel = make('button', 'btn btn-ghost', 'Cancel');
-    cancel.type = 'button';
-    cancel.addEventListener('click', function () { feedbackFormOpen = false; renderFeedbackAsk(); });
+    send.disabled = sendingFeedback;
     actions.appendChild(send);
-    actions.appendChild(cancel);
-    var status = statusLine('');
-    f.appendChild(pickLabel);
-    f.appendChild(pick);
-    f.appendChild(noteLabel);
-    f.appendChild(note);
+    actions.appendChild(make('span', 'feedback-private', '🔒 Only the Dollar Search team can read this.'));
     f.appendChild(actions);
+    var status = statusLine('');
     f.appendChild(status);
     f.addEventListener('submit', function (e) {
       e.preventDefault();
-      var text = note.value.trim();
-      if (unkind(text, true)) { status.textContent = KIND_NOTE; note.focus(); return; }
-      if (openFeedbackRequests().some(function (r) { return r.projectId === pick.value; })) {
-        status.textContent = 'You’ve already asked for feedback on that research. It’s on the list below.';
-        return;
-      }
-      askingFeedback = true;
+      var text = body.value.trim();
+      var name = nameIn ? nameIn.value.trim() : '';
+      if (!text) { status.textContent = 'Write your feedback first.'; body.focus(); return; }
+      if (unkind(text + ' ' + name, true)) { status.textContent = KIND_NOTE; body.focus(); return; }
+      sendingFeedback = true;
       send.disabled = true;
-      status.textContent = 'Posting…';
-      client.from('feedback_requests').insert({ project_id: pick.value, note: text }).then(function (res) {
-        askingFeedback = false;
-        if (res.error) { send.disabled = false; status.textContent = dbMessage(res.error); return; }
-        state.feedback.unshift({ id: 'new-' + Date.now(), userId: me.id, projectId: pick.value, note: text, closed: false, at: Date.now() });
-        feedbackFormOpen = false;
-        feedbackDraft = { projectId: '', note: '' };
-        showToast('Posted! People can now find your research under Feedback wanted.');
+      send.textContent = 'Sending…';
+      status.textContent = '';
+      client.from('site_feedback').insert({ kind: feedbackDraft.kind, body: text, name: name }).then(function (res) {
+        sendingFeedback = false;
+        if (res.error) { send.disabled = false; send.textContent = 'Send feedback'; status.textContent = dbMessage(res.error); return; }
+        if (isAdmin) refresh();
+        feedbackDraft = { kind: 'idea', body: '', name: '' };
+        feedbackSent = true;
         renderFeedback();
-        refresh();
       });
     });
     box.appendChild(f);
   }
-  function closeFeedback(f) {
-    client.from('feedback_requests').update({ closed: true }).eq('id', f.id).then(function (res) {
-      if (res.error) { showToast(dbMessage(res.error)); return; }
-      f.closed = true;
-      showToast('Taken off the list. Glad you got some feedback!');
-      renderFeedback();
+  // What people sent, for site admins only.
+  function renderFeedbackInbox() {
+    var inbox = $('feedback-inbox');
+    inbox.hidden = !isAdmin;
+    if (inbox.hidden) return;
+    var list = $('feedback-list');
+    list.textContent = '';
+    $('feedback-count').textContent = state.feedback.length ? '(' + state.feedback.length + ')' : '';
+    $('feedback-empty').hidden = state.feedback.length > 0;
+    state.feedback.forEach(function (f) {
+      var li = make('li', 'feedback-item');
+      li.appendChild(make('span', 'feedback-kind', feedbackKindLabel(f.kind)));
+      li.appendChild(make('p', 'feedback-text', f.body));
+      var who = (f.userId && ownerName(f.userId)) || f.name || (f.userId ? 'A Dollar Search member' : 'A visitor');
+      var foot = make('div', 'feedback-foot');
+      foot.appendChild(make('span', 'feedback-when', 'From ' + who + ' · ' + timeAgo(f.at).toLowerCase()));
+      var done = make('button', 'mini-btn', 'Done ✓');
+      done.type = 'button';
+      done.title = 'Remove this feedback';
+      done.addEventListener('click', function () { removeFeedback(f, done); });
+      foot.appendChild(done);
+      li.appendChild(foot);
+      list.appendChild(li);
+    });
+  }
+  function removeFeedback(f, btn) {
+    btn.disabled = true;
+    client.from('site_feedback').delete().eq('id', f.id).then(function (res) {
+      if (res.error) { btn.disabled = false; showToast(dbMessage(res.error)); return; }
+      state.feedback = state.feedback.filter(function (x) { return x !== f; });
+      renderFeedbackInbox();
     });
   }
 
@@ -7364,7 +7358,7 @@
     // Unsaved team notes are kept in noteDrafts, so only pause while someone is typing in them.
     var typingNotes = (!!document.activeElement && document.activeElement.classList.contains('notes-input')) ||
       Object.keys(pollEditing).some(function (k) { return pollEditing[k]; }) || calEditing !== null ||
-      (feedbackFormOpen && $('feedback-ask').contains(document.activeElement));
+      $('feedback-box').contains(document.activeElement);
     return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab || typingNotes;
   }
   var routed = false;

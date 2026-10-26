@@ -28,7 +28,7 @@ as $$
 declare
   fresh text;
   before_text text := '';
-  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'feedback_requests');
+  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'site_feedback');
 begin
   fresh := concat_ws(' ', to_jsonb(new) ->> 'name', to_jsonb(new) ->> 'description', to_jsonb(new) ->> 'title',
     to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options', to_jsonb(new) ->> 'note');

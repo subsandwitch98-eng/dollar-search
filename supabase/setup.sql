@@ -907,7 +907,7 @@ as $$
 declare
   fresh text;
   before_text text := '';
-  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'feedback_requests');
+  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'site_feedback');
 begin
   fresh := concat_ws(' ', to_jsonb(new) ->> 'name', to_jsonb(new) ->> 'description', to_jsonb(new) ->> 'title',
     to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options', to_jsonb(new) ->> 'note');
@@ -1209,43 +1209,36 @@ alter table public.projects add constraint projects_pdf_check check (char_length
 grant update (title, link, description, sources, tags, image, status, is_draft, published_at, pdf) on public.projects to authenticated;
 
 -- ===========================================================================
--- Feedback wanted (same as supabase/feedback.sql).
+-- Send us feedback (same as supabase/feedback.sql).
 -- ===========================================================================
 
-create table if not exists public.feedback_requests (
+
+create table if not exists public.site_feedback (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  project_id uuid not null references public.projects (id) on delete cascade,
-  note text not null default '' check (char_length(note) <= 200),
-  closed boolean not null default false,
+  user_id uuid default auth.uid() references auth.users (id) on delete set null,
+  kind text not null default 'other' check (kind in ('idea', 'problem', 'love', 'other')),
+  body text not null check (char_length(btrim(body)) between 1 and 500),
+  name text not null default '' check (char_length(name) <= 60),
   created_at timestamptz not null default now()
 );
-create index if not exists feedback_requests_created on public.feedback_requests (created_at desc);
-alter table public.feedback_requests enable row level security;
+create index if not exists site_feedback_created on public.site_feedback (created_at desc);
+alter table public.site_feedback enable row level security;
 
-drop policy if exists "feedback requests readable" on public.feedback_requests;
-create policy "feedback requests readable" on public.feedback_requests for select to anon, authenticated using (true);
--- You can only ask for feedback on your own research.
-drop policy if exists "ask for feedback on your research" on public.feedback_requests;
-create policy "ask for feedback on your research" on public.feedback_requests for insert to authenticated
-  with check (
-    user_id = auth.uid()
-    and exists (select 1 from public.projects r join public.profiles p on p.id = r.profile_id
-                where r.id = project_id and p.owner_id = auth.uid())
-  );
-drop policy if exists "close your feedback requests" on public.feedback_requests;
-create policy "close your feedback requests" on public.feedback_requests for update to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
-drop policy if exists "remove your feedback requests" on public.feedback_requests;
-create policy "remove your feedback requests" on public.feedback_requests for delete to authenticated
-  using (user_id = auth.uid() or public.is_admin());
-grant select on public.feedback_requests to anon, authenticated;
-grant insert (project_id, note) on public.feedback_requests to authenticated;
-grant update (closed) on public.feedback_requests to authenticated;
-grant delete on public.feedback_requests to authenticated;
+-- Anyone can send feedback. Signed-in people's feedback is marked as theirs.
+drop policy if exists "anyone can send feedback" on public.site_feedback;
+create policy "anyone can send feedback" on public.site_feedback for insert to anon, authenticated
+  with check (user_id is not distinct from auth.uid());
+-- Only admins can read it and clear it.
+drop policy if exists "admins read feedback" on public.site_feedback;
+create policy "admins read feedback" on public.site_feedback for select to anon, authenticated using (public.is_admin());
+drop policy if exists "admins remove feedback" on public.site_feedback;
+create policy "admins remove feedback" on public.site_feedback for delete to authenticated using (public.is_admin());
+grant select on public.site_feedback to anon, authenticated;
+grant insert (kind, body, name) on public.site_feedback to anon, authenticated;
+grant delete on public.site_feedback to authenticated;
 
--- Notes are checked for unkind words, like everything else people post. (Same as keep_it_kind() in
--- more-features-2.sql, now also checking notes.)
+-- Feedback is checked for unkind words, like everything else people post. (Same as keep_it_kind() in
+-- more-features-2.sql, now also checking feedback.)
 create or replace function public.keep_it_kind()
 returns trigger
 language plpgsql
@@ -1254,7 +1247,7 @@ as $$
 declare
   fresh text;
   before_text text := '';
-  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'feedback_requests');
+  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'site_feedback');
 begin
   fresh := concat_ws(' ', to_jsonb(new) ->> 'name', to_jsonb(new) ->> 'description', to_jsonb(new) ->> 'title',
     to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options', to_jsonb(new) ->> 'note');
@@ -1269,6 +1262,6 @@ begin
   return new;
 end;
 $$;
-drop trigger if exists keep_it_kind on public.feedback_requests;
-create trigger keep_it_kind before insert or update on public.feedback_requests
+drop trigger if exists keep_it_kind on public.site_feedback;
+create trigger keep_it_kind before insert or update on public.site_feedback
   for each row execute function public.keep_it_kind();

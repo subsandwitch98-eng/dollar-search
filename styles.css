@@ -1479,7 +1479,7 @@ img { max-width: 100%; }
     /* Row 1: the site name. Row 2: the round buttons, spread across. Row 3: the page links, scrolling sideways if needed. */
     .top { padding-block: 0.75rem 0.5rem; }
     .top .wrap { gap: 0.5rem; }
-    .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 0.4rem; }
+    .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem 0.55rem; }
     .top-actions .nav {
       order: 10; flex: 1 0 100%; gap: 1.1rem; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
       padding-top: 0.35rem; border-top: 1px solid var(--line);

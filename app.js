@@ -56,7 +56,7 @@
   // ---- State, loaded from the database ----
   var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
     reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [], reports: [],
-    polls: {}, votes: [], blocks: [], siteGifts: [] };
+    polls: {}, votes: [], blocks: [], siteGifts: [], calendar: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
@@ -69,6 +69,7 @@
   var repliesReady = false;   // comments can have replies
   var pollsReady = false;     // research cards can have a quick poll
   var blocksReady = false;    // you can block people
+  var calendarReady = false;  // your own plans can be added to the research calendar
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -209,6 +210,7 @@
         giftingReady = false; state.starsGiven = 0; state.giftsReceived = [];
         reportsReady = false; state.reports = [];
         blocksReady = false; state.blocks = []; state.siteGifts = [];
+        calendarReady = false; state.calendar = [];
         return;
       }
       return Promise.all([
@@ -224,7 +226,8 @@
         client.from('messages').select('id, from_user, to_user, body, created_at, read_at').order('created_at'),
         client.from('collab_notes').select('project_id, body, updated_by, updated_at'),
         client.from('reports').select('id, reporter, kind, target_id, reason, created_at').order('created_at', { ascending: false }),
-        client.from('blocks').select('blocked_user').eq('user_id', me.id)
+        client.from('blocks').select('blocked_user').eq('user_id', me.id),
+        client.from('calendar_events').select('id, day, title, project_id, done').eq('user_id', me.id).order('day')
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -283,6 +286,13 @@
         // People you've blocked.
         blocksReady = !extra[9].error;
         if (!extra[9].error) state.blocks = extra[9].data.map(function (b) { return b.blocked_user; });
+        // Your own plans on the research calendar.
+        calendarReady = !extra[10].error;
+        if (!extra[10].error) {
+          state.calendar = extra[10].data.map(function (e) {
+            return { id: e.id, day: e.day, title: e.title || '', projectId: e.project_id || null, done: !!e.done };
+          });
+        }
       });
     });
   }
@@ -1635,13 +1645,14 @@
     navHome.hidden = true;
     navResearch.hidden = true;
     navAchievements.hidden = true;
+    $('nav-calendar').hidden = true;
     navContact.hidden = true;
     renderHome();
     window.scrollTo(0, 0);
   }
   function showProfile(id, push) {
     if (!findProfile(id)) { showHome(push); return; }
-    if (id !== currentId) { followersOpen = false; collabOpen = false; collabNote = ''; }
+    if (id !== currentId) { followersOpen = false; collabOpen = false; collabNote = ''; resetCalendar(); }
     // Close comments opened in Recent research, so the portfolio's own comment boxes are the only ones on the page.
     if (Object.keys(recentCommentsOpen).length) { recentCommentsOpen = {}; renderRecent(); }
     currentId = id;
@@ -1657,6 +1668,7 @@
     navHome.hidden = false;
     navResearch.hidden = false;
     navAchievements.hidden = false;
+    $('nav-calendar').hidden = false;
     renderProfile();
     window.scrollTo(0, 0);
   }
@@ -2478,8 +2490,265 @@
     ctaContact.hidden = !p.email;
     navContact.hidden = !p.email;
     renderProjects();
+    renderCalendar(p);
     if (!achievementsDialog.hidden) renderAchievements(p);
   }
+
+  // ---- Research calendar: when research was posted and updated, plus your own private plans ----
+  // Everyone sees the research dates. Only the portfolio's owner sees, adds and changes plans.
+  var calMonth = '';    // "2026-10", the month showing
+  var calPicked = '';   // "2026-10-28", the day open below the calendar
+  var calEditing = null; // the plan being edited
+  var calSaving = false;
+  var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function resetCalendar() {
+    calMonth = dayKey(Date.now()).slice(0, 7);
+    calPicked = dayKey(Date.now());
+    calEditing = null;
+  }
+  resetCalendar();
+  function shiftMonth(month, n) {
+    var d = new Date(month + '-01T12:00:00Z');
+    d.setUTCMonth(d.getUTCMonth() + n);
+    return d.toISOString().slice(0, 7);
+  }
+  function monthTitle(month) {
+    return new Date(month + '-01T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  function ownsCalendar(p) { return !!me && p.ownerId === me.id; }
+  // What happened on each day: research posted or updated, and (for the owner) their plans.
+  function calendarDays(p) {
+    var days = {};
+    function on(key) { return days[key] || (days[key] = { posted: [], updated: [], plans: [] }); }
+    p.projects.forEach(function (q) {
+      on(dayKey(q.createdAt)).posted.push(q);
+      var edited = q.updatedAt > q.createdAt + 60000;
+      if (edited && dayKey(q.updatedAt) !== dayKey(q.createdAt)) on(dayKey(q.updatedAt)).updated.push(q);
+    });
+    if (ownsCalendar(p)) state.calendar.forEach(function (e) { on(e.day).plans.push(e); });
+    return days;
+  }
+  function renderCalendar(p) {
+    var section = $('calendar');
+    section.hidden = false;
+    var mine = ownsCalendar(p);
+    $('cal-sub').textContent = mine
+      ? 'Days your research was posted or updated. Click any day to add plans like due dates or reminders. Only you can see your plans.'
+      : 'Days ' + p.name + ' posted or updated research.';
+    $('cal-month').textContent = monthTitle(calMonth);
+    var key = $('cal-key');
+    key.textContent = '';
+    [['posted', 'Research posted'], ['updated', 'Research updated']].concat(mine ? [['plan', 'Your plans']] : []).forEach(function (k) {
+      var item = make('span', 'cal-key-item');
+      item.appendChild(make('span', 'cal-dot ' + k[0]));
+      item.appendChild(document.createTextNode(k[1]));
+      key.appendChild(item);
+    });
+    var days = calendarDays(p);
+    var grid = $('cal-grid');
+    grid.textContent = '';
+    WEEKDAYS.forEach(function (w) {
+      var h = make('span', 'cal-weekday', w);
+      h.setAttribute('role', 'columnheader');
+      grid.appendChild(h);
+    });
+    var first = new Date(calMonth + '-01T12:00:00Z');
+    var startPad = first.getUTCDay();
+    var count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+    for (var s = 0; s < startPad; s++) grid.appendChild(make('span', 'cal-cell empty'));
+    var today = dayKey(Date.now());
+    for (var d = 1; d <= count; d++) {
+      var dayStr = calMonth + '-' + (d < 10 ? '0' : '') + d;
+      var info = days[dayStr] || { posted: [], updated: [], plans: [] };
+      var cell = make('button', 'cal-cell' + (dayStr === today ? ' today' : '') + (dayStr === calPicked ? ' picked' : ''));
+      cell.type = 'button';
+      cell.setAttribute('role', 'gridcell');
+      cell.appendChild(make('span', 'cal-num', String(d)));
+      var marks = make('span', 'cal-marks');
+      if (info.posted.length) marks.appendChild(make('span', 'cal-dot posted'));
+      if (info.updated.length) marks.appendChild(make('span', 'cal-dot updated'));
+      if (info.plans.length) marks.appendChild(make('span', 'cal-dot plan' + (info.plans.every(function (e) { return e.done; }) ? ' done' : '')));
+      cell.appendChild(marks);
+      // On wide screens, the first thing that day is written in the box too.
+      var label = info.plans[0] ? info.plans[0].title : info.posted[0] ? info.posted[0].title : '';
+      if (label) cell.appendChild(make('span', 'cal-label', label));
+      var parts = [];
+      if (info.posted.length) parts.push(plural(info.posted.length, 'research') .replace('researchs', 'research') + ' posted');
+      if (info.updated.length) parts.push(info.updated.length + ' updated');
+      if (info.plans.length) parts.push(plural(info.plans.length, 'plan'));
+      cell.setAttribute('aria-label', niceDay(dayStr) + (parts.length ? ': ' + parts.join(', ') : ''));
+      cell.setAttribute('aria-pressed', dayStr === calPicked ? 'true' : 'false');
+      (function (dayStr) {
+        cell.addEventListener('click', function () { calPicked = dayStr; calEditing = null; renderCalendar(p); });
+      })(dayStr);
+      grid.appendChild(cell);
+    }
+    renderCalendarDay(p, days[calPicked] || { posted: [], updated: [], plans: [] });
+  }
+  // The day you clicked: its research, and (for the owner) its plans with add, edit, done and delete.
+  function renderCalendarDay(p, info) {
+    var box = $('cal-day');
+    box.textContent = '';
+    var mine = ownsCalendar(p);
+    box.appendChild(make('h3', 'cal-day-title', niceDay(calPicked)));
+    var any = false;
+    info.posted.concat(info.updated).forEach(function (q) {
+      any = true;
+      var row = make('button', 'cal-item research');
+      row.type = 'button';
+      row.appendChild(make('span', 'cal-dot ' + (info.posted.indexOf(q) >= 0 ? 'posted' : 'updated')));
+      row.appendChild(make('span', 'cal-item-text', (info.posted.indexOf(q) >= 0 ? 'Posted: ' : 'Updated: ') + q.title));
+      row.addEventListener('click', function () { goToResearch(q.profileId, q.id); });
+      box.appendChild(row);
+    });
+    if (mine) {
+      info.plans.forEach(function (e) {
+        any = true;
+        box.appendChild(calEditing === e.id ? planForm(p, e) : planRow(p, e));
+      });
+    }
+    if (!any) box.appendChild(make('p', 'cal-empty', mine ? 'Nothing on this day yet.' : 'No research on this day.'));
+    if (!mine) return;
+    if (!calendarReady) {
+      box.appendChild(make('p', 'cal-empty', 'Adding plans switches on once the calendar database setup has been run.'));
+      return;
+    }
+    if (calEditing !== 'new') {
+      var add = make('button', 'mini-btn cal-add', '+ Add a plan for this day');
+      add.type = 'button';
+      add.addEventListener('click', function () { calEditing = 'new'; renderCalendar(p); var t = $('cal-title'); if (t) t.focus(); });
+      box.appendChild(add);
+    } else {
+      box.appendChild(planForm(p, null));
+    }
+  }
+  function planRow(p, e) {
+    var row = make('div', 'cal-item plan' + (e.done ? ' done' : ''));
+    var check = make('input', 'cal-check');
+    check.type = 'checkbox';
+    check.checked = e.done;
+    check.setAttribute('aria-label', 'Done: ' + e.title);
+    check.addEventListener('change', function () { savePlan(p, e, { done: check.checked }); });
+    row.appendChild(check);
+    var text = make('span', 'cal-item-text', e.title);
+    var linked = e.projectId && findProject(e.projectId);
+    if (linked) {
+      var link = make('button', 'link-btn cal-link', linked.title);
+      link.type = 'button';
+      link.addEventListener('click', function () { goToResearch(linked.profileId, linked.id); });
+      text.appendChild(document.createTextNode(' · '));
+      text.appendChild(link);
+    }
+    row.appendChild(text);
+    var edit = make('button', 'link-btn', 'Edit');
+    edit.type = 'button';
+    edit.setAttribute('aria-label', 'Edit ' + e.title);
+    edit.addEventListener('click', function () { calEditing = e.id; renderCalendar(p); var t = $('cal-title'); if (t) t.focus(); });
+    row.appendChild(edit);
+    var del = make('button', 'link-btn', 'Delete');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Delete ' + e.title);
+    del.addEventListener('click', function () {
+      if (!window.confirm('Delete “' + e.title + '”?')) return;
+      client.from('calendar_events').delete().eq('id', e.id).then(function (res) {
+        if (res.error) { showToast(dbMessage(res.error)); return; }
+        state.calendar = state.calendar.filter(function (x) { return x.id !== e.id; });
+        renderCalendar(p);
+      });
+    });
+    row.appendChild(del);
+    return row;
+  }
+  // Adding a new plan (e is null) or editing one: what, which day, and which research it's for.
+  function planForm(p, e) {
+    var f = make('form', 'cal-form');
+    var titleLabel = make('label', 'edit-label', e ? 'Edit plan' : 'New plan');
+    titleLabel.htmlFor = 'cal-title';
+    var title = make('input');
+    title.id = 'cal-title';
+    title.type = 'text';
+    title.maxLength = 80;
+    title.placeholder = 'For example: Finish my sources';
+    title.value = e ? e.title : '';
+    var row = make('div', 'cal-form-row');
+    var dayLabel = make('label', 'cal-small-label', 'Day');
+    var day = make('input');
+    day.type = 'date';
+    day.value = e ? e.day : calPicked;
+    dayLabel.appendChild(day);
+    var forLabel = make('label', 'cal-small-label', 'For research');
+    var pick = make('select');
+    var none = make('option', null, 'None');
+    none.value = '';
+    pick.appendChild(none);
+    p.projects.forEach(function (q) {
+      var o = make('option', null, q.title);
+      o.value = q.id;
+      pick.appendChild(o);
+    });
+    pick.value = e && e.projectId ? e.projectId : '';
+    forLabel.appendChild(pick);
+    row.appendChild(dayLabel);
+    row.appendChild(forLabel);
+    var actions = make('div', 'edit-actions');
+    var save = make('button', 'btn btn-solid', e ? 'Save' : 'Add plan');
+    save.type = 'submit';
+    save.disabled = calSaving;
+    var cancel = make('button', 'btn btn-ghost', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', function () { calEditing = null; renderCalendar(p); });
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    var status = statusLine('');
+    f.appendChild(titleLabel);
+    f.appendChild(title);
+    f.appendChild(row);
+    f.appendChild(actions);
+    f.appendChild(status);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var text = title.value.trim();
+      if (!text) { status.textContent = 'Write what the plan is.'; title.focus(); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day.value)) { status.textContent = 'Pick a day.'; day.focus(); return; }
+      var changes = { title: text, day: day.value, project_id: pick.value || null };
+      if (e) { savePlan(p, e, changes, status); return; }
+      calSaving = true;
+      status.textContent = 'Saving…';
+      client.from('calendar_events').insert(changes).select('id, day, title, project_id, done').then(function (res) {
+        calSaving = false;
+        if (res.error) { status.textContent = dbMessage(res.error); return; }
+        var r = res.data && res.data[0];
+        state.calendar.push({ id: r ? r.id : 'new-' + Date.now(), day: changes.day, title: text, projectId: changes.project_id, done: false });
+        calEditing = null;
+        calPicked = changes.day;
+        calMonth = changes.day.slice(0, 7);
+        renderCalendar(p);
+        refresh();
+      });
+    });
+    return f;
+  }
+  function savePlan(p, e, changes, status) {
+    calSaving = true;
+    if (status) status.textContent = 'Saving…';
+    client.from('calendar_events').update(changes).eq('id', e.id).then(function (res) {
+      calSaving = false;
+      if (res.error) {
+        if (status) status.textContent = dbMessage(res.error); else showToast(dbMessage(res.error));
+        renderCalendar(p);
+        return;
+      }
+      if ('title' in changes) e.title = changes.title;
+      if ('day' in changes) { e.day = changes.day; calPicked = changes.day; calMonth = changes.day.slice(0, 7); }
+      if ('project_id' in changes) e.projectId = changes.project_id;
+      if ('done' in changes) e.done = changes.done;
+      calEditing = null;
+      renderCalendar(p);
+    });
+  }
+  $('cal-prev').addEventListener('click', function () { calMonth = shiftMonth(calMonth, -1); var p = current(); if (p) renderCalendar(p); });
+  $('cal-next').addEventListener('click', function () { calMonth = shiftMonth(calMonth, 1); var p = current(); if (p) renderCalendar(p); });
+  $('cal-today').addEventListener('click', function () { resetCalendar(); var p = current(); if (p) renderCalendar(p); });
 
   function resetDelete() {
     deleteArmed = false;
@@ -6445,7 +6714,7 @@
     var typingCollab = !collabPanel.hidden && collabPanel.contains(document.activeElement);
     // Unsaved team notes are kept in noteDrafts, so only pause while someone is typing in them.
     var typingNotes = (!!document.activeElement && document.activeElement.classList.contains('notes-input')) ||
-      Object.keys(pollEditing).some(function (k) { return pollEditing[k]; });
+      Object.keys(pollEditing).some(function (k) { return pollEditing[k]; }) || calEditing !== null;
     return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab || typingNotes;
   }
   var routed = false;

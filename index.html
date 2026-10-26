@@ -26,6 +26,7 @@
         <a href="./" id="nav-home" hidden>All profiles</a>
         <a href="#research" id="nav-research" hidden>Research</a>
         <a href="#achievements" id="nav-achievements" hidden>Achievements</a>
+        <a href="#calendar" id="nav-calendar" hidden>Calendar</a>
         <a href="#contact" id="nav-contact" hidden>Contact</a>
       </nav>
       <button class="cart-btn" id="cart-btn" type="button" aria-label="Star Shop" hidden>
@@ -368,6 +369,26 @@
         </div>
         <div class="card-grid" id="projects"></div>
         <p class="empty-note" id="projects-empty" hidden>Research projects will be listed here soon.</p>
+      </div>
+    </section>
+
+    <section class="calendar-band" id="calendar" hidden>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Research calendar</h2>
+          <p class="section-sub" id="cal-sub">Days research was posted.</p>
+        </div>
+        <div class="cal-card">
+          <div class="cal-top">
+            <button class="recent-arrow" id="cal-prev" type="button" aria-label="Previous month">←</button>
+            <h3 class="cal-month" id="cal-month" aria-live="polite"></h3>
+            <button class="recent-arrow" id="cal-next" type="button" aria-label="Next month">→</button>
+            <button class="mini-btn" id="cal-today" type="button">Today</button>
+          </div>
+          <div class="cal-key" id="cal-key"></div>
+          <div class="cal-grid" id="cal-grid" role="grid" aria-labelledby="cal-month"></div>
+          <div class="cal-day" id="cal-day"></div>
+        </div>
       </div>
     </section>
 

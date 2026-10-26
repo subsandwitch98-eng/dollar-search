@@ -2818,6 +2818,12 @@
   var SEASON_ORDER = ['halloween', 'fall', 'winter', 'valentine', 'spring'];
   // The year a season's last day falls in, for "leave the shop on February 28, 2027".
   function seasonYear(k) { return new Date(SEASONS[k].ends - 86400000).getUTCFullYear(); }
+  // The site owner: whoever owns the portfolio in cfg.ownerProfileId (config.js).
+  function isSiteOwner() {
+    if (!me || !cfg.ownerProfileId) return false;
+    var p = findProfile(cfg.ownerProfileId);
+    return !!p && p.ownerId === me.id;
+  }
   function nextSeason() { return SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; })[0] || null; }
   var SHOP = [
     { id: 'pumpkin-top', name: 'Pumpkin orange outfit', kind: 'Clothing color', key: 'top', index: 17, price: 1, season: 'halloween' },
@@ -3023,13 +3029,16 @@
     SHOP.filter(function (item) { return onSale(item) || (!upcoming(item) && ownsItem(item)); }).forEach(function (item) {
       list.appendChild(shopCard(item, base, stars, friend));
     });
-    // Coming soon: the next seasons' items, to look at before they arrive.
+    // Coming soon: the next seasons' items, to look at before they arrive. Only the site owner sees these,
+    // so everyone else is surprised when a new season starts.
     var soon = $('shop-upcoming');
     soon.textContent = '';
+    if (!isSiteOwner()) return;
     // Only the next two seasons, so the shop doesn't get too long.
     SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).slice(0, 2).forEach(function (k) {
       var head = make('div', 'shop-soon-head');
       head.appendChild(make('span', 'shop-soon-tag', 'Coming soon'));
+      head.appendChild(make('span', 'shop-soon-private', 'Only you can see this'));
       head.appendChild(make('h3', 'shop-soon-title', SEASONS[k].name + ' items · ' + SEASONS[k].first + ' to ' + SEASONS[k].last));
       head.appendChild(make('span', 'shop-soon-when', timeUntil(SEASONS[k].starts, true)));
       soon.appendChild(head);

@@ -6782,7 +6782,7 @@
   function renderHeader() {
     paintName($('brand-name'), state.hubName);
     $('footer-name').textContent = '© 2026 ' + state.hubName;
-    if (!currentId) { document.title = state.hubName + ': Research Portfolios by Friends'; setDescription(HOME_DESCRIPTION); }
+    if (!currentId) { document.title = state.hubName + ': Research and Read'; setDescription(HOME_DESCRIPTION); }
     signinBtn.hidden = !client || !!me;
     account.hidden = !me;
     if (me) {

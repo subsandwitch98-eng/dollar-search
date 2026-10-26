@@ -172,6 +172,29 @@
       </div>
     </section>
 
+    <section class="challenge-band" id="challenge-band" hidden>
+      <div class="wrap challenge-grid">
+        <div class="challenge-card" id="challenge">
+          <div class="challenge-head">
+            <span class="challenge-tag">Weekly challenge</span>
+            <span class="challenge-left" id="challenge-left"></span>
+          </div>
+          <h2 class="challenge-topic" id="challenge-topic"></h2>
+          <p class="challenge-text" id="challenge-text"></p>
+          <ol class="challenge-entries" id="challenge-entries"></ol>
+          <div class="challenge-actions">
+            <button class="btn btn-solid" id="challenge-enter" type="button">Enter the challenge</button>
+          </div>
+          <p class="challenge-last" id="challenge-last" hidden></p>
+        </div>
+        <div class="leader-card" id="leaderboard">
+          <h2 class="leader-title">Star leaderboard</h2>
+          <p class="leader-sub" id="leader-sub">Most likes on research this month</p>
+          <ol class="leader-list" id="leader-list"></ol>
+        </div>
+      </div>
+    </section>
+
     <section class="idea-band" id="idea-generator">
       <div class="wrap">
         <div class="section-head">
@@ -249,6 +272,7 @@
           <span class="eyebrow">Research</span>
           <h1 id="site-name"></h1>
           <p class="lede" id="lede"></p>
+          <div class="badge-strip" id="badge-strip" hidden></div>
           <div class="react-row" id="react-row">
             <button class="react-btn" id="like-btn" type="button" aria-pressed="false"><span class="react-icon" aria-hidden="true">♥</span><span class="react-label">Like</span><span class="react-count">0</span></button>
             <button class="react-btn" id="follow-btn" type="button" aria-pressed="false"><span class="react-icon" aria-hidden="true">+</span><span class="react-label">Follow</span><span class="react-count">0 followers</span></button>
@@ -265,6 +289,7 @@
             <button class="edit-btn" id="remove-profile" type="button" hidden>Remove this profile</button>
             <button class="edit-btn share-btn" id="share-btn" type="button">Share</button>
             <button class="edit-btn report-btn" id="report-profile" type="button" hidden>Report</button>
+            <button class="edit-btn report-btn" id="block-btn" type="button" hidden>Block</button>
           </div>
           <form class="edit-form" id="pic-form" hidden></form>
           <form class="edit-form" id="edit-form" hidden>
@@ -368,7 +393,7 @@
 </main>
 
 <footer>
-  <div class="wrap" id="footer-name">© 2026 Dollar Search</div>
+  <div class="wrap footer-row"><span id="footer-name">© 2026 Dollar Search</span> <button class="link-btn" id="tour-again" type="button">Take the tour</button></div>
 </footer>
 
 <!-- Star Shop pop-up, opened from the cart by the bell -->
@@ -428,6 +453,21 @@
       </form>
       <p class="edit-status" id="msg-status" aria-live="polite"></p>
     </div>
+  </div>
+</div>
+
+<!-- Welcome tour: a few quick pop-ups for first-time visitors (replay it from the footer) -->
+<div class="dialog-backdrop tour-backdrop" id="tour-dialog" hidden>
+  <div class="dialog tour-dialog" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text">
+    <div class="tour-art" id="tour-art" aria-hidden="true"></div>
+    <h2 id="tour-title">Welcome!</h2>
+    <p id="tour-text"></p>
+    <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
+    <div class="edit-actions tour-actions">
+      <button class="btn btn-ghost" id="tour-back" type="button">Back</button>
+      <button class="btn btn-solid" id="tour-next" type="button">Next</button>
+    </div>
+    <button class="link-btn tour-skip" id="tour-skip" type="button">Skip the tour</button>
   </div>
 </div>
 

@@ -18,13 +18,13 @@
     hairColor: ['#2E2226', '#5B3A29', '#A0643B', '#E3B562', '#E58FA8', '#8E7CC3', '#C2552E', '#EDE3C8', '#6FA8DC', '#7B4FA0'],
     top: ['#F7C8D4', '#D2728F', '#8EC5E8', '#9BD3AE', '#F4D35E', '#4A4E69',
       '#E05A5A', '#F29E4C', '#F28B82', '#B9A6E8', '#BDEBD9', '#4FB3A9', '#2F4A7A', '#8A5A3C', '#2B2B2E', '#F4F1EC', '#5B3A8C', '#F28C28'],
-    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape', 'Flannel', 'Cozy scarf'],
-    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown', 'Leaf crown', 'Earmuffs', 'Santa hat'],
+    outfit: ['Tee', 'Hoodie', 'Sweater', 'Shirt', 'Jacket', 'Overalls', 'Vampire cape', 'Flannel', 'Cozy scarf', 'Heart sweater', 'Raincoat'],
+    headwear: ['None', 'Cap', 'Beanie', 'Headphones', 'Crown', 'Bow', 'Beret', 'Bucket hat', 'Top hat', 'Headband', 'Flower crown', 'Witch hat', 'Pumpkin hat', 'Bat headband', 'Devil horns', 'Candy corn crown', 'Leaf crown', 'Earmuffs', 'Santa hat', 'Heart headband', 'Bunny ears', 'Sun hat'],
     glasses: ['None', 'Glasses', 'Shades', 'Square', 'Cat-eye', 'Hearts', 'Stars', 'Aviators', 'Monocle'],
     face: ['Smile', 'Grin', 'Cool', 'Wink', 'Happy', 'Laugh', 'Surprised', 'Tongue', 'Sleepy', 'Starry', 'Smirk', 'Vampire', 'Scarecrow (removed)', 'Witch'],
-    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A', '#F6D9B8', '#2F5D50'],
-    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb', 'Maple leaves', 'Snowflakes'],
-    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy', 'Hedgehog', 'Snowman', 'Penguin'],
+    bg: ['#FBE3E6', '#FFF1D6', '#DDF0FA', '#E3F4E6', '#ECE6FA', '#FFFCF7', '#3B2E5A', '#F6D9B8', '#2F5D50', '#F7C1CF', '#D6EFC7'],
+    frame: ['None', 'Hearts', 'Stars', 'Lace', 'Flowers', 'Rainbow', 'Sparkles', 'Bow', 'Pumpkins', 'Ghosts', 'Candy corn', 'Spiderweb', 'Maple leaves', 'Snowflakes', 'Cupid hearts', 'Butterflies'],
+    pet: ['None', 'Cat', 'Dog', 'Bunny', 'Hamster', 'Bird', 'Fish', 'Bat', 'Ghost', 'Pumpkin buddy', 'Hedgehog', 'Snowman', 'Penguin', 'Teddy bear', 'Duckling'],
     // The scene on your portfolio: what your character stands on and what's behind it.
     scene: ['Books', 'Library', 'Night sky', 'Garden'],
     petColor: ['#F2A65A', '#9A9AA6', '#FBF7F2', '#3A2E33', '#C9A27A', '#F7C8D4', '#8EC5E8']
@@ -55,7 +55,8 @@
 
   // ---- State, loaded from the database ----
   var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
-    reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [], reports: [] };
+    reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [], reports: [],
+    polls: {}, votes: [], blocks: [], siteGifts: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
@@ -64,6 +65,10 @@
   var messagesReady = false;  // true once messages with friends have loaded
   var notesReady = false;     // true once team notes have loaded
   var reportsReady = false;   // true once reports can be sent (and, for the site owner, read)
+  var statusReady = false;    // research can be marked In progress or Finished
+  var repliesReady = false;   // comments can have replies
+  var pollsReady = false;     // research cards can have a quick poll
+  var blocksReady = false;    // you can block people
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -89,7 +94,8 @@
       createdAt: created,
       tags: Array.isArray(r.tags) ? r.tags.filter(function (t) { return TAGS.indexOf(t) >= 0; }).slice(0, 3) : [],
       image: typeof r.image === 'string' ? r.image : '',
-      updatedAt: Date.parse(r.updated_at) || created
+      updatedAt: Date.parse(r.updated_at) || created,
+      status: r.status === 'in-progress' || r.status === 'finished' ? r.status : ''
     };
   }
   // Selects the newer columns too, falling back to the original ones if the database doesn't have them yet.
@@ -102,6 +108,19 @@
       });
     });
   }
+
+  // Tries each list of columns in turn, newest first, until the database has them all. res.tier says which worked.
+  function selectTiers(table, tiers) {
+    function attempt(i) {
+      return client.from(table).select(tiers[i]).order('created_at').then(function (res) {
+        if (res.error && i < tiers.length - 1) return attempt(i + 1);
+        res.tier = i;
+        return res;
+      });
+    }
+    return attempt(0);
+  }
+  var PROJECT_COLUMNS = 'id, profile_id, title, link, description, sources, created_at';
 
   // Runs a query, and if the database doesn't have its newer columns yet, the older query instead.
   function orOlder(query, older) {
@@ -118,13 +137,16 @@
     return Promise.all([
       client.from('site_settings').select('hub_name, hub_intro').eq('id', 1).maybeSingle(),
       selectNewer('profiles', 'pinned_project', 'id, owner_id, name, description, email, avatar, created_at'),
-      selectNewer('projects', 'tags, image, updated_at', 'id, profile_id, title, link, description, sources, created_at'),
+      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status', PROJECT_COLUMNS + ', tags, image, updated_at', PROJECT_COLUMNS]),
       client.from('likes').select('user_id, profile_id'),
       client.from('follows').select('user_id, profile_id, created_at'),
       client.from('project_likes').select('user_id, project_id, created_at'),
-      client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at'),
+      orOlder(client.from('project_comments').select('id, project_id, user_id, kind, body, created_at, parent_id').order('created_at'),
+        function () { return client.from('project_comments').select('id, project_id, user_id, kind, body, created_at').order('created_at'); }),
       client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at'),
-      client.from('project_reactions').select('user_id, project_id, kind')
+      client.from('project_reactions').select('user_id, project_id, kind, created_at'),
+      client.from('polls').select('project_id, question, options, created_at'),
+      client.from('poll_votes').select('project_id, user_id, choice, created_at')
     ]).then(function (res) {
       // Research likes, comments and collabs are optional: if their tables aren't set up yet, the rest of the site still loads.
       res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
@@ -132,7 +154,8 @@
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
       }
-      extrasReady = !res[1].usedFallback && !res[2].usedFallback;
+      extrasReady = !res[1].usedFallback && res[2].tier <= 1;
+      statusReady = res[2].tier === 0;
       var projects = res[2].data.map(toProject);
       state.profiles = res[1].data.map(function (r) {
         return {
@@ -150,12 +173,24 @@
         return { userId: l.user_id, projectId: l.project_id, at: Date.parse(l.created_at) || 0 };
       });
       commentsReady = !res[6].error;
+      repliesReady = !res[6].error && !res[6].usedFallback;
       state.comments = res[6].error ? [] : res[6].data.map(function (c) {
         return {
           id: c.id, projectId: c.project_id, userId: c.user_id, kind: c.kind === 'tip' ? 'tip' : 'comment',
-          body: c.body || '', createdAt: Date.parse(c.created_at) || 0
+          body: c.body || '', createdAt: Date.parse(c.created_at) || 0, parentId: c.parent_id || null
         };
       });
+      // Polls on research cards, and everyone's votes.
+      pollsReady = !res[9].error && !res[10].error;
+      state.polls = {};
+      if (pollsReady) {
+        res[9].data.forEach(function (p) {
+          state.polls[p.project_id] = { question: p.question, options: Array.isArray(p.options) ? p.options : [] };
+        });
+      }
+      state.votes = pollsReady ? res[10].data.map(function (v) {
+        return { projectId: v.project_id, userId: v.user_id, choice: v.choice, at: Date.parse(v.created_at) || 0 };
+      }) : [];
       collabsReady = !res[7].error;
       state.collabs = res[7].error ? [] : res[7].data.map(function (c) {
         return {
@@ -166,28 +201,30 @@
       });
       reactionsReady = !res[8].error;
       state.reactions = res[8].error ? [] : res[8].data.map(function (r) {
-        return { userId: r.user_id, projectId: r.project_id, kind: r.kind };
+        return { userId: r.user_id, projectId: r.project_id, kind: r.kind, at: Date.parse(r.created_at) || 0 };
       });
       if (!me) {
         isAdmin = false; seenAt = 0; shopReady = false; state.purchases = []; state.giftStars = 0; state.claims = []; state.bookmarks = [];
         messagesReady = false; notesReady = false; state.messages = []; state.notes = {};
         giftingReady = false; state.starsGiven = 0; state.giftsReceived = [];
         reportsReady = false; state.reports = [];
+        blocksReady = false; state.blocks = []; state.siteGifts = [];
         return;
       }
       return Promise.all([
         client.from('site_admins').select('user_id').eq('user_id', me.id).maybeSingle(),
         client.from('notif_state').select('seen_at').eq('user_id', me.id).maybeSingle(),
         // With gifting set up, you also see items and stars you gave to friends (falls back to just your own).
-        orOlder(client.from('shop_purchases').select('item, price, user_id, paid_by'),
+        orOlder(client.from('shop_purchases').select('item, price, user_id, paid_by, created_at'),
           function () { return client.from('shop_purchases').select('item, price').eq('user_id', me.id); }),
-        orOlder(client.from('star_gifts').select('user_id, stars, from_user, created_at'),
+        orOlder(client.from('star_gifts').select('user_id, stars, from_user, reason, created_at'),
           function () { return client.from('star_gifts').select('stars').eq('user_id', me.id); }),
         client.from('star_claims').select('day').eq('user_id', me.id),
         client.from('bookmarks').select('project_id, created_at').eq('user_id', me.id).order('created_at', { ascending: false }),
         client.from('messages').select('id, from_user, to_user, body, created_at, read_at').order('created_at'),
         client.from('collab_notes').select('project_id, body, updated_by, updated_at'),
-        client.from('reports').select('id, reporter, kind, target_id, reason, created_at').order('created_at', { ascending: false })
+        client.from('reports').select('id, reporter, kind, target_id, reason, created_at').order('created_at', { ascending: false }),
+        client.from('blocks').select('blocked_user').eq('user_id', me.id)
       ]).then(function (extra) {
         isAdmin = !!(extra[0].data);
         seenAt = extra[1].data ? (Date.parse(extra[1].data.seen_at) || 0) : 0;
@@ -197,7 +234,7 @@
         if (!extra[2].error) {
           shopReady = true;
           state.purchases = extra[2].data.map(function (r) {
-            return { item: r.item, price: r.price, owner: r.user_id || me.id, paidBy: r.paid_by || null };
+            return { item: r.item, price: r.price, owner: r.user_id || me.id, paidBy: r.paid_by || null, at: Date.parse(r.created_at) || 0 };
           });
         } else if (!state.purchases.length) {
           shopReady = false;
@@ -210,6 +247,9 @@
           state.giftStars = got.reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
           state.giftsReceived = got.filter(function (g) { return g.from_user; }).map(function (g) {
             return { from: g.from_user, stars: g.stars, at: Date.parse(g.created_at) || 0 };
+          });
+          state.siteGifts = got.filter(function (g) { return !g.from_user && g.reason; }).map(function (g) {
+            return { reason: g.reason, stars: g.stars, at: Date.parse(g.created_at) || 0 };
           });
           state.starsGiven = extra[3].data.filter(function (g) { return g.from_user === me.id && g.user_id !== me.id; })
             .reduce(function (sum, g) { return sum + (g.stars || 0); }, 0);
@@ -240,6 +280,9 @@
             state.notes[n.project_id] = { body: n.body || '', by: n.updated_by, at: Date.parse(n.updated_at) || 0 };
           });
         }
+        // People you've blocked.
+        blocksReady = !extra[9].error;
+        if (!extra[9].error) state.blocks = extra[9].data.map(function (b) { return b.blocked_user; });
       });
     });
   }
@@ -268,6 +311,8 @@
     if (code === '42501' || /row-level security|permission denied/i.test(msg)) {
       return 'You are not allowed to do that. Make sure you are signed in to the right account.';
     }
+    // Messages the database writes for people (like "Please keep it kind") are shown as they are.
+    if (code === 'P0001' && msg) return msg;
     if (code === '23514') return 'Some of the text is too long. Shorten it and save again.';
     if (code === '23505') return 'That is already saved.';
     return 'Saving failed. Check your connection and try again.';
@@ -282,6 +327,14 @@
     return node;
   }
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+  // Keep it kind: swear words and slurs are blocked everywhere; mean words also in comments, replies and
+  // messages (`strict`). The database checks the same lists (is_unkind in supabase/more-features-2.sql).
+  var SWEARS = /\b(fuck\w*|shit\w*|bitch\w*|bastard\w*|asshole\w*|dick|dickhead\w*|cunt\w*|slut\w*|whore\w*|nigg\w*|fag|fags|faggot\w*|retard\w*|tranny|kys|kill yourself)\b/i;
+  var MEAN_WORDS = /\b(idiot\w*|stupid|dumb|dumbass|loser\w*|moron\w*|ugly|shut up|hate you)\b/i;
+  var KIND_NOTE = 'Please keep it kind. Try saying that another way.';
+  function unkind(text, strict) {
+    return SWEARS.test(text || '') || (!!strict && MEAN_WORDS.test(text || ''));
+  }
   function setBusy(buttons, on) { buttons.forEach(function (b) { b.disabled = on; }); }
   function statusLine(text) {
     var s = make('p', 'edit-status', text);
@@ -602,6 +655,8 @@
         add('path', { d: MAPLE_LEAF, fill: leafColors[i % 4], transform: t });
         add('path', { d: 'M0 2 L0 6.2', stroke: shade(leafColors[i % 4], -0.3), 'stroke-width': 0.7, 'stroke-linecap': 'round', transform: t });
       });
+    } else if (kind === 14 || kind === 15) {
+      drawSeasonFrame(add, kind, ring, around);
     } else if (kind === 13) { // Star Shop Winter: an icy blue ring of snowflakes
       ring(M, '#D6EAF8', FRAME_WIDTH);
       ring(59.3, '#FFFFFF', 1.2);
@@ -615,6 +670,37 @@
         [0, 60, 120].forEach(function (r) {
           add('path', { d: 'M0 -4.6 L0 4.6 M-1.4 -3.4 L0 -2.3 L1.4 -3.4 M-1.4 3.4 L0 2.3 L1.4 3.4', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 1, 'stroke-linecap': 'round', transform: t + ' rotate(' + r + ')' });
         });
+      });
+    }
+  }
+  // Star Shop Valentine's and spring frames, drawn on their own so drawFrame stays readable.
+  function drawSeasonFrame(add, kind, ring, around) {
+    var M = FRAME_MID;
+    if (kind === 14) { // Valentine's: a pink ring of red and white hearts, with two little cupid arrows
+      ring(M, '#FAD3DE', FRAME_WIDTH);
+      around(10, M, 0, function (x, y, deg, i) {
+        if (i === 2 || i === 7) return; // room for the arrows
+        add('path', { d: HEART, fill: i % 2 ? '#FFFFFF' : '#E05A5A', transform: 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + deg + ') scale(' + (i % 2 ? 3.4 : 4.4) + ')' });
+      });
+      [72, 252].forEach(function (deg) {
+        var a = (deg - 90) * Math.PI / 180, x = 60 + Math.cos(a) * M, y = 60 + Math.sin(a) * M;
+        var t = 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + (deg + 45) + ')';
+        add('path', { d: 'M-6 0 L5 0', stroke: '#C9A27A', 'stroke-width': 1.1, 'stroke-linecap': 'round', transform: t });
+        add('path', { d: 'M6.5 0 L3.6 -2 L3.6 2 Z', fill: '#E05A5A', transform: t });
+        add('path', { d: 'M-6 0 L-7.8 -2 M-6 0 L-7.8 2 M-4.6 0 L-6.4 -2 M-4.6 0 L-6.4 2', stroke: '#F7A8C0', 'stroke-width': 0.9, 'stroke-linecap': 'round', transform: t });
+      });
+    } else if (kind === 15) { // Spring: a soft green ring with fluttering butterflies
+      ring(M, '#DDF2D6', FRAME_WIDTH);
+      around(12, M, 15, function (x, y) { add('circle', { cx: fx(x), cy: fx(y), r: 1, fill: '#F7A8C0' }); });
+      var wings = [['#F7A8C0', '#FBD3DF'], ['#B9A6E8', '#DCD2F6'], ['#F4D35E', '#FBE9A8'], ['#8EC5E8', '#CDE6F6']];
+      around(6, M, 0, function (x, y, deg, i) {
+        var t = 'translate(' + fx(x) + ' ' + fx(y) + ') rotate(' + (deg + (i % 2 ? 15 : -15)) + ')';
+        var w = wings[i % 4];
+        add('ellipse', { cx: -2.6, cy: -1.6, rx: 2.8, ry: 2.2, fill: w[0], transform: t });
+        add('ellipse', { cx: 2.6, cy: -1.6, rx: 2.8, ry: 2.2, fill: w[0], transform: t });
+        add('ellipse', { cx: -2, cy: 1.8, rx: 2, ry: 1.6, fill: w[1], transform: t });
+        add('ellipse', { cx: 2, cy: 1.8, rx: 2, ry: 1.6, fill: w[1], transform: t });
+        add('path', { d: 'M0 -3 L0 3.4 M0 -3 L-1.2 -5 M0 -3 L1.2 -5', stroke: '#5A4048', 'stroke-width': 0.8, 'stroke-linecap': 'round', fill: 'none', transform: t });
       });
     }
   }
@@ -667,6 +753,29 @@
       add('path', { d: 'M50 85 L60 95 L52 99 Z', fill: shade(color, -0.12), stroke: shade(color, -0.4), 'stroke-width': 1, 'stroke-linejoin': 'round' });
       add('path', { d: 'M70 85 L60 95 L68 99 Z', fill: shade(color, -0.12), stroke: shade(color, -0.4), 'stroke-width': 1, 'stroke-linejoin': 'round' });
       [103, 111].forEach(function (y) { add('circle', { cx: 60, cy: y, r: 1.5, fill: '#FBF7F2' }); });
+      return;
+    }
+    if (kind === 9) { // Star Shop Valentine's: a crew-neck sweater with a big heart on the front
+      add('path', { d: SHOULDERS, fill: color });
+      neck();
+      add('path', { d: 'M49 87 Q60 97 71 87', fill: 'none', stroke: dark, 'stroke-width': 4.5, 'stroke-linecap': 'round' });
+      var heartFill = color.toUpperCase() === '#E05A5A' ? '#FFFDF7' : '#E05A5A';
+      add('path', { d: HEART, fill: heartFill, stroke: shade(heartFill, -0.2), 'stroke-width': 0.08, transform: 'translate(60 107) scale(8)' });
+      add('path', { d: 'M54.5 103.5 Q56 101.8 58 102.2', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 1.2, 'stroke-linecap': 'round', opacity: 0.6 });
+      return;
+    }
+    if (kind === 10) { // Star Shop spring: a sunny yellow raincoat, open over a top in the clothing color
+      var coat = '#F4D35E', coatDark = '#D9B33A';
+      add('path', { d: 'M37 92 Q40 79 60 79 Q80 79 83 92 Q71 86 60 86 Q49 86 37 92 Z', fill: coatDark });
+      add('path', { d: SHOULDERS, fill: coat });
+      neck();
+      add('path', { d: 'M50 87 Q60 95 70 87 L65 120 L55 120 Z', fill: color });
+      add('path', { d: 'M50 87 L55 120 M70 87 L65 120', stroke: coatDark, 'stroke-width': 2, 'stroke-linecap': 'round' });
+      add('path', { d: 'M49 86 L44 96 L52 100 Z M71 86 L76 96 L68 100 Z', fill: coatDark });
+      [[50.5, 106], [51.5, 114], [69.5, 106], [68.5, 114]].forEach(function (b) {
+        add('rect', { x: b[0] - 2.2, y: b[1] - 0.9, width: 4.4, height: 1.8, rx: 0.9, fill: '#8A5A3C' });
+      });
+      add('path', { d: 'M28 112 L36 112 M84 112 L92 112', stroke: coatDark, 'stroke-width': 1.4, 'stroke-linecap': 'round' });
       return;
     }
     if (kind === 8) { // Star Shop Winter: a tee in the clothing color with a red and white striped knit scarf
@@ -1229,6 +1338,40 @@
       });
       add('circle', { cx: 93, cy: 38, r: 5.2, fill: '#FFFDF7', stroke: '#EDE3E6', 'stroke-width': 0.8 });
     }
+    // Star Shop Valentine's and spring headwear: 19 Heart headband, 20 Bunny ears, 21 Sun hat.
+    if (c.headwear === 19) { // A pink band with two bouncy hearts on springs
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#E26D8E', 'stroke-width': 3, 'stroke-linecap': 'round' });
+      [-24, 24].forEach(function (deg) {
+        var base = crownPoint(deg), lean = deg < 0 ? -4 : 4;
+        var tipX = base.x + lean, tipY = base.y - 14;
+        add('path', { d: 'M' + fx(base.x) + ' ' + fx(base.y) + ' Q' + fx(base.x + lean * 1.6) + ' ' + fx(base.y - 6) + ' ' + fx(tipX) + ' ' + fx(tipY + 4),
+          fill: 'none', stroke: '#3A2A30', 'stroke-width': 1, 'stroke-linecap': 'round' });
+        add('path', { d: HEART, fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.12, transform: 'translate(' + fx(tipX) + ' ' + fx(tipY) + ') scale(5.2)' });
+        add('circle', { cx: fx(tipX - 1.8), cy: fx(tipY - 2), r: 0.9, fill: '#FFFFFF', opacity: 0.7 });
+      });
+    }
+    if (c.headwear === 20) { // Fluffy white bunny ears with pink insides, on a white band
+      [[-20, -12], [20, 12]].forEach(function (e) {
+        var base = crownPoint(e[0]);
+        var t = 'rotate(' + e[1] + ' ' + fx(base.x) + ' ' + fx(base.y) + ')';
+        add('ellipse', { cx: fx(base.x), cy: fx(base.y - 12), rx: 5.2, ry: 13.5, fill: '#FFFDF7', stroke: '#E9DDE2', 'stroke-width': 0.8, transform: t });
+        add('ellipse', { cx: fx(base.x), cy: fx(base.y - 11), rx: 2.6, ry: 10, fill: '#F7A8C0', transform: t });
+      });
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#FFFDF7', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
+      add('path', { d: crownArc(46), fill: 'none', stroke: '#E9DDE2', 'stroke-width': 0.6, 'stroke-linecap': 'round' });
+    }
+    if (c.headwear === 21) { // A wide straw sun hat with a ribbon in the clothing color and a little flower
+      add('ellipse', { cx: 60, cy: 40, rx: 39, ry: 8.5, fill: '#E9C27F' });
+      add('ellipse', { cx: 60, cy: 39, rx: 37, ry: 7, fill: '#F2D49B' });
+      add('path', { d: 'M41 39 Q42 19 60 19 Q78 19 79 39 Z', fill: '#F2D49B' });
+      add('path', { d: 'M46 27 Q60 24 74 27 M44 33 Q60 30 76 33', fill: 'none', stroke: '#E0BB78', 'stroke-width': 0.9, opacity: 0.8 });
+      add('path', { d: 'M41.6 34 Q60 30 78.4 34 L78.8 38.6 Q60 35 41.2 38.6 Z', fill: top });
+      for (var fp = 0; fp < 5; fp++) {
+        var fa = Math.PI * 2 / 5 * fp;
+        add('circle', { cx: fx(72 + Math.cos(fa) * 2.4), cy: fx(35 + Math.sin(fa) * 2.4), r: 2.1, fill: '#FFFDF7' });
+      }
+      add('circle', { cx: 72, cy: 35, r: 1.5, fill: '#F4D35E' });
+    }
     return svg;
   }
   // The pet is its own little picture, shown only in the portfolio scene beside the character (not in the character itself).
@@ -1405,6 +1548,36 @@
       add('circle', { cx: 5, cy: -3.6, r: 1.3, fill: pink, opacity: 0.6 });
       add('path', { d: 'M0 0.6 L-3.4 -1.2 L-3.4 2.4 Z M0 0.6 L3.4 -1.2 L3.4 2.4 Z', fill: color, stroke: line, 'stroke-width': 0.5 });
       add('circle', { cx: 0, cy: 0.6, r: 0.9, fill: color, stroke: line, 'stroke-width': 0.5 });
+    } else if (kind === 13) { // Star Shop Valentine's: a teddy bear in the pet color, holding a heart
+      body({ cx: -7.5, cy: -12, r: 3.6 });
+      body({ cx: 7.5, cy: -12, r: 3.6 });
+      add('circle', { cx: -7.5, cy: -12, r: 1.8, fill: light });
+      add('circle', { cx: 7.5, cy: -12, r: 1.8, fill: light });
+      body({ cx: -6, cy: 12, rx: 3.6, ry: 2.6 });
+      body({ cx: 6, cy: 12, rx: 3.6, ry: 2.6 });
+      body({ cx: 0, cy: 6, rx: 9.5, ry: 8 });
+      add('ellipse', { cx: 0, cy: 7, rx: 5.5, ry: 5, fill: light });
+      body({ cx: 0, cy: -5, r: 9 });
+      add('ellipse', { cx: 0, cy: -2.4, rx: 4.2, ry: 3.2, fill: light });
+      add('ellipse', { cx: 0, cy: -3.6, rx: 1.5, ry: 1.1, fill: '#3A2A30' });
+      add('path', { d: 'M-1.4 -1.4 Q0 -0.2 1.4 -1.4', fill: 'none', stroke: '#3A2A30', 'stroke-width': 0.7, 'stroke-linecap': 'round' });
+      eyes(-6.6, 3.6);
+      cheeks(-3);
+      add('path', { d: HEART, fill: '#E05A5A', stroke: '#B83B3B', 'stroke-width': 0.1, transform: 'translate(0 6.5) scale(3.6)' });
+      body({ cx: -6.5, cy: 5, rx: 2.6, ry: 3.6, transform: 'rotate(-30 -6.5 5)' });
+      body({ cx: 6.5, cy: 5, rx: 2.6, ry: 3.6, transform: 'rotate(30 6.5 5)' });
+    } else if (kind === 14) { // Star Shop spring: a fluffy yellow duckling with a bow in the pet color
+      add('path', { d: 'M-4 13 L-6.5 14.5 L-1.5 14.5 Z M4 13 L1.5 14.5 L6.5 14.5 Z', fill: '#F2A541' });
+      add('ellipse', { cx: 1, cy: 5, rx: 11, ry: 8.5, fill: '#F6D55C', stroke: '#E0B53C', 'stroke-width': 1 });
+      add('path', { d: 'M10 2 Q16 0 14 6 Z', fill: '#F6D55C', stroke: '#E0B53C', 'stroke-width': 0.8 });
+      add('ellipse', { cx: 3, cy: 5, rx: 5, ry: 3.4, fill: '#F0C540', transform: 'rotate(-15 3 5)' });
+      add('circle', { cx: -4, cy: -7, r: 7.5, fill: '#F6D55C', stroke: '#E0B53C', 'stroke-width': 1 });
+      add('path', { d: 'M-5 -14 Q-4 -18 -1.5 -15.5 Q-3 -15 -3.4 -13.8', fill: '#F6D55C', stroke: '#E0B53C', 'stroke-width': 0.7 });
+      add('path', { d: 'M-11 -5.5 L-16 -4.2 L-11 -2.6 Z', fill: '#F2A541', stroke: '#C77F1E', 'stroke-width': 0.6 });
+      add('circle', { cx: -6.5, cy: -8.5, r: 1.3, fill: '#3A2A30' });
+      add('circle', { cx: -7.6, cy: -4.4, r: 1.4, fill: pink, opacity: 0.6 });
+      add('path', { d: 'M0 -1.5 L-3.4 -3.6 L-3.4 0.6 Z M0 -1.5 L3.4 -3.6 L3.4 0.6 Z', fill: color, stroke: line, 'stroke-width': 0.5 });
+      add('circle', { cx: 0, cy: -1.5, r: 0.9, fill: color, stroke: line, 'stroke-width': 0.5 });
     } else if (kind === 6) { // Fish in a round bowl
       add('circle', { cx: 0, cy: 2, r: 12.5, fill: '#DDF0FA', stroke: '#8EC5E8', 'stroke-width': 1.2 });
       add('path', { d: 'M-11 -2 Q0 1 11 -2 L11 2 A12.5 12.5 0 0 1 -11 2 Z', fill: '#BDE3F5', opacity: 0.7 });
@@ -1921,10 +2094,165 @@
     });
   }
 
+  // ---- Home: the weekly research challenge ----
+  // Each week (Monday to Sunday, US Eastern) has a topic from TAGS, in order. The most-liked research posted
+  // that week with that topic wins 10 stars, awarded by award_challenge() in supabase/more-features-2.sql.
+  var CHALLENGE_START = '2026-10-26'; // the first challenge week
+  var CHALLENGE_PRIZE = 10;
+  var WEEK = 7 * 86400000;
+  function weekKey(t) {
+    var d = new Date(dayKey(t) + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+    return d.toISOString().slice(0, 10);
+  }
+  function weekTopic(key) {
+    var i = Math.round((Date.parse(key + 'T00:00:00Z') - Date.UTC(2026, 0, 5)) / WEEK);
+    return TAGS[((i % TAGS.length) + TAGS.length) % TAGS.length];
+  }
+  function addDays(key, n) {
+    var d = new Date(key + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function niceDay(key) {
+    return new Date(key + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  }
+  // The research entered in a week's challenge, most liked first.
+  function challengeEntries(key) {
+    var topic = weekTopic(key);
+    var out = [];
+    state.profiles.forEach(function (p) {
+      p.projects.forEach(function (q) {
+        if (q.tags.indexOf(topic) < 0 || weekKey(q.createdAt) !== key) return;
+        var likes = state.projectLikes.filter(function (l) { return l.projectId === q.id; }).length;
+        out.push({ p: p, q: q, likes: likes });
+      });
+    });
+    return out.sort(function (a, b) { return b.likes - a.likes || a.q.createdAt - b.q.createdAt; });
+  }
+  // Did this portfolio ever enter a challenge? (for the Challenger badge)
+  function enteredChallenges(p) {
+    return p.projects.filter(function (q) {
+      var key = weekKey(q.createdAt);
+      return key >= CHALLENGE_START && q.tags.indexOf(weekTopic(key)) >= 0;
+    }).length;
+  }
+  var challengeTag = ''; // a topic to pick for the next new research card
+  function renderChallenge() {
+    var band = $('challenge-band');
+    band.hidden = !client || !loaded || !!loadError || !extrasReady;
+    if (band.hidden) return;
+    var now = weekKey(Date.now());
+    var started = now >= CHALLENGE_START;
+    var key = started ? now : CHALLENGE_START;
+    var topic = weekTopic(key);
+    $('challenge-topic').textContent = topic;
+    var ends = Date.parse(addDays(key, 7) + 'T05:00:00Z');
+    $('challenge-left').textContent = started ? timeUntil(ends) : 'Starts ' + niceDay(CHALLENGE_START);
+    $('challenge-text').textContent = started
+      ? 'Post research about ' + topic.toLowerCase() + ' this week and tag it ' + topic + '. The most-liked one on Sunday night wins ' +
+        CHALLENGE_PRIZE + ' stars, and everyone who enters gets the Challenger badge.'
+      : 'The first weekly challenge is ' + topic + '. Post research about it next week and tag it ' + topic +
+        '. The most-liked one wins ' + CHALLENGE_PRIZE + ' stars, and everyone who enters gets the Challenger badge.';
+    var list = $('challenge-entries');
+    list.textContent = '';
+    var entries = started ? challengeEntries(key) : [];
+    entries.slice(0, 3).forEach(function (it, i) {
+      var li = make('li', 'challenge-entry' + (i === 0 && it.likes ? ' leading' : ''));
+      var b = make('button', 'challenge-open');
+      b.type = 'button';
+      b.appendChild(make('span', 'challenge-entry-title', it.q.title));
+      var by = make('span', 'challenge-entry-by');
+      paintName(by, it.p.name);
+      b.appendChild(by);
+      b.appendChild(make('span', 'challenge-entry-likes', '♥ ' + it.likes));
+      b.addEventListener('click', function () { goToResearch(it.p.id, it.q.id); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    list.hidden = !entries.length;
+    $('challenge-enter').hidden = !started;
+    $('challenge-enter').textContent = entries.length
+      ? 'Enter the challenge (' + entries.length + (entries.length === 1 ? ' entry' : ' entries') + ' so far)'
+      : 'Be the first to enter';
+    // Last week's winner.
+    var last = addDays(now, -7);
+    var lastEntries = last >= CHALLENGE_START ? challengeEntries(last).filter(function (it) { return it.likes > 0; }) : [];
+    var lastEl = $('challenge-last');
+    lastEl.hidden = !lastEntries.length;
+    if (lastEntries.length) {
+      lastEl.textContent = 'Last week (' + weekTopic(last) + '): ' + lastEntries[0].p.name + ' won with “' + lastEntries[0].q.title + '”.';
+    }
+    awardLastWeek(last);
+  }
+  // Once someone signed in visits after a week ends, the server hands out that week's prize (only once).
+  var awardedWeek = '';
+  function awardLastWeek(last) {
+    if (!me || !pollsReady || last < CHALLENGE_START || awardedWeek === last) return;
+    awardedWeek = last;
+    client.rpc('award_challenge', { week_start: last }).then(function (res) {
+      if (!res.error && res.data && res.data.awarded && res.data.winner === me.id) refresh();
+    });
+  }
+  $('challenge-enter').addEventListener('click', function () {
+    if (!me) { openAuth('signin', 'Sign in to enter the weekly challenge.'); return; }
+    var mp = myProfile();
+    if (!mp) { showToast('Make your portfolio first, then you can enter the challenge.'); return; }
+    challengeTag = weekTopic(weekKey(Date.now()));
+    showProfile(mp.id, true);
+    openProject('new');
+    var titleIn = $('project-title-input');
+    if (titleIn) titleIn.closest('.project').scrollIntoView({ block: 'center' });
+  });
+
+  // ---- Home: Star leaderboard, by likes on research this month ----
+  function renderLeaderboard() {
+    var monthStart = dayKey(Date.now()).slice(0, 8) + '01';
+    var counts = {};
+    state.projectLikes.forEach(function (l) {
+      if (!l.at || dayKey(l.at) < monthStart) return;
+      var q = findProject(l.projectId);
+      var owner = q && findProfile(q.profileId);
+      if (owner) counts[owner.ownerId] = (counts[owner.ownerId] || 0) + 1;
+    });
+    var ranked = Object.keys(counts).map(function (id) { return { id: id, n: counts[id] }; })
+      .sort(function (a, b) { return b.n - a.n || ownerName(a.id).localeCompare(ownerName(b.id)); }).slice(0, 5);
+    var monthName = new Date().toLocaleDateString('en-US', { month: 'long', timeZone: 'America/New_York' });
+    $('leader-sub').textContent = 'Most likes on research in ' + monthName + '. Every like is a star.';
+    var list = $('leader-list');
+    list.textContent = '';
+    if (!ranked.length) {
+      list.appendChild(make('li', 'leader-empty', 'No likes yet this month. Like research you enjoy to get it started!'));
+      return;
+    }
+    ranked.forEach(function (r, i) {
+      var fp = profileFor(r.id);
+      var li = make('li', 'leader-item' + (i === 0 ? ' first' : ''));
+      var b = make('button', 'leader-open');
+      b.type = 'button';
+      b.appendChild(make('span', 'leader-rank', String(i + 1)));
+      var pic = fp ? pictureNode(fp.avatar, fp.name) : null;
+      var avatar = make('span', 'avatar leader-avatar', pic ? null : ownerName(r.id).charAt(0).toUpperCase());
+      if (pic) avatar.appendChild(pic);
+      avatar.setAttribute('aria-hidden', 'true');
+      b.appendChild(avatar);
+      var nm = make('span', 'leader-name');
+      paintName(nm, ownerName(r.id));
+      b.appendChild(nm);
+      b.appendChild(make('span', 'leader-stars', '★ ' + r.n));
+      b.setAttribute('aria-label', 'Number ' + (i + 1) + ': ' + ownerName(r.id) + ', ' + plural(r.n, 'star') + ' this month');
+      if (fp) b.addEventListener('click', function () { showProfile(fp.id, true); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
   function renderHome() {
     var list = state.profiles;
     renderRecent();
     renderTop();
+    renderChallenge();
+    renderLeaderboard();
     myPortfolioBtn.hidden = !myProfile();
     paintName(hubNameEl, state.hubName);
     hubIntroEl.textContent = state.hubIntro;
@@ -2050,6 +2378,7 @@
       var n = nameIn.value.trim();
       var email = emailIn.value.trim();
       if (!n) { statusEl.textContent = 'Write a profile name before saving.'; nameIn.focus(); return; }
+      if (unkind(n + ' ' + descIn.value)) { statusEl.textContent = KIND_NOTE; nameIn.focus(); return; }
       if (!validEmail(email)) {
         statusEl.textContent = 'That email address does not look right. Check it, or leave it blank.';
         emailIn.focus();
@@ -2136,6 +2465,12 @@
     $('report-profile').hidden = !me || !reportsReady || canEdit(p);
     $('report-profile').textContent = reported ? 'Reported' : 'Report';
     $('report-profile').disabled = reported;
+    // Block: they can't message you or comment on your research, and you won't see their comments or messages.
+    var blockBtn = $('block-btn');
+    blockBtn.hidden = !me || !blocksReady || canEdit(p) || p.ownerId === (me && me.id);
+    blockBtn.textContent = isBlockedByMe(p.ownerId) ? 'Unblock' : 'Block';
+    blockBtn.disabled = blocking;
+    renderBadgeStrip(p);
     paintPortrait(p.avatar, p.name);
     renderProfileReactions();
     addr.textContent = p.email;
@@ -2227,6 +2562,7 @@
     var email = emailInput.value.trim();
     if (!name) { editStatus.textContent = 'Write a portfolio name before saving.'; nameInput.focus(); return; }
     if (!text) { editStatus.textContent = 'Write a description before saving.'; input.focus(); return; }
+    if (unkind(name + ' ' + text)) { editStatus.textContent = KIND_NOTE; input.focus(); return; }
     if (!validEmail(email)) {
       editStatus.textContent = 'That email address does not look right. Check it, or leave it blank.';
       emailInput.focus();
@@ -2389,10 +2725,34 @@
       { icon: '❝', name: 'Chatterbox', task: 'Leave 10 comments or tips on research', have: comments, goal: 10 }
     ];
     if (extrasReady) goals.push({ icon: '◆', name: 'Explorer', task: 'Research 3 different topics', have: Object.keys(topics).length, goal: 3 });
+    if (extrasReady) goals.push({ icon: '⚑', name: 'Challenger', task: 'Enter a weekly research challenge', have: enteredChallenges(p), goal: 1 });
     if (me && p.ownerId === me.id && claimsReady) {
       goals.push({ icon: '☀', name: 'Regular', task: 'Claim your daily star 7 days in a row', have: streakDays(), goal: 7 });
     }
     return goals;
+  }
+  // Earned badges, shown as little gold medals under the portfolio's description. Clicking opens Achievements.
+  function renderBadgeStrip(p) {
+    var strip = $('badge-strip');
+    strip.textContent = '';
+    var earned = badgeGoals(p).filter(function (g) { return g.have >= g.goal; });
+    var pets = Object.keys(PET_UNLOCKS).filter(function (i) { return petProgress(p, Number(i)).unlocked; }).length;
+    strip.hidden = !earned.length && !pets;
+    if (strip.hidden) return;
+    earned.forEach(function (g) {
+      var b = make('button', 'badge-medal', g.icon);
+      b.type = 'button';
+      b.title = g.name + ': ' + g.task;
+      b.setAttribute('aria-label', g.name + ' badge: ' + g.task + '. Open achievements.');
+      b.addEventListener('click', openAchievements);
+      strip.appendChild(b);
+    });
+    if (pets) {
+      var more = make('button', 'badge-more', plural(pets, 'pet') + ' unlocked');
+      more.type = 'button';
+      more.addEventListener('click', openAchievements);
+      strip.appendChild(more);
+    }
   }
   function renderBadges(p) {
     var list = $('badge-list');
@@ -2451,9 +2811,14 @@
   var SEASONS = {
     halloween: { name: 'Halloween', starts: 0, ends: Date.parse('2026-11-01T04:00:00Z'), last: 'October 31' },
     fall: { name: 'Fall', starts: Date.parse('2026-11-01T04:00:00Z'), ends: Date.parse('2026-12-01T05:00:00Z'), first: 'November 1', last: 'November 30' },
-    winter: { name: 'Winter', starts: Date.parse('2026-12-01T05:00:00Z'), ends: Date.parse('2027-01-01T05:00:00Z'), first: 'December 1', last: 'December 31' }
+    winter: { name: 'Winter', starts: Date.parse('2026-12-01T05:00:00Z'), ends: Date.parse('2027-01-01T05:00:00Z'), first: 'December 1', last: 'December 31' },
+    valentine: { name: 'Valentine’s', starts: Date.parse('2027-02-01T05:00:00Z'), ends: Date.parse('2027-03-01T05:00:00Z'), first: 'February 1', last: 'February 28' },
+    spring: { name: 'Spring', starts: Date.parse('2027-03-01T05:00:00Z'), ends: Date.parse('2027-06-01T04:00:00Z'), first: 'March 1', last: 'May 31' }
   };
-  var SEASON_ORDER = ['halloween', 'fall', 'winter'];
+  var SEASON_ORDER = ['halloween', 'fall', 'winter', 'valentine', 'spring'];
+  // The year a season's last day falls in, for "leave the shop on February 28, 2027".
+  function seasonYear(k) { return new Date(SEASONS[k].ends - 86400000).getUTCFullYear(); }
+  function nextSeason() { return SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; })[0] || null; }
   var SHOP = [
     { id: 'pumpkin-top', name: 'Pumpkin orange outfit', kind: 'Clothing color', key: 'top', index: 17, price: 1, season: 'halloween' },
     { id: 'witchy-hair', name: 'Witchy purple hair', kind: 'Hair color', key: 'hairColor', index: 9, price: 1, season: 'halloween' },
@@ -2486,7 +2851,20 @@
     { id: 'santa-hat', name: 'Santa hat', kind: 'Headwear', key: 'headwear', index: 18, price: 3, season: 'winter' },
     { id: 'snowflake-frame', name: 'Snowflake frame', kind: 'Frame', key: 'frame', index: 13, price: 4, season: 'winter' },
     { id: 'snowman-pet', name: 'Snowman', kind: 'Pet', key: 'pet', index: 11, price: 5, season: 'winter' },
-    { id: 'penguin-pet', name: 'Penguin', kind: 'Pet', key: 'pet', index: 12, price: 6, season: 'winter' }
+    { id: 'penguin-pet', name: 'Penguin', kind: 'Pet', key: 'pet', index: 12, price: 6, season: 'winter' },
+    // Valentine's, all through February.
+    { id: 'rose-bg', name: 'Rose pink background', kind: 'Background', key: 'bg', index: 9, price: 1, season: 'valentine' },
+    { id: 'heart-headband', name: 'Heart headband', kind: 'Headwear', key: 'headwear', index: 19, price: 2, season: 'valentine' },
+    { id: 'heart-sweater', name: 'Heart sweater', kind: 'Clothing', key: 'outfit', index: 9, price: 3, season: 'valentine' },
+    { id: 'cupid-frame', name: 'Cupid hearts frame', kind: 'Frame', key: 'frame', index: 14, price: 4, season: 'valentine' },
+    { id: 'teddy-pet', name: 'Teddy bear', kind: 'Pet', key: 'pet', index: 13, price: 5, season: 'valentine' },
+    // Spring, March through May.
+    { id: 'meadow-bg', name: 'Meadow green background', kind: 'Background', key: 'bg', index: 10, price: 1, season: 'spring' },
+    { id: 'bunny-ears', name: 'Bunny ears', kind: 'Headwear', key: 'headwear', index: 20, price: 2, season: 'spring' },
+    { id: 'sun-hat', name: 'Sun hat', kind: 'Headwear', key: 'headwear', index: 21, price: 3, season: 'spring' },
+    { id: 'raincoat', name: 'Sunny raincoat', kind: 'Clothing', key: 'outfit', index: 10, price: 3, season: 'spring' },
+    { id: 'butterfly-frame', name: 'Butterfly frame', kind: 'Frame', key: 'frame', index: 15, price: 4, season: 'spring' },
+    { id: 'duckling-pet', name: 'Duckling', kind: 'Pet', key: 'pet', index: 14, price: 5, season: 'spring' }
   ];
   function onSale(item) {
     var s = SEASONS[item.season], now = Date.now();
@@ -2618,15 +2996,24 @@
     gift.hidden = !state.giftStars;
     // Gifts from the site (like the early tester gift) and from friends.
     var fromFriends = state.giftsReceived.reduce(function (sum, g) { return sum + g.stars; }, 0);
-    var fromSite = state.giftStars - fromFriends;
+    function siteStars(prefix) {
+      return state.siteGifts.filter(function (g) { return g.reason.indexOf(prefix) === 0; }).reduce(function (sum, g) { return sum + g.stars; }, 0);
+    }
+    var prizes = siteStars('challenge:'), fromOwner = siteStars('owner-gift:');
+    var fromSite = state.giftStars - fromFriends - prizes - fromOwner;
     var parts = [];
     if (fromSite > 0) parts.push(plural(fromSite, 'early tester star'));
+    if (prizes > 0) parts.push(prizes + ' from weekly challenges');
+    if (fromOwner > 0) parts.push(fromOwner + ' from the site owner');
     if (fromFriends > 0) parts.push(fromFriends + ' from ' + giftSenders());
+    if (parts.length > 1) parts = [parts.slice(0, -1).join(', '), parts[parts.length - 1]];
     gift.textContent = 'Includes ' + plural(state.giftStars, 'gifted star') + ': ' + parts.join(' and ') + '. Thank you!';
     $('shop-limited').classList.toggle('ended', !season);
     $('shop-limited-text').textContent = season
-      ? 'The ' + SEASONS[season].name + ' items leave the shop on ' + SEASONS[season].last + ', 2026. ' + timeUntil(SEASONS[season].ends)
-      : 'The seasonal items have left the shop. Anything you bought is still yours in Edit character.';
+      ? 'The ' + SEASONS[season].name + ' items leave the shop on ' + SEASONS[season].last + ', ' + seasonYear(season) + '. ' + timeUntil(SEASONS[season].ends)
+      : nextSeason()
+        ? 'New ' + SEASONS[nextSeason()].name + ' items arrive on ' + SEASONS[nextSeason()].first + '. Anything you bought is still yours in Edit character.'
+        : 'The seasonal items have left the shop. Anything you bought is still yours in Edit character.';
     var mp = myProfile();
     var base = normalizeCharacter(mp && mp.avatar ? mp.avatar.character : DEFAULT_CHAR);
     var friend = shopFor && areFriends(me.id, shopFor) ? shopFor : '';
@@ -2639,7 +3026,8 @@
     // Coming soon: the next seasons' items, to look at before they arrive.
     var soon = $('shop-upcoming');
     soon.textContent = '';
-    SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).forEach(function (k) {
+    // Only the next two seasons, so the shop doesn't get too long.
+    SEASON_ORDER.filter(function (k) { return Date.now() < SEASONS[k].starts; }).slice(0, 2).forEach(function (k) {
       var head = make('div', 'shop-soon-head');
       head.appendChild(make('span', 'shop-soon-tag', 'Coming soon'));
       head.appendChild(make('h3', 'shop-soon-title', SEASONS[k].name + ' items · ' + SEASONS[k].first + ' to ' + SEASONS[k].last));
@@ -2947,9 +3335,41 @@
     if (oldTag) oldTag.remove();
     if (avatar && avatar.character.pet) {
       var petPic = renderPet(avatar.character);
-      if (avatar.petName) petPic.setAttribute('aria-label', 'Pet ' + CHAR.pet[avatar.character.pet].toLowerCase() + ' named ' + avatar.petName);
+      var petLabel = (avatar.petName ? avatar.petName + ' the ' : 'Pet ') + CHAR.pet[avatar.character.pet].toLowerCase();
+      // Click the pet (or press Enter on it) for a trick.
+      petPic.setAttribute('role', 'button');
+      petPic.setAttribute('tabindex', '0');
+      petPic.setAttribute('aria-label', petLabel + '. Click for a trick!');
+      petPic.addEventListener('click', function () { petTrick(petPic); });
+      petPic.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); petTrick(petPic); }
+      });
       profileArt.appendChild(petPic);
       if (avatar.petName) profileArt.appendChild(make('span', 'pet-name-tag', avatar.petName));
+    }
+  }
+  // Pet tricks: a hop, a spin, a wiggle or a flip, with little hearts floating up.
+  var TRICKS = ['hop', 'spin', 'wiggle', 'flip'];
+  var lastTrick = '';
+  function petTrick(pet) {
+    if (pet.classList.contains('tricking')) return;
+    var choices = TRICKS.filter(function (t) { return t !== lastTrick; });
+    var trick = choices[Math.floor(Math.random() * choices.length)];
+    lastTrick = trick;
+    pet.classList.add('tricking', 'trick-' + trick);
+    var stop = function () { pet.classList.remove('tricking', 'trick-' + trick); };
+    pet.addEventListener('animationend', stop, { once: true });
+    setTimeout(stop, 1200); // in case animations are off
+    var art = pet.parentNode;
+    var box = pet.getBoundingClientRect(), artBox = art.getBoundingClientRect();
+    for (var i = 0; i < 3; i++) {
+      var h = make('span', 'trick-heart', '♥');
+      h.setAttribute('aria-hidden', 'true');
+      h.style.left = (box.left - artBox.left + box.width * (0.2 + 0.3 * i)) + 'px';
+      h.style.top = (box.top - artBox.top + box.height * 0.1) + 'px';
+      h.style.animationDelay = (i * 0.12) + 's';
+      art.appendChild(h);
+      setTimeout(function (el) { el.remove(); }.bind(null, h), 1400);
     }
   }
   function draftAvatar() {
@@ -3282,6 +3702,268 @@
     line.title = (edited ? 'Updated ' : 'Posted ') + exactTime(edited ? q.updatedAt : q.createdAt);
     return line;
   }
+  // "In progress" or "Finished" on a research card.
+  function statusTag(q) {
+    if (!q.status) return null;
+    return make('span', 'status-tag ' + q.status, q.status === 'finished' ? 'Finished ✓' : 'In progress');
+  }
+  // The research outline: these headings get their own line when a description uses them.
+  var OUTLINE = ['Question', 'What I expected', 'How I found out', 'What I learned'];
+  function outlineHeading(line) {
+    for (var i = 0; i < OUTLINE.length; i++) {
+      if (line.toLowerCase().indexOf(OUTLINE[i].toLowerCase() + ':') === 0) return OUTLINE[i];
+    }
+    return '';
+  }
+  function descriptionNode(text) {
+    var lines = text.split('\n');
+    if (!lines.some(outlineHeading)) return make('p', 'project-desc', text);
+    var box = make('div', 'project-desc outline');
+    lines.forEach(function (line) {
+      var h = outlineHeading(line);
+      if (h) {
+        box.appendChild(make('span', 'outline-head', h));
+        var rest = line.slice(h.length + 1).trim();
+        if (rest) box.appendChild(make('p', 'outline-text', rest));
+      } else if (line.trim()) {
+        box.appendChild(make('p', 'outline-text', line.trim()));
+      }
+    });
+    return box;
+  }
+
+  // ---- Citations: a source written out in MLA and APA style ----
+  var citeOpen = {}; // "researchId:sourceIndex" -> its citation is showing
+  var MONTHS = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+  function citations(s, href) {
+    var site = hostOf(href);
+    var name = (s.name || site).replace(/\.$/, '');
+    var d = new Date();
+    var mla = '“' + name + '.” ' + site + ', ' + href + '. Accessed ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + '.';
+    var apa = name + '. (n.d.). ' + site + '. ' + href;
+    return [['MLA', mla], ['APA', apa]];
+  }
+  function citationBox(s, href) {
+    var box = make('div', 'cite-box');
+    citations(s, href).forEach(function (c) {
+      var row = make('div', 'cite-row');
+      row.appendChild(make('span', 'cite-style', c[0]));
+      row.appendChild(make('span', 'cite-text', c[1]));
+      var copy = make('button', 'mini-btn', 'Copy');
+      copy.type = 'button';
+      copy.setAttribute('aria-label', 'Copy the ' + c[0] + ' citation');
+      copy.addEventListener('click', function () {
+        var done = function () { copy.textContent = 'Copied ✓'; };
+        if (navigator.clipboard) navigator.clipboard.writeText(c[1]).then(done, function () { window.prompt('Copy this citation:', c[1]); });
+        else window.prompt('Copy this citation:', c[1]);
+      });
+      row.appendChild(copy);
+      box.appendChild(row);
+    });
+    box.appendChild(make('p', 'cite-note', 'If you know the author or the date it was written, add them in.'));
+    return box;
+  }
+
+  // ---- Polls: one quick question on a research card, with results as a bar chart ----
+  var pollEditing = {};  // research id -> the "add a poll" form is open
+  var voting = null;
+  function pollBlock(q, mineToEdit) {
+    if (!pollsReady) return null;
+    var poll = state.polls[q.id];
+    if (!poll) {
+      if (!mineToEdit) return null;
+      if (!pollEditing[q.id]) {
+        var add = make('button', 'link-btn poll-add', '+ Add a quick poll');
+        add.type = 'button';
+        add.title = 'Ask visitors a question and see the answers as a chart';
+        add.addEventListener('click', function () { pollEditing[q.id] = true; renderProjects(); var f = $('poll-q-' + q.id); if (f) f.focus(); });
+        return add;
+      }
+      return pollForm(q);
+    }
+    var box = make('div', 'poll');
+    box.appendChild(make('p', 'poll-question', poll.question));
+    var votes = state.votes.filter(function (v) { return v.projectId === q.id; });
+    var mineVote = me ? votes.filter(function (v) { return v.userId === me.id; })[0] : null;
+    var showResults = !!mineVote || mineToEdit || !me;
+    poll.options.forEach(function (opt, i) {
+      var count = votes.filter(function (v) { return v.choice === i; }).length;
+      var pct = votes.length ? Math.round(count / votes.length * 100) : 0;
+      if (showResults) {
+        var row = make('div', 'poll-result' + (mineVote && mineVote.choice === i ? ' mine' : ''));
+        var bar = make('span', 'poll-bar');
+        bar.style.width = pct + '%';
+        row.appendChild(bar);
+        row.appendChild(make('span', 'poll-option', opt + (mineVote && mineVote.choice === i ? ' ✓' : '')));
+        row.appendChild(make('span', 'poll-pct', pct + '%'));
+        box.appendChild(row);
+      } else {
+        var b = make('button', 'poll-choice', opt);
+        b.type = 'button';
+        b.disabled = voting === q.id;
+        b.addEventListener('click', function () { vote(q, i); });
+        box.appendChild(b);
+      }
+    });
+    var foot = make('div', 'poll-foot');
+    foot.appendChild(make('span', 'poll-count', plural(votes.length, 'vote') + (!me ? ' · Sign in to vote' : '')));
+    if (mineVote) {
+      var change = make('button', 'link-btn', 'Change my vote');
+      change.type = 'button';
+      change.addEventListener('click', function () { unvote(q); });
+      foot.appendChild(change);
+    }
+    if (mineToEdit) {
+      var remove = make('button', 'link-btn', 'Remove poll');
+      remove.type = 'button';
+      remove.addEventListener('click', function () {
+        if (!window.confirm('Remove this poll and all its votes?')) return;
+        client.from('polls').delete().eq('project_id', q.id).then(function (res) {
+          if (res.error) { showToast(dbMessage(res.error)); return; }
+          delete state.polls[q.id];
+          renderProjects();
+          refresh();
+        });
+      });
+      foot.appendChild(remove);
+    }
+    box.appendChild(foot);
+    return box;
+  }
+  function pollForm(q) {
+    var f = make('form', 'poll-form');
+    var qLabel = make('label', 'edit-label', 'Poll question');
+    qLabel.htmlFor = 'poll-q-' + q.id;
+    var question = make('input');
+    question.id = 'poll-q-' + q.id;
+    question.type = 'text';
+    question.maxLength = 120;
+    question.placeholder = 'For example: How much sleep do you usually get?';
+    f.appendChild(qLabel);
+    f.appendChild(question);
+    f.appendChild(make('span', 'edit-label', 'Answers (2 to 6)'));
+    var inputs = [];
+    for (var i = 0; i < 4; i++) {
+      var o = make('input', 'poll-option-input');
+      o.type = 'text';
+      o.maxLength = 60;
+      o.placeholder = ['Less than 7 hours', '7 to 8 hours', 'More than 8 hours', 'Another answer (optional)'][i];
+      o.setAttribute('aria-label', 'Answer ' + (i + 1));
+      inputs.push(o);
+      f.appendChild(o);
+    }
+    var more = make('button', 'link-btn', '+ Another answer');
+    more.type = 'button';
+    more.addEventListener('click', function () {
+      if (inputs.length >= 6) return;
+      var o = make('input', 'poll-option-input');
+      o.type = 'text';
+      o.maxLength = 60;
+      o.setAttribute('aria-label', 'Answer ' + (inputs.length + 1));
+      inputs.push(o);
+      f.insertBefore(o, more);
+      o.focus();
+      if (inputs.length >= 6) more.hidden = true;
+    });
+    f.appendChild(more);
+    var actions = make('div', 'edit-actions');
+    var save = make('button', 'btn btn-solid', 'Add poll');
+    save.type = 'submit';
+    var cancel = make('button', 'btn btn-ghost', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', function () { pollEditing[q.id] = false; renderProjects(); });
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    f.appendChild(actions);
+    var statusEl = statusLine('');
+    f.appendChild(statusEl);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = question.value.trim();
+      var options = inputs.map(function (x) { return x.value.trim(); }).filter(Boolean);
+      if (!text) { statusEl.textContent = 'Write a question first.'; question.focus(); return; }
+      if (options.length < 2) { statusEl.textContent = 'Add at least 2 answers.'; return; }
+      if (unkind(text + ' ' + options.join(' '))) { statusEl.textContent = KIND_NOTE; return; }
+      save.disabled = true;
+      statusEl.textContent = 'Saving…';
+      client.from('polls').insert({ project_id: q.id, question: text, options: options }).then(function (res) {
+        save.disabled = false;
+        if (res.error) { statusEl.textContent = dbMessage(res.error); return; }
+        state.polls[q.id] = { question: text, options: options };
+        pollEditing[q.id] = false;
+        renderProjects();
+        refresh();
+      });
+    });
+    return f;
+  }
+  function vote(q, choice) {
+    if (!me) { openAuth('signin', 'Sign in to vote.'); return; }
+    if (voting) return;
+    voting = q.id;
+    renderProjects();
+    client.from('poll_votes').insert({ project_id: q.id, choice: choice }).then(function (res) {
+      voting = null;
+      if (res.error && res.error.code !== '23505') showToast(dbMessage(res.error));
+      else if (!res.error) state.votes.push({ projectId: q.id, userId: me.id, choice: choice, at: Date.now() });
+      renderProjects();
+    });
+  }
+  function unvote(q) {
+    client.from('poll_votes').delete().eq('project_id', q.id).eq('user_id', me.id).then(function (res) {
+      if (res.error) { showToast(dbMessage(res.error)); return; }
+      state.votes = state.votes.filter(function (v) { return !(v.projectId === q.id && v.userId === me.id); });
+      renderProjects();
+    });
+  }
+
+  // ---- Print: a clean page with just one research card, for printing or saving as a PDF ----
+  function printResearch(q) {
+    var owner = findProfile(q.profileId);
+    var old = $('print-sheet');
+    if (old) old.remove();
+    var sheet = make('article', 'print-sheet');
+    sheet.id = 'print-sheet';
+    sheet.appendChild(make('p', 'print-site', state.hubName));
+    sheet.appendChild(make('h1', null, q.title));
+    sheet.appendChild(make('p', 'print-by', 'By ' + (owner ? owner.name : 'a Dollar Search member') +
+      ' · ' + new Date(q.updatedAt || q.createdAt).toLocaleDateString(undefined, { dateStyle: 'long' }) +
+      (q.status ? ' · ' + (q.status === 'finished' ? 'Finished' : 'In progress') : '') +
+      (q.tags.length ? ' · ' + q.tags.join(', ') : '')));
+    sheet.appendChild(descriptionNode(q.description));
+    var href = cleanLink(q.link);
+    if (href) sheet.appendChild(make('p', 'print-link', 'Link: ' + href));
+    var poll = pollsReady && state.polls[q.id];
+    if (poll) {
+      var votes = state.votes.filter(function (v) { return v.projectId === q.id; });
+      sheet.appendChild(make('h2', null, 'Poll: ' + poll.question));
+      var ul = make('ul');
+      poll.options.forEach(function (opt, i) {
+        var n = votes.filter(function (v) { return v.choice === i; }).length;
+        ul.appendChild(make('li', null, opt + ': ' + plural(n, 'vote') + (votes.length ? ' (' + Math.round(n / votes.length * 100) + '%)' : '')));
+      });
+      sheet.appendChild(ul);
+    }
+    if (q.sources.length) {
+      sheet.appendChild(make('h2', null, 'Sources'));
+      var ol = make('ol');
+      q.sources.forEach(function (s) {
+        var sHref = cleanLink(s.link);
+        if (sHref) ol.appendChild(make('li', null, citations(s, sHref)[0][1]));
+      });
+      sheet.appendChild(ol);
+    }
+    document.body.appendChild(sheet);
+    document.body.classList.add('printing');
+    var done = function () {
+      document.body.classList.remove('printing');
+      sheet.remove();
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    window.print();
+  }
+
   function isPinned(q) {
     var owner = findProfile(q.profileId);
     return !!owner && owner.pinnedProject === q.id;
@@ -3321,6 +4003,11 @@
     }
     card.appendChild(title);
     var tags = tagChips(p);
+    var status = statusTag(p);
+    if (status) {
+      if (!tags) tags = make('div', 'tag-row');
+      tags.insertBefore(status, tags.firstChild);
+    }
     if (tags) card.appendChild(tags);
     card.appendChild(projectMeta(p));
     var collabLine = collabNames(p);
@@ -3328,7 +4015,7 @@
     var mineToEdit = canEditProject(p); // owner or accepted collaborator
 
     var about = make('div', 'tab-panel');
-    about.appendChild(make('p', 'project-desc', p.description));
+    about.appendChild(descriptionNode(p.description));
     if (href) {
       // The linked website's home address, shown under the description.
       var site = make('a', 'project-site', hostOf(href));
@@ -3346,10 +4033,10 @@
       var sources = make('div', 'tab-panel');
       if (p.sources.length) {
         var list = make('ul', 'source-list');
-        p.sources.forEach(function (s) {
+        p.sources.forEach(function (s, si) {
           var sHref = cleanLink(s.link);
           if (!sHref) return;
-          var li = make('li');
+          var li = make('li', 'source-item');
           var sa = make('a');
           sa.href = sHref;
           sa.target = '_blank';
@@ -3357,6 +4044,14 @@
           sa.appendChild(make('span', 'source-name', (s.name || hostOf(sHref)) + ' ↗'));
           sa.appendChild(make('span', 'source-host', hostOf(sHref)));
           li.appendChild(sa);
+          // Cite: the source written out in MLA and APA style, ready to copy into schoolwork.
+          var citeKey = p.id + ':' + si;
+          var cite = make('button', 'link-btn cite-btn', citeOpen[citeKey] ? 'Hide citation' : 'Cite');
+          cite.type = 'button';
+          cite.setAttribute('aria-expanded', citeOpen[citeKey] ? 'true' : 'false');
+          cite.addEventListener('click', function () { citeOpen[citeKey] = !citeOpen[citeKey]; renderProjects(); });
+          li.appendChild(cite);
+          if (citeOpen[citeKey]) li.appendChild(citationBox(s, sHref));
           list.appendChild(li);
         });
         sources.appendChild(list);
@@ -3406,6 +4101,8 @@
     } else {
       card.appendChild(about);
     }
+    var poll = pollBlock(p, mineToEdit);
+    if (poll) card.appendChild(poll);
 
     // Footer: research likes for everyone to see; only other people's research can be liked.
     var tools = make('div', 'project-tools');
@@ -3436,6 +4133,12 @@
       pin.addEventListener('click', function () { togglePin(p); });
       tools.appendChild(pin);
     }
+    // Print (or save as a PDF) just this research card, for handing in.
+    var print = make('button', 'mini-btn print-btn', 'Print');
+    print.type = 'button';
+    print.title = 'Print this research or save it as a PDF';
+    print.addEventListener('click', function () { printResearch(p); });
+    tools.appendChild(print);
     var team = hasTeamNotes(p);
     if (team) {
       var notesBtn = make('button', 'mini-btn notes-btn', 'Team notes');
@@ -3859,6 +4562,8 @@
     return 'A Dollar Search member';
   }
 
+  var replyOpen = {};   // comment id -> its reply box is open
+  var replyDrafts = {}; // comment id -> unsent reply
   function commentsPanel(p, comments, editable) {
     var panel = make('div', 'comments');
     panel.id = 'comments-' + p.id;
@@ -3869,54 +4574,23 @@
       panel.appendChild(make('p', 'comments-empty', 'Comments are not switched on for this site yet.'));
       return panel;
     }
-    if (!comments.length) {
+    // Comments from people you've blocked are hidden from you.
+    comments = comments.filter(function (c) { return !isBlockedByMe(c.userId); });
+    var ids = comments.map(function (c) { return c.id; });
+    // Replies sit under the comment they answer; a reply to a missing comment shows as a comment.
+    var top = comments.filter(function (c) { return !c.parentId || ids.indexOf(c.parentId) < 0; });
+    if (!top.length) {
       panel.appendChild(make('p', 'comments-empty', editable ? 'No comments on this research yet.' : 'No comments yet. Leave the first one.'));
     } else {
       var list = make('ul', 'comment-list');
-      comments.forEach(function (c) {
-        var li = make('li', 'comment');
-        var head = make('div', 'comment-head');
-        head.appendChild(make('span', 'comment-author', authorName(c.userId)));
-        if (c.kind === 'tip') head.appendChild(make('span', 'comment-tip', 'Tip'));
-        head.appendChild(make('span', 'comment-when', timeAgo(c.createdAt)));
-        li.appendChild(head);
-        li.appendChild(make('p', 'comment-body', c.body));
-        if (me && (c.userId === me.id || editable || isAdmin)) {
-          var del = make('button', 'link-btn comment-delete', armedDelete === c.id ? 'Click again to delete' : 'Delete');
-          del.type = 'button';
-          del.addEventListener('click', function () {
-            if (armedDelete !== c.id) { armedDelete = c.id; rerenderResearch(); return; }
-            armedDelete = null;
-            del.disabled = true;
-            // The wand works its magic while the delete is saved; the list updates once both are done.
-            Promise.all([
-              wandTapAway(li),
-              client.from('project_comments').delete().eq('id', c.id)
-            ]).then(function (results) {
-              var res = results[1];
-              if (res.error) {
-                // Bring the comment back and say why it couldn't be deleted.
-                li.getAnimations().forEach(function (a) { a.cancel(); });
-                li.style.opacity = '';
-                del.disabled = false;
-                del.textContent = dbMessage(res.error);
-                return;
-              }
-              state.comments = state.comments.filter(function (x) { return x.id !== c.id; });
-              rerenderResearch();
-              refresh();
-            });
-          });
-          li.appendChild(del);
-        }
-        // Other people's comments can be reported to the site owner.
-        if (me && reportsReady && c.userId !== me.id) {
-          var rep = make('button', 'link-btn comment-report', alreadyReported('comment', c.id) ? 'Reported' : 'Report');
-          rep.type = 'button';
-          rep.disabled = alreadyReported('comment', c.id);
-          rep.setAttribute('aria-label', 'Report this comment by ' + authorName(c.userId));
-          rep.addEventListener('click', function () { openReport('comment', c.id, 'this comment by ' + authorName(c.userId)); });
-          li.appendChild(rep);
+      top.forEach(function (c) {
+        var li = commentItem(p, c, editable, false);
+        var replies = comments.filter(function (r) { return r.parentId === c.id; });
+        if (replies.length || replyOpen[c.id]) {
+          var sub = make('ul', 'reply-list');
+          replies.forEach(function (r) { sub.appendChild(commentItem(p, r, editable, true)); });
+          if (replyOpen[c.id] && me) sub.appendChild(replyForm(p, c));
+          li.appendChild(sub);
         }
         list.appendChild(li);
       });
@@ -3931,7 +4605,9 @@
       return panel;
     }
     if (editable) {
-      panel.appendChild(make('p', 'comments-note', "You can't comment on your own research."));
+      panel.appendChild(make('p', 'comments-note', repliesReady
+        ? "You can't comment on your own research, but you can reply to comments."
+        : "You can't comment on your own research."));
       return panel;
     }
 
@@ -3975,6 +4651,7 @@
       e.preventDefault();
       var text = box.value.trim();
       if (!text) { statusEl.textContent = 'Write something before posting.'; box.focus(); return; }
+      if (unkind(text, true)) { statusEl.textContent = KIND_NOTE; box.focus(); return; }
       postingComment = p.id;
       post.disabled = true;
       statusEl.textContent = 'Posting…';
@@ -3990,6 +4667,103 @@
     });
     panel.appendChild(f);
     return panel;
+  }
+  // One comment (or reply), with Reply, Delete and Report where they apply.
+  function commentItem(p, c, editable, isReply) {
+    var li = make('li', 'comment' + (isReply ? ' reply' : ''));
+    var head = make('div', 'comment-head');
+    head.appendChild(make('span', 'comment-author', authorName(c.userId)));
+    if (c.kind === 'tip' && !isReply) head.appendChild(make('span', 'comment-tip', 'Tip'));
+    head.appendChild(make('span', 'comment-when', timeAgo(c.createdAt)));
+    li.appendChild(head);
+    li.appendChild(make('p', 'comment-body', c.body));
+    var tools = make('div', 'comment-tools');
+    // Anyone signed in can reply to a comment (replies to replies go under the same comment).
+    if (me && repliesReady && !isReply) {
+      var reply = make('button', 'link-btn comment-reply', replyOpen[c.id] ? 'Cancel reply' : 'Reply');
+      reply.type = 'button';
+      reply.addEventListener('click', function () {
+        replyOpen[c.id] = !replyOpen[c.id];
+        rerenderResearch();
+        var input = $('reply-input-' + c.id);
+        if (replyOpen[c.id] && input) input.focus();
+      });
+      tools.appendChild(reply);
+    }
+    if (me && (c.userId === me.id || editable || isAdmin)) {
+      var del = make('button', 'link-btn comment-delete', armedDelete === c.id ? 'Click again to delete' : 'Delete');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        if (armedDelete !== c.id) { armedDelete = c.id; rerenderResearch(); return; }
+        armedDelete = null;
+        del.disabled = true;
+        // The wand works its magic while the delete is saved; the list updates once both are done.
+        Promise.all([
+          wandTapAway(li),
+          client.from('project_comments').delete().eq('id', c.id)
+        ]).then(function (results) {
+          var res = results[1];
+          if (res.error) {
+            // Bring the comment back and say why it couldn't be deleted.
+            li.getAnimations().forEach(function (a) { a.cancel(); });
+            li.style.opacity = '';
+            del.disabled = false;
+            del.textContent = dbMessage(res.error);
+            return;
+          }
+          state.comments = state.comments.filter(function (x) { return x.id !== c.id && x.parentId !== c.id; });
+          rerenderResearch();
+          refresh();
+        });
+      });
+      tools.appendChild(del);
+    }
+    // Other people's comments can be reported to the site owner.
+    if (me && reportsReady && c.userId !== me.id) {
+      var rep = make('button', 'link-btn comment-report', alreadyReported('comment', c.id) ? 'Reported' : 'Report');
+      rep.type = 'button';
+      rep.disabled = alreadyReported('comment', c.id);
+      rep.setAttribute('aria-label', 'Report this comment by ' + authorName(c.userId));
+      rep.addEventListener('click', function () { openReport('comment', c.id, 'this comment by ' + authorName(c.userId)); });
+      tools.appendChild(rep);
+    }
+    if (tools.childNodes.length) li.appendChild(tools);
+    return li;
+  }
+  function replyForm(p, c) {
+    var li = make('li', 'reply-form-item');
+    var f = make('form', 'reply-form');
+    var box = make('textarea');
+    box.id = 'reply-input-' + c.id;
+    box.rows = 2;
+    box.maxLength = 500;
+    box.placeholder = 'Reply to ' + authorName(c.userId) + '…';
+    box.setAttribute('aria-label', 'Your reply to ' + authorName(c.userId));
+    box.value = replyDrafts[c.id] || '';
+    box.addEventListener('input', function () { replyDrafts[c.id] = box.value; });
+    var send = make('button', 'mini-btn', 'Reply');
+    send.type = 'submit';
+    var statusEl = statusLine('');
+    f.appendChild(box);
+    f.appendChild(send);
+    li.appendChild(f);
+    li.appendChild(statusEl);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = box.value.trim();
+      if (!text) { box.focus(); return; }
+      if (unkind(text, true)) { statusEl.textContent = KIND_NOTE; box.focus(); return; }
+      send.disabled = true;
+      statusEl.textContent = 'Posting…';
+      client.from('project_comments').insert({ project_id: p.id, kind: 'comment', body: text, parent_id: c.id }).then(function (res) {
+        send.disabled = false;
+        if (res.error) { statusEl.textContent = dbMessage(res.error); return; }
+        delete replyDrafts[c.id];
+        replyOpen[c.id] = false;
+        refresh();
+      });
+    });
+    return li;
   }
 
   var likingProject = null; // the research project whose like is being saved
@@ -4030,15 +4804,53 @@
     var linkIn = textInput(500, isNew ? '' : p.link);
     linkIn.inputMode = 'url';
     linkIn.placeholder = 'https://…';
-    var descIn = textArea(400, isNew ? '' : p.description);
+    // Longer descriptions (room for the research outline) once the database allows them.
+    var descIn = textArea(statusReady ? 1500 : 400, isNew ? '' : p.description);
 
     field('Title', titleIn, 'project-title-input')
       .concat(field('Link to your research (optional)', linkIn, 'project-link-input'))
       .concat(field('Description', descIn, 'project-desc-input'))
       .forEach(function (node) { f.appendChild(node); });
+    // The research outline fills the description with four short headings to answer.
+    var outlineBtn = make('button', 'mini-btn outline-btn', 'Use the research outline');
+    outlineBtn.type = 'button';
+    outlineBtn.title = 'Adds four headings to help you write your research';
+    outlineBtn.addEventListener('click', function () {
+      var template = OUTLINE.map(function (h) { return h + ': '; }).join('\n');
+      var current = descIn.value.trim();
+      if (OUTLINE.every(function (h) { return current.indexOf(h + ':') >= 0; })) { descIn.focus(); return; }
+      descIn.value = current ? template + '\n' + current : template;
+      descIn.rows = 8;
+      descIn.focus();
+      descIn.setSelectionRange(OUTLINE[0].length + 2, OUTLINE[0].length + 2);
+    });
+    f.appendChild(outlineBtn);
+    // In progress or Finished.
+    var pickedStatus = isNew ? '' : p.status;
+    if (statusReady) {
+      var statusLabel = make('span', 'edit-label', 'Status');
+      statusLabel.id = 'project-status-label';
+      var statusChips = make('div', 'chips');
+      statusChips.setAttribute('role', 'group');
+      statusChips.setAttribute('aria-labelledby', statusLabel.id);
+      [['', 'No label'], ['in-progress', 'In progress'], ['finished', 'Finished']].forEach(function (s) {
+        var b = make('button', 'chip', s[1]);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', pickedStatus === s[0] ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          pickedStatus = s[0];
+          Array.prototype.forEach.call(statusChips.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        });
+        statusChips.appendChild(b);
+      });
+      f.appendChild(statusLabel);
+      f.appendChild(statusChips);
+    }
 
     // Topics (up to 3) and a cover picture, once the database has room for them.
-    var pickedTags = isNew ? [] : p.tags.slice();
+    // Entering the weekly challenge starts a new card with that week's topic picked.
+    var pickedTags = isNew ? (challengeTag ? [challengeTag] : []) : p.tags.slice();
+    if (isNew) challengeTag = '';
     var imageIn = textInput(500, isNew ? '' : p.image);
     if (extrasReady) {
       var tagLabel = make('span', 'edit-label', 'Topics (pick up to 3)');
@@ -4163,6 +4975,7 @@
         return;
       }
       if (!d) { statusEl.textContent = 'Write a description before saving.'; descIn.focus(); return; }
+      if (unkind(t + ' ' + d)) { statusEl.textContent = KIND_NOTE; descIn.focus(); return; }
       var sourceList = [];
       var rows = rowsEl.querySelectorAll('.source-row');
       for (var i = 0; i < rows.length; i++) {
@@ -4191,6 +5004,7 @@
         row.tags = pickedTags;
         row.image = image;
       }
+      if (statusReady) row.status = pickedStatus;
       setBusy(buttons, true);
       statusEl.textContent = 'Saving…';
       if (isNew) {
@@ -4287,7 +5101,7 @@
     ownFriends.hidden = !own;
     if (own) ownFriends.textContent = plural(friendCount(p.ownerId), 'friend');
     // Friends can message each other from the portfolio.
-    $('message-btn').hidden = own || !me || !messagesReady || !areFriends(me.id, p.ownerId);
+    $('message-btn').hidden = own || !me || !messagesReady || !areFriends(me.id, p.ownerId) || isBlockedByMe(p.ownerId);
     renderFollowers(p);
     renderCollabs(p, own);
   }
@@ -4702,7 +5516,7 @@
     });
     state.comments.forEach(function (c) {
       var target = projectsById[c.projectId];
-      if (!target || target.profile.ownerId !== me.id || c.userId === me.id) return;
+      if (!target || target.profile.ownerId !== me.id || c.userId === me.id || isBlockedByMe(c.userId)) return;
       var label = c.kind === 'tip' ? 'left a tip on ' : 'commented on ';
       items.push({
         time: c.createdAt, profile: target.profile, project: target.project, comment: true,
@@ -4723,6 +5537,50 @@
         });
       } else if (c.status === 'accepted' && c.fromUser === me.id) {
         items.push({ time: c.respondedAt || c.createdAt, profile: mp, project: q, collab: true, who: to.name, what: 'accepted your collab on ' + q.title });
+      }
+    });
+    // Replies to your comments.
+    state.comments.forEach(function (c) {
+      if (!c.parentId || c.userId === me.id) return;
+      var parent = state.comments.filter(function (x) { return x.id === c.parentId; })[0];
+      var target = projectsById[c.projectId];
+      if (!parent || parent.userId !== me.id || !target) return;
+      items.push({
+        time: c.createdAt, profile: target.profile, project: target.project, comment: true, who: authorName(c.userId),
+        what: 'replied to your comment on ' + target.project.title + ': “' + snippet(c.body) + '”'
+      });
+    });
+    // Likes and reactions on your research.
+    var REACT_WORDS = { inspiring: 'Inspiring', smart: 'Smart', sourced: 'Well-sourced' };
+    state.projectLikes.forEach(function (l) {
+      var target = projectsById[l.projectId];
+      if (!l.at || !target || target.profile.ownerId !== me.id || l.userId === me.id) return;
+      items.push({ time: l.at, profile: target.profile, project: target.project, who: authorName(l.userId), what: 'liked ' + target.project.title + ' (+1 star)' });
+    });
+    state.reactions.forEach(function (r) {
+      var target = projectsById[r.projectId];
+      if (!r.at || !target || target.profile.ownerId !== me.id || r.userId === me.id) return;
+      items.push({ time: r.at, profile: target.profile, project: target.project, who: authorName(r.userId), what: 'reacted ' + REACT_WORDS[r.kind] + ' to ' + target.project.title });
+    });
+    // New messages.
+    state.messages.forEach(function (m) {
+      if (m.to !== me.id || isBlockedByMe(m.from)) return;
+      items.push({ time: m.at, who: authorName(m.from), what: 'sent you a message: “' + snippet(m.body) + '”', open: function () { openMessages(m.from); } });
+    });
+    // Gifts: stars and items from friends, the weekly challenge prize, and stars from the site owner.
+    state.giftsReceived.forEach(function (g) {
+      items.push({ time: g.at, who: authorName(g.from), what: 'gifted you ' + plural(g.stars, 'star') + '!', open: openShop });
+    });
+    state.purchases.forEach(function (pu) {
+      if (pu.owner !== me.id || !pu.paidBy || pu.paidBy === me.id || !pu.at) return;
+      var item = SHOP.filter(function (s) { return s.id === pu.item; })[0];
+      items.push({ time: pu.at, who: authorName(pu.paidBy), what: 'gifted you the ' + (item ? item.name.toLowerCase() : 'a Star Shop item') + '!', open: openShop });
+    });
+    state.siteGifts.forEach(function (g) {
+      if (g.reason.indexOf('challenge:') === 0) {
+        items.push({ time: g.at, who: 'Weekly challenge', what: 'You won ' + weekTopic(g.reason.slice(10)) + ' week! +' + plural(g.stars, 'star'), open: openShop });
+      } else if (g.reason.indexOf('owner-gift:') === 0) {
+        items.push({ time: g.at, who: state.hubName, what: 'The site owner gifted you ' + plural(g.stars, 'star') + '!', open: openShop });
       }
     });
     items.sort(function (a, b) { return b.time - a.time; });
@@ -4774,6 +5632,8 @@
       b.appendChild(make('span', 'notif-when', timeAgo(n.time)));
       b.addEventListener('click', function () {
         closeNotifs();
+        // Messages and gifts open their own pop-ups.
+        if (n.open) { n.open(); return; }
         // A collab notification opens the Collabs list on your own portfolio.
         if (n.collab) {
           showProfile(n.profile.id, true);
@@ -4828,7 +5688,7 @@
     state.profiles.forEach(function (p) { if (areFriends(me.id, p.ownerId)) ids[p.ownerId] = true; });
     state.messages.forEach(function (m) { ids[m.from === me.id ? m.to : m.from] = true; });
     delete ids[me.id];
-    return Object.keys(ids).filter(function (id) { return ownerName(id); }).map(function (id) {
+    return Object.keys(ids).filter(function (id) { return ownerName(id) && !isBlockedByMe(id); }).map(function (id) {
       var msgs = chatMessages(id);
       var last = msgs[msgs.length - 1];
       return { id: id, last: last || null, unread: msgs.filter(function (m) { return m.to === me.id && !m.readAt; }).length };
@@ -4840,7 +5700,7 @@
     });
   }
   function unreadMessages() {
-    return state.messages.filter(function (m) { return m.to === me.id && !m.readAt; }).length;
+    return state.messages.filter(function (m) { return m.to === me.id && !m.readAt && !isBlockedByMe(m.from); }).length;
   }
   function renderMsgButton() {
     var show = !!me && messagesReady && loaded && !loadError;
@@ -4953,6 +5813,7 @@
     e.preventDefault();
     var body = msgInput.value.trim();
     if (!body || !chatWith || sendingMsg) return;
+    if (unkind(body, true)) { $('msg-status').textContent = KIND_NOTE; msgInput.focus(); return; }
     var to = chatWith;
     sendingMsg = true;
     $('msg-status').textContent = '';
@@ -5024,6 +5885,104 @@
   $('report-profile').addEventListener('click', function () {
     var p = current();
     if (p) openReport('profile', p.id, p.name);
+  });
+
+  // ---- Welcome tour: a few quick pop-ups the first time someone visits ----
+  var tourDialog = $('tour-dialog');
+  var tourStep = 0;
+  var TOUR = [
+    { art: '★', title: function () { return 'Welcome to ' + state.hubName + '!'; },
+      text: 'A place where friends share their research. Here’s a quick look around. It takes about 20 seconds.' },
+    { art: '☺', title: 'Portfolios', target: 'profiles',
+      text: 'Everyone has a portfolio with their own character, research cards and sources. Click any profile to look around, and follow the ones you like.' },
+    { art: '✎', title: 'Research', target: 'recent-research',
+      text: 'Like, react to, comment on and save research. On the home screen, check Recent research, Top research and this week’s challenge.' },
+    { art: '♥', title: 'Stars and the Star Shop', target: 'cart-btn',
+      text: 'You get a star for every like your research gets, plus a free star every day. Spend them on outfits, frames and pets in the Star Shop (the cart at the top).' },
+    { art: '✦', title: 'Make your own', text: '' }
+  ];
+  function tourSeen() { try { return localStorage.getItem('ds-tour') === 'done'; } catch (e) { return true; } }
+  function renderTour() {
+    var s = TOUR[tourStep];
+    var last = tourStep === TOUR.length - 1;
+    $('tour-art').textContent = s.art;
+    $('tour-title').textContent = typeof s.title === 'function' ? s.title() : s.title;
+    $('tour-text').textContent = last
+      ? (myProfile() ? 'You’re all set. Jump to your portfolio to add research, or explore everyone else’s.'
+        : me ? 'Make your portfolio from the home screen: click + Create my profile, then add your first research card.'
+          : 'Sign in or make an account to create your own portfolio. You can look around without one, too.')
+      : s.text;
+    var dots = $('tour-dots');
+    dots.textContent = '';
+    TOUR.forEach(function (_, i) { dots.appendChild(make('span', i === tourStep ? 'on' : null)); });
+    $('tour-back').hidden = tourStep === 0;
+    $('tour-next').textContent = last ? (myProfile() ? 'Go to my portfolio' : me ? 'Let’s go' : 'Sign in') : 'Next';
+    // Point at the part of the page this step is about.
+    Array.prototype.forEach.call(document.querySelectorAll('.tour-glow'), function (el) { el.classList.remove('tour-glow'); });
+    var target = s.target && $(s.target);
+    if (target && !target.hidden) {
+      target.classList.add('tour-glow');
+      if (target.id !== 'cart-btn') target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  }
+  function openTour() {
+    if (currentId) showHome(true);
+    tourStep = 0;
+    renderTour();
+    tourDialog.hidden = false;
+    $('tour-next').focus();
+  }
+  function closeTour() {
+    tourDialog.hidden = true;
+    Array.prototype.forEach.call(document.querySelectorAll('.tour-glow'), function (el) { el.classList.remove('tour-glow'); });
+    try { localStorage.setItem('ds-tour', 'done'); } catch (e) {}
+  }
+  $('tour-next').addEventListener('click', function () {
+    if (tourStep < TOUR.length - 1) { tourStep++; renderTour(); $('tour-next').focus(); return; }
+    closeTour();
+    window.scrollTo(0, 0);
+    var mp = myProfile();
+    if (mp) showProfile(mp.id, true);
+    else if (!me) openAuth('signin', '');
+  });
+  $('tour-back').addEventListener('click', function () { if (tourStep > 0) { tourStep--; renderTour(); } });
+  $('tour-skip').addEventListener('click', function () { closeTour(); window.scrollTo(0, 0); });
+  $('tour-again').addEventListener('click', openTour);
+  // Shown once, after the site has loaded for the first time on this device.
+  function maybeStartTour() {
+    if (tourSeen() || !loaded || loadError || !client || currentId) return;
+    try { localStorage.setItem('ds-tour', 'done'); } catch (e) {}
+    setTimeout(openTour, 600);
+  }
+
+  // ---- Blocking ----
+  var blocking = false;
+  function isBlockedByMe(userId) { return state.blocks.indexOf(userId) >= 0; }
+  $('block-btn').addEventListener('click', function () {
+    var p = current();
+    if (!p || !me || blocking) return;
+    var on = isBlockedByMe(p.ownerId);
+    if (!on && !window.confirm('Block ' + p.name + '? They won’t be able to message you or comment on your research, ' +
+      'and you won’t see their comments or messages. You can unblock them here any time.')) return;
+    blocking = true;
+    renderProfile();
+    var req = on
+      ? client.from('blocks').delete().eq('user_id', me.id).eq('blocked_user', p.ownerId)
+      : client.from('blocks').insert({ blocked_user: p.ownerId });
+    req.then(function (res) {
+      blocking = false;
+      if (res.error && res.error.code !== '23505') {
+        showToast(dbMessage(res.error));
+      } else if (on) {
+        state.blocks = state.blocks.filter(function (id) { return id !== p.ownerId; });
+        showToast('Unblocked ' + p.name + '.');
+      } else {
+        state.blocks.push(p.ownerId);
+        showToast('Blocked ' + p.name + '.');
+      }
+      renderProfile();
+      renderMsgButton();
+    });
   });
 
   // ---- Share: send a portfolio's link to someone ----
@@ -5297,6 +6256,7 @@
     if (!savedDialog.hidden) { closeSaved(); return; }
     if (!msgDialog.hidden) { closeMessages(); return; }
     if (!reportDialog.hidden) { closeReport(); return; }
+    if (!tourDialog.hidden) { closeTour(); return; }
     if (!adminDialog.hidden) { closeAdmin(); return; }
     if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
@@ -5471,10 +6431,12 @@
 
   // ---- Putting it together ----
   function busy() {
-    var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; });
+    var typingComment = Object.keys(commentDrafts).some(function (k) { return commentDrafts[k]; }) ||
+      Object.keys(replyDrafts).some(function (k) { return replyDrafts[k]; });
     var typingCollab = !collabPanel.hidden && collabPanel.contains(document.activeElement);
     // Unsaved team notes are kept in noteDrafts, so only pause while someone is typing in them.
-    var typingNotes = !!document.activeElement && document.activeElement.classList.contains('notes-input');
+    var typingNotes = (!!document.activeElement && document.activeElement.classList.contains('notes-input')) ||
+      Object.keys(pollEditing).some(function (k) { return pollEditing[k]; });
     return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab || typingNotes;
   }
   var routed = false;
@@ -5483,7 +6445,7 @@
     renderBell();
     renderCart();
     renderMsgButton();
-    if (!routed && loaded) { routed = true; route(); return; }
+    if (!routed && loaded) { routed = true; route(); maybeStartTour(); return; }
     if (busy()) return;
     if (currentId) {
       if (findProfile(currentId)) renderProfile(); else showHome(true);

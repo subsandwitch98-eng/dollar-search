@@ -1808,15 +1808,8 @@
     by.appendChild(name);
     b.appendChild(by);
     b.setAttribute('aria-label', 'Open ' + q.title + ', by ' + p.name + ', ' + timeAgo(q.createdAt).toLowerCase());
-    // Opens the portfolio and scrolls to this research card.
-    b.addEventListener('click', function () {
-      showProfile(p.id, true);
-      var target = $('project-' + q.id);
-      if (!target) return;
-      target.scrollIntoView({ block: 'center' });
-      target.classList.add('flash');
-      setTimeout(function () { target.classList.remove('flash'); }, 1600);
-    });
+    // Opens the research in the reader, right here on the home screen.
+    b.addEventListener('click', function () { openReader(q.id); });
     card.appendChild(b);
 
     // Like and comment without leaving the home screen.
@@ -1869,14 +1862,7 @@
       paintName(nm, it.p.name);
       by.appendChild(nm);
       b.appendChild(by);
-      b.addEventListener('click', function () {
-        showProfile(it.p.id, true);
-        var target = $('project-' + it.q.id);
-        if (!target) return;
-        target.scrollIntoView({ block: 'center' });
-        target.classList.add('flash');
-        setTimeout(function () { target.classList.remove('flash'); }, 1600);
-      });
+      b.addEventListener('click', function () { openReader(it.q.id); });
       li.appendChild(b);
       list.appendChild(li);
     });
@@ -2064,7 +2050,10 @@
   });
 
   // Opens a portfolio and scrolls to one of its research cards.
-  function goToResearch(profileId, projectId) {
+  // Clicking research anywhere on the site opens it in the reader, right where you are.
+  function goToResearch(profileId, projectId) { openReader(projectId); }
+  // The portfolio page, scrolled to one of its research cards.
+  function showOnPortfolio(profileId, projectId) {
     showProfile(profileId, true);
     var target = $('project-' + projectId);
     if (!target) return;
@@ -2072,6 +2061,141 @@
     target.classList.add('flash');
     setTimeout(function () { target.classList.remove('flash'); }, 1600);
   }
+
+  // ---- Research reader: the whole research in a pop-up, with its sources, poll, likes and comments ----
+  var readerDialog = $('reader');
+  var readerId = null;
+  var readerOpener = null;
+  function openReader(projectId) {
+    if (!findProject(projectId)) return;
+    if (readerDialog.hidden) readerOpener = document.activeElement;
+    readerId = projectId;
+    closeNotifs();
+    renderReader();
+    readerDialog.hidden = false;
+    readerDialog.querySelector('.reader-dialog').scrollTop = 0;
+    $('reader-close').focus();
+  }
+  function closeReader() {
+    readerDialog.hidden = true;
+    readerId = null;
+    if (readerOpener && readerOpener.focus && document.contains(readerOpener)) readerOpener.focus();
+  }
+  function renderReader() {
+    var q = readerId && findProject(readerId);
+    if (!q) { if (!readerDialog.hidden) closeReader(); return; }
+    var owner = findProfile(q.profileId);
+    var body = $('reader-body');
+    var keepScroll = readerDialog.querySelector('.reader-dialog').scrollTop;
+    body.textContent = '';
+    var cover = projectImage(q);
+    if (cover) { cover.classList.add('reader-cover'); body.appendChild(cover); }
+    if (q.draft) body.appendChild(make('span', 'draft-tag', 'Private draft · only you can see this'));
+    var title = make('h2', 'reader-title', q.title);
+    title.id = 'reader-title';
+    body.appendChild(title);
+    // Who wrote it, with a button to their portfolio.
+    if (owner) {
+      var by = make('button', 'reader-by');
+      by.type = 'button';
+      var pic = pictureNode(owner.avatar, owner.name);
+      var avatar = make('span', 'avatar reader-avatar', pic ? null : owner.name.charAt(0).toUpperCase());
+      if (pic) avatar.appendChild(pic);
+      avatar.setAttribute('aria-hidden', 'true');
+      by.appendChild(avatar);
+      var who = make('span', 'reader-who');
+      var nm = make('span', 'reader-name');
+      paintName(nm, owner.name);
+      who.appendChild(nm);
+      who.appendChild(make('span', 'reader-open', 'Open portfolio →'));
+      by.appendChild(who);
+      by.addEventListener('click', function () { closeReader(); showOnPortfolio(owner.id, q.id); });
+      body.appendChild(by);
+    }
+    var tags = tagChips(q);
+    var status = statusTag(q);
+    if (status) { if (!tags) tags = make('div', 'tag-row'); tags.insertBefore(status, tags.firstChild); }
+    if (tags) body.appendChild(tags);
+    body.appendChild(projectMeta(q));
+    var collabLine = collabNames(q);
+    if (collabLine) body.appendChild(collabLine);
+    body.appendChild(descriptionNode(q.description));
+    // The research's own link, if it has one, opens in a new tab only if you choose it.
+    var href = cleanLink(q.link);
+    if (href) {
+      var site = make('a', 'reader-link', 'Visit the research link: ' + hostOf(href) + ' ↗');
+      site.href = href;
+      site.target = '_blank';
+      site.rel = 'noopener noreferrer';
+      body.appendChild(site);
+    }
+    // Sources, each with a Cite button.
+    body.appendChild(make('h3', 'reader-head', 'Sources (' + q.sources.length + ')'));
+    if (q.sources.length) {
+      var list = make('ul', 'source-list');
+      q.sources.forEach(function (s, si) {
+        var sHref = cleanLink(s.link);
+        if (!sHref) return;
+        var li = make('li', 'source-item');
+        var sa = make('a');
+        sa.href = sHref;
+        sa.target = '_blank';
+        sa.rel = 'noopener noreferrer';
+        sa.appendChild(make('span', 'source-name', (s.name || hostOf(sHref)) + ' ↗'));
+        sa.appendChild(make('span', 'source-host', hostOf(sHref)));
+        li.appendChild(sa);
+        var citeKey = q.id + ':' + si;
+        var cite = make('button', 'link-btn cite-btn', citeOpen[citeKey] ? 'Hide citation' : 'Cite');
+        cite.type = 'button';
+        cite.addEventListener('click', function () { citeOpen[citeKey] = !citeOpen[citeKey]; rerenderResearch(); });
+        li.appendChild(cite);
+        if (citeOpen[citeKey]) li.appendChild(citationBox(s, sHref));
+        list.appendChild(li);
+      });
+      body.appendChild(list);
+    } else {
+      body.appendChild(make('p', 'cal-empty', 'No sources listed yet.'));
+    }
+    var mineToEdit = canEditProject(q);
+    var poll = pollBlock(q, mineToEdit);
+    if (poll) body.appendChild(poll);
+    if (!q.draft) {
+      var reacts = reactionRow(q);
+      if (reacts) body.appendChild(reacts);
+    }
+    var tools = make('div', 'project-tools reader-tools');
+    if (!q.draft) {
+      tools.appendChild(researchLikeButton(q));
+      var save = researchSaveButton(q);
+      if (save) tools.appendChild(save);
+    }
+    var print = make('button', 'mini-btn', 'Print');
+    print.type = 'button';
+    print.addEventListener('click', function () { printResearch(q); });
+    tools.appendChild(print);
+    if (mineToEdit) {
+      var edit = make('button', 'mini-btn', 'Edit');
+      edit.type = 'button';
+      edit.addEventListener('click', function () {
+        closeReader();
+        if (currentId !== q.profileId) showProfile(q.profileId, true);
+        openProject(q.id);
+        var card = $('project-title-input');
+        if (card) card.closest('.project').scrollIntoView({ block: 'center' });
+      });
+      tools.appendChild(edit);
+    }
+    body.appendChild(tools);
+    // Comments and tips, always open in the reader.
+    if (!q.draft) {
+      body.appendChild(make('h3', 'reader-head', 'Comments'));
+      var comments = state.comments.filter(function (c) { return c.projectId === q.id; });
+      body.appendChild(commentsPanel(q, comments, !!owner && canEdit(owner)));
+    }
+    readerDialog.querySelector('.reader-dialog').scrollTop = keepScroll;
+  }
+  $('reader-close').addEventListener('click', closeReader);
+  readerDialog.addEventListener('click', function (e) { if (e.target === readerDialog) closeReader(); });
 
   // ---- Home: Top research this week, ranked by likes from the last 7 days ----
   var TOP_LIMIT = 5;
@@ -4075,7 +4199,7 @@
         var add = make('button', 'link-btn poll-add', '+ Add a quick poll');
         add.type = 'button';
         add.title = 'Ask visitors a question and see the answers as a chart';
-        add.addEventListener('click', function () { pollEditing[q.id] = true; renderProjects(); var f = $('poll-q-' + q.id); if (f) f.focus(); });
+        add.addEventListener('click', function () { pollEditing[q.id] = true; rerenderResearch(); var f = $('poll-q-' + q.id); if (f) f.focus(); });
         return add;
       }
       return pollForm(q);
@@ -4120,7 +4244,7 @@
         client.from('polls').delete().eq('project_id', q.id).then(function (res) {
           if (res.error) { showToast(dbMessage(res.error)); return; }
           delete state.polls[q.id];
-          renderProjects();
+          rerenderResearch();
           refresh();
         });
       });
@@ -4170,7 +4294,7 @@
     save.type = 'submit';
     var cancel = make('button', 'btn btn-ghost', 'Cancel');
     cancel.type = 'button';
-    cancel.addEventListener('click', function () { pollEditing[q.id] = false; renderProjects(); });
+    cancel.addEventListener('click', function () { pollEditing[q.id] = false; rerenderResearch(); });
     actions.appendChild(save);
     actions.appendChild(cancel);
     f.appendChild(actions);
@@ -4190,7 +4314,7 @@
         if (res.error) { statusEl.textContent = dbMessage(res.error); return; }
         state.polls[q.id] = { question: text, options: options };
         pollEditing[q.id] = false;
-        renderProjects();
+        rerenderResearch();
         refresh();
       });
     });
@@ -4200,19 +4324,19 @@
     if (!me) { openAuth('signin', 'Sign in to vote.'); return; }
     if (voting) return;
     voting = q.id;
-    renderProjects();
+    rerenderResearch();
     client.from('poll_votes').insert({ project_id: q.id, choice: choice }).then(function (res) {
       voting = null;
       if (res.error && res.error.code !== '23505') showToast(dbMessage(res.error));
       else if (!res.error) state.votes.push({ projectId: q.id, userId: me.id, choice: choice, at: Date.now() });
-      renderProjects();
+      rerenderResearch();
     });
   }
   function unvote(q) {
     client.from('poll_votes').delete().eq('project_id', q.id).eq('user_id', me.id).then(function (res) {
       if (res.error) { showToast(dbMessage(res.error)); return; }
       state.votes = state.votes.filter(function (v) { return !(v.projectId === q.id && v.userId === me.id); });
-      renderProjects();
+      rerenderResearch();
     });
   }
 
@@ -4290,21 +4414,22 @@
     var cover = projectImage(p);
     if (cover) card.appendChild(cover);
     if (isPinned(p)) card.appendChild(make('span', 'pin-tag', 'Pinned'));
+    // The title opens the whole research in the reader (its own link is shown under the description).
     var title = make('h3', 'project-title');
     var href = cleanLink(p.link);
-    if (href) {
-      var a = make('a', null, p.title);
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      var arrow = make('span', 'project-arrow', ' ↗');
-      arrow.setAttribute('aria-hidden', 'true');
-      a.appendChild(arrow);
-      title.appendChild(a);
-    } else {
-      title.textContent = p.title;
-    }
+    var read = make('button', 'project-read', p.title);
+    read.type = 'button';
+    read.setAttribute('aria-label', 'Read ' + p.title);
+    read.addEventListener('click', function () { openReader(p.id); });
+    title.appendChild(read);
     card.appendChild(title);
+    // Clicking anywhere else on the card that isn't a button or link opens it too.
+    card.classList.add('openable');
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('button, a, input, textarea, select, label, form, .comments')) return;
+      if (window.getSelection && String(window.getSelection())) return; // let people select text
+      openReader(p.id);
+    });
     var tags = tagChips(p);
     var status = statusTag(p);
     if (status) {
@@ -4352,7 +4477,7 @@
           var cite = make('button', 'link-btn cite-btn', citeOpen[citeKey] ? 'Hide citation' : 'Cite');
           cite.type = 'button';
           cite.setAttribute('aria-expanded', citeOpen[citeKey] ? 'true' : 'false');
-          cite.addEventListener('click', function () { citeOpen[citeKey] = !citeOpen[citeKey]; renderProjects(); });
+          cite.addEventListener('click', function () { citeOpen[citeKey] = !citeOpen[citeKey]; rerenderResearch(); });
           li.appendChild(cite);
           if (citeOpen[citeKey]) li.appendChild(citationBox(s, sHref));
           list.appendChild(li);
@@ -4750,6 +4875,7 @@
   function rerenderResearch() {
     if (!profileView.hidden && current()) renderProjects();
     if (!homeView.hidden) renderRecent();
+    if (!readerDialog.hidden) renderReader();
   }
 
   // "Collab with …" under a card's title: everyone working on it except the portfolio you're looking at.
@@ -6608,6 +6734,7 @@
     if (!msgDialog.hidden) { closeMessages(); return; }
     if (!reportDialog.hidden) { closeReport(); return; }
     if (!tourDialog.hidden) { closeTour(); return; }
+    if (!readerDialog.hidden) { closeReader(); return; }
     if (!adminDialog.hidden) { closeAdmin(); return; }
     if (!shopDialog.hidden) { closeShop(); return; }
     if (!notifPanel.hidden) { closeNotifs(); bellBtn.focus(); }
@@ -6798,6 +6925,7 @@
     renderMsgButton();
     if (!routed && loaded) { routed = true; route(); maybeStartTour(); return; }
     if (busy()) return;
+    if (!readerDialog.hidden) renderReader();
     if (currentId) {
       if (findProfile(currentId)) renderProfile(); else showHome(true);
     } else {

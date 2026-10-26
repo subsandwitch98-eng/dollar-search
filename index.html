@@ -477,6 +477,14 @@
   </div>
 </div>
 
+<!-- Research reader: the whole research in a pop-up, opened by clicking any research card -->
+<div class="dialog-backdrop" id="reader" hidden>
+  <div class="dialog reader-dialog" role="dialog" aria-modal="true" aria-labelledby="reader-title">
+    <button class="dialog-close reader-close" id="reader-close" type="button" aria-label="Close the research">×</button>
+    <div class="reader-body" id="reader-body"></div>
+  </div>
+</div>
+
 <!-- Welcome tour: a few quick pop-ups for first-time visitors (replay it from the footer) -->
 <div class="dialog-backdrop tour-backdrop" id="tour-dialog" hidden>
   <div class="dialog tour-dialog" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text">

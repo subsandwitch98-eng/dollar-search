@@ -2079,6 +2079,9 @@
   function closeReader() {
     readerDialog.hidden = true;
     readerId = null;
+    // Remove the preview so a video or document inside stops.
+    $('reader-preview').textContent = '';
+    $('reader-preview').dataset.key = '';
     if (readerOpener && readerOpener.focus && document.contains(readerOpener)) readerOpener.focus();
   }
   function renderReader() {
@@ -2120,15 +2123,19 @@
     var collabLine = collabNames(q);
     if (collabLine) body.appendChild(collabLine);
     body.appendChild(descriptionNode(q.description));
-    // The research's own link, if it has one, opens in a new tab only if you choose it.
+    // The research's own link: shown right here when the site allows it, with a link to open it in a new tab.
+    // It has its own spot that's only rebuilt for different research, so likes and comments don't reload it.
     var href = cleanLink(q.link);
-    if (href) {
-      var site = make('a', 'reader-link', 'Visit the research link: ' + hostOf(href) + ' ↗');
-      site.href = href;
-      site.target = '_blank';
-      site.rel = 'noopener noreferrer';
-      body.appendChild(site);
+    var previewSpot = $('reader-preview');
+    var previewKey = href ? q.id + ' ' + href : '';
+    if (previewSpot.dataset.key !== previewKey) {
+      previewSpot.textContent = '';
+      previewSpot.dataset.key = previewKey;
+      if (href) previewSpot.appendChild(researchPreview(href));
     }
+    // Everything after the preview goes in the second part of the reader.
+    body = $('reader-rest');
+    body.textContent = '';
     // Sources, each with a Cite button.
     body.appendChild(make('h3', 'reader-head', 'Sources (' + q.sources.length + ')'));
     if (q.sources.length) {
@@ -2193,6 +2200,86 @@
       body.appendChild(commentsPanel(q, comments, !!owner && canEdit(owner)));
     }
     readerDialog.querySelector('.reader-dialog').scrollTop = keepScroll;
+  }
+  // How to show a research link inside the page. Many sites have a special "embed" address for this;
+  // a few (like GitHub) never allow it, so their PDFs go through Google's PDF viewer instead.
+  function embedFor(href) {
+    var u;
+    try { u = new URL(href); } catch (e) { return null; }
+    var host = u.hostname.replace(/^www\./, '');
+    var path = u.pathname;
+    var m;
+    if (host === location.hostname) return null; // never put this site inside itself
+    if (host === 'docs.google.com') {
+      if ((m = path.match(/^\/document\/d\/([\w-]+)/))) return { src: 'https://docs.google.com/document/d/' + m[1] + '/preview', kind: 'doc', name: 'Google Doc' };
+      if ((m = path.match(/^\/presentation\/d\/([\w-]+)/))) return { src: 'https://docs.google.com/presentation/d/' + m[1] + '/embed?start=false', kind: 'slides', name: 'Google Slides' };
+      if ((m = path.match(/^\/spreadsheets\/d\/([\w-]+)/))) return { src: 'https://docs.google.com/spreadsheets/d/' + m[1] + '/preview', kind: 'doc', name: 'Google Sheet' };
+      if ((m = path.match(/^\/forms\/d\/e\/([\w-]+)/))) return { src: 'https://docs.google.com/forms/d/e/' + m[1] + '/viewform?embedded=true', kind: 'doc', name: 'Google Form' };
+    }
+    if (host === 'drive.google.com' && (m = path.match(/^\/file\/d\/([\w-]+)/))) {
+      return { src: 'https://drive.google.com/file/d/' + m[1] + '/preview', kind: 'doc', name: 'Google Drive file' };
+    }
+    var video = null;
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      video = u.searchParams.get('v') || ((m = path.match(/^\/(?:shorts|embed|live)\/([\w-]+)/)) && m[1]);
+    } else if (host === 'youtu.be') {
+      video = path.slice(1).split('/')[0];
+    }
+    if (video) return { src: 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(video), kind: 'video', name: 'YouTube video' };
+    if (host === 'vimeo.com' && (m = path.match(/^\/(\d+)/))) return { src: 'https://player.vimeo.com/video/' + m[1], kind: 'video', name: 'Vimeo video' };
+    if (host === 'canva.com' && (m = path.match(/^\/design\/([\w-]+)/))) return { src: 'https://www.canva.com/design/' + m[1] + '/view?embed', kind: 'slides', name: 'Canva design' };
+    // A file on GitHub: its raw copy can be shown (PDFs through a PDF viewer).
+    var raw = href;
+    if (host === 'github.com' && (m = path.match(/^\/([^/]+)\/([^/]+)\/blob\/(.+)$/))) {
+      raw = 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/' + m[3];
+    }
+    if (/\.pdf$/i.test(new URL(raw).pathname)) {
+      return { src: 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(raw), kind: 'doc', name: 'PDF' };
+    }
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(path)) return { src: raw, kind: 'image', name: 'picture' };
+    if (host === 'github.com') return null; // GitHub pages refuse to be shown inside other sites
+    return { src: href, kind: 'page', name: hostOf(href) };
+  }
+  function researchPreview(href) {
+    var box = make('div', 'preview');
+    var embed = embedFor(href);
+    var head = make('div', 'preview-head');
+    head.appendChild(make('h3', 'reader-head', 'The research'));
+    var open = make('a', 'preview-open', 'Open in a new tab ↗');
+    open.href = href;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    head.appendChild(open);
+    box.appendChild(head);
+    if (!embed) {
+      box.appendChild(make('p', 'preview-note', hostOf(href) + ' doesn’t let other sites show its pages, so open it in a new tab to read it.'));
+      return box;
+    }
+    var frameBox = make('div', 'preview-frame ' + embed.kind);
+    if (embed.kind === 'image') {
+      var img = make('img');
+      img.src = embed.src;
+      img.alt = 'The research';
+      img.referrerPolicy = 'no-referrer';
+      frameBox.appendChild(img);
+    } else {
+      var frame = make('iframe');
+      frame.src = embed.src;
+      frame.title = 'The research: ' + embed.name;
+      frame.referrerPolicy = 'no-referrer';
+      // The page inside can run, but it can't take over this site.
+      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation allow-forms');
+      frame.setAttribute('allow', 'fullscreen; picture-in-picture');
+      frame.allowFullscreen = true;
+      frameBox.appendChild(frame);
+    }
+    box.appendChild(frameBox);
+    box.appendChild(make('p', 'preview-note', embed.kind === 'page'
+      ? 'Showing ' + embed.name + ' here. If it stays blank, that site doesn’t allow previews. Use Open in a new tab.'
+      : embed.kind === 'doc'
+        ? 'If it asks you to sign in or stays blank, the owner needs to share it as “Anyone with the link can view”.'
+        : 'Showing the ' + embed.name + ' here.'));
+    return box;
   }
   $('reader-close').addEventListener('click', closeReader);
   readerDialog.addEventListener('click', function (e) { if (e.target === readerDialog) closeReader(); });

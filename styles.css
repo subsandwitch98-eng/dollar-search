@@ -1473,3 +1473,75 @@ img { max-width: 100%; }
   }
   :root[data-theme="dark"] .challenge-entry.leading .challenge-open { background: #3A3220; color: #F6E08E; }
   .shop-soon-private { font-size: 0.72rem; font-weight: 700; color: var(--muted); border: 1px dashed var(--pink); border-radius: 999px; padding: 0.1rem 0.55rem; }
+
+  /* ---- Phones: the header on three tidy rows, panels that stay on screen, roomier pictures ---- */
+  @media (max-width: 600px) {
+    /* Row 1: the site name. Row 2: the round buttons, spread across. Row 3: the page links, scrolling sideways if needed. */
+    .top { padding-block: 0.75rem 0.5rem; }
+    .top .wrap { gap: 0.5rem; }
+    .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 0.4rem; }
+    .top-actions .nav {
+      order: 10; flex: 1 0 100%; gap: 1.1rem; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+      padding-top: 0.35rem; border-top: 1px solid var(--line);
+    }
+    .top-actions .nav::-webkit-scrollbar { display: none; }
+    .nav a { white-space: nowrap; padding-block: 0.45rem; }
+    .cart-btn, .bell-btn, .account-btn { width: 2.6rem; height: 2.6rem; }
+    .auth-btn { padding: 0.6rem 1.1rem; }
+    /* The bell's list and the account menu use the full width under the buttons. */
+    .notif-panel { left: 0; right: 0; width: auto; max-height: 65vh; }
+    .account { position: static; }
+    .account-menu { left: auto; right: 0; }
+
+    /* The drawing and the portfolio picture: centered and a good size. */
+    .hero .art, #profile-art { justify-self: center; max-width: 17rem; width: 100%; }
+    .portrait { border-width: 5px; }
+
+    /* Topic chips above Recent research scroll sideways instead of stacking up. */
+    .recent-tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 0.2rem; margin-inline: -16px; padding-inline: 16px; }
+    .recent-tags::-webkit-scrollbar { display: none; }
+    .recent-tags .chip { flex: none; }
+    .recent-arrows { display: none; }
+
+    /* Pop-ups: a little less padding so there's more room inside. */
+    .dialog-backdrop { padding: 10px; }
+    .dialog, .dialog.shop-dialog, .dialog.achievements-dialog, .dialog.admin-dialog, .dialog.msg-dialog { padding: 1.1rem 1rem 1.25rem; border-radius: 1.25rem; }
+    .dialog h2 { font-size: 1.35rem; }
+    .dialog-close { width: 2.6rem; height: 2.6rem; }
+
+    /* The Star Shop: two items per row. */
+    .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+    .shop-item { padding: 0.8rem 0.55rem 0.8rem; border-radius: 1rem; }
+    .avatar.shop-avatar { width: 4.6rem; margin: 0.4rem 0 0.25rem; }
+    .shop-name { font-size: 0.95rem; }
+    .shop-buy { padding-inline: 0.6rem; font-size: 0.82rem; width: 100%; }
+    .daily-star { padding: 0.7rem 0.8rem; }
+    .daily-claim { flex: 1 1 100%; }
+    .inv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* Achievements and badges: two per row. */
+    .achievement-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+    .achievement { padding: 1rem 0.6rem 0.9rem; border-radius: 1.1rem; }
+    .achievement-badge { width: 3.6rem; height: 3.6rem; }
+    .achievement-name { font-size: 1rem; }
+    .badge-grid { grid-template-columns: 1fr; }
+
+    /* Home sections. */
+    .challenge-card, .leader-card { padding: 1.1rem 1rem; border-radius: 1.25rem; }
+    .challenge-open { flex-wrap: wrap; }
+    .challenge-entry-title { flex-basis: 100%; }
+    .idea-band, .recent-band, .top-band, .challenge-band { padding-block: 2rem 0.5rem; }
+
+    /* Research cards. */
+    .cite-row { grid-template-columns: 1fr auto; }
+    .cite-style { grid-column: 1 / -1; justify-self: start; }
+    .reply-list { padding-left: 0.6rem; }
+    .reply-form { flex-direction: column; align-items: stretch; }
+    .msg-bubble { max-width: 88%; }
+    .footer-row { justify-content: center; text-align: center; }
+  }
+  /* Very small phones */
+  @media (max-width: 360px) {
+    .cart-btn, .bell-btn, .account-btn { width: 2.4rem; height: 2.4rem; }
+    .shop-grid, .achievement-grid { grid-template-columns: 1fr; }
+  }

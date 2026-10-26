@@ -56,7 +56,7 @@
   // ---- State, loaded from the database ----
   var state = { hubName: 'Dollar Search', hubIntro: '', profiles: [], likes: [], follows: [], projectLikes: [], comments: [], collabs: [], purchases: [], giftStars: 0, claims: [], bookmarks: [],
     reactions: [], messages: [], notes: {}, starsGiven: 0, giftsReceived: [], reports: [],
-    polls: {}, votes: [], blocks: [], siteGifts: [], calendar: [] };
+    polls: {}, votes: [], blocks: [], siteGifts: [], calendar: [], feedback: [] };
   var collabsReady = true; // false until the collab_requests table exists in Supabase
   var shopReady = false;   // true once the signed-in person's Star Shop purchases have loaded
   var claimsReady = false; // true once daily star claims have loaded
@@ -72,6 +72,7 @@
   var calendarReady = false;  // your own plans can be added to the research calendar
   var draftsReady = false;    // research can be saved as a private draft
   var pdfReady = false;       // research cards can have an uploaded PDF
+  var feedbackReady = false;  // people can ask for feedback on their research
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
   var seenAt = 0;         // notifications read up to this time (ms)
@@ -154,7 +155,8 @@
       client.from('collab_requests').select('id, project_id, from_user, to_profile, message, status, created_at, responded_at').order('created_at'),
       client.from('project_reactions').select('user_id, project_id, kind, created_at'),
       client.from('polls').select('project_id, question, options, created_at'),
-      client.from('poll_votes').select('project_id, user_id, choice, created_at')
+      client.from('poll_votes').select('project_id, user_id, choice, created_at'),
+      client.from('feedback_requests').select('id, user_id, project_id, note, closed, created_at').order('created_at', { ascending: false })
     ]).then(function (res) {
       // Research likes, comments and collabs are optional: if their tables aren't set up yet, the rest of the site still loads.
       res.forEach(function (r, i) { if (r.error && i < 5) throw r.error; });
@@ -203,6 +205,11 @@
       state.votes = pollsReady ? res[10].data.map(function (v) {
         return { projectId: v.project_id, userId: v.user_id, choice: v.choice, at: Date.parse(v.created_at) || 0 };
       }) : [];
+      // Requests for feedback on research (the Feedback wanted section on the home screen).
+      feedbackReady = !res[11].error;
+      state.feedback = res[11].error ? [] : res[11].data.map(function (f) {
+        return { id: f.id, userId: f.user_id, projectId: f.project_id, note: f.note || '', closed: !!f.closed, at: Date.parse(f.created_at) || 0 };
+      });
       collabsReady = !res[7].error;
       state.collabs = res[7].error ? [] : res[7].data.map(function (c) {
         return {
@@ -2446,6 +2453,161 @@
     if (titleIn) titleIn.closest('.project').scrollIntoView({ block: 'center' });
   });
 
+  // ---- Home: Feedback wanted. People ask for feedback on their research; others answer with comments and tips. ----
+  var FEEDBACK_LIMIT = 12;
+  var feedbackFormOpen = false;
+  var feedbackDraft = { projectId: '', note: '' };
+  var askingFeedback = false;
+  function openFeedbackRequests() {
+    return state.feedback.filter(function (f) { return !f.closed && findProject(f.projectId) && !findProject(f.projectId).draft; });
+  }
+  function renderFeedback() {
+    var section = $('feedback-wanted');
+    section.hidden = !client || !loaded || !!loadError || !feedbackReady;
+    if (section.hidden) return;
+    renderFeedbackAsk();
+    var list = $('feedback-list');
+    list.textContent = '';
+    var open = openFeedbackRequests().filter(function (f) { return !isBlockedByMe(f.userId); }).slice(0, FEEDBACK_LIMIT);
+    $('feedback-empty').hidden = open.length > 0;
+    open.forEach(function (f) {
+      var q = findProject(f.projectId);
+      var owner = findProfile(q.profileId);
+      var li = make('li', 'feedback-item');
+      var head = make('div', 'feedback-head');
+      var pic = owner ? pictureNode(owner.avatar, owner.name) : null;
+      var avatar = make('span', 'avatar feedback-avatar', pic ? null : (owner ? owner.name.charAt(0).toUpperCase() : '?'));
+      if (pic) avatar.appendChild(pic);
+      avatar.setAttribute('aria-hidden', 'true');
+      head.appendChild(avatar);
+      var who = make('span', 'feedback-who');
+      var nm = make('span', 'feedback-name');
+      paintName(nm, owner ? owner.name : 'A Dollar Search member');
+      who.appendChild(nm);
+      who.appendChild(make('span', 'feedback-when', 'Asked ' + timeAgo(f.at).toLowerCase()));
+      head.appendChild(who);
+      li.appendChild(head);
+      li.appendChild(make('h3', 'feedback-title', q.title));
+      if (f.note) li.appendChild(make('p', 'feedback-note', '“' + f.note + '”'));
+      // How much feedback it's had since asking.
+      var replies = state.comments.filter(function (c) { return c.projectId === q.id && c.createdAt >= f.at && c.userId !== f.userId; }).length;
+      var foot = make('div', 'feedback-foot');
+      foot.appendChild(make('span', 'feedback-count', replies ? (replies === 1 ? '1 reply' : replies + ' replies') + ' so far' : 'No replies yet'));
+      var mine = me && f.userId === me.id;
+      if (mine) {
+        var done = make('button', 'mini-btn', 'Got my feedback ✓');
+        done.type = 'button';
+        done.title = 'Take this off the list';
+        done.addEventListener('click', function () { closeFeedback(f); });
+        foot.appendChild(done);
+      } else {
+        var give = make('button', 'btn btn-solid feedback-give', 'Give feedback');
+        give.type = 'button';
+        give.addEventListener('click', function () { openReader(q.id); });
+        foot.appendChild(give);
+      }
+      li.appendChild(foot);
+      li.addEventListener('click', function (e) {
+        if (e.target.closest('button')) return;
+        openReader(q.id);
+      });
+      list.appendChild(li);
+    });
+  }
+  // The "Ask for feedback" button and its little form.
+  function renderFeedbackAsk() {
+    var box = $('feedback-ask');
+    box.textContent = '';
+    if (!me) {
+      var signIn = make('button', 'btn btn-ghost', 'Sign in to ask for feedback');
+      signIn.type = 'button';
+      signIn.addEventListener('click', function () { openAuth('signin', 'Sign in to ask for feedback on your research.'); });
+      box.appendChild(signIn);
+      return;
+    }
+    var mp = myProfile();
+    var mine = mp ? mp.projects : [];
+    if (!mine.length) {
+      box.appendChild(make('p', 'feedback-hint', 'Post some research on your portfolio, then come back here to ask for feedback on it.'));
+      return;
+    }
+    if (!feedbackFormOpen) {
+      var ask = make('button', 'btn btn-solid', 'Ask for feedback');
+      ask.type = 'button';
+      ask.addEventListener('click', function () { feedbackFormOpen = true; renderFeedbackAsk(); var s = $('feedback-pick'); if (s) s.focus(); });
+      box.appendChild(ask);
+      return;
+    }
+    var f = make('form', 'feedback-form');
+    var pickLabel = make('label', 'edit-label', 'Which research?');
+    pickLabel.htmlFor = 'feedback-pick';
+    var pick = make('select');
+    pick.id = 'feedback-pick';
+    mine.forEach(function (q) {
+      var o = make('option', null, q.title);
+      o.value = q.id;
+      pick.appendChild(o);
+    });
+    if (feedbackDraft.projectId && mine.some(function (q) { return q.id === feedbackDraft.projectId; })) pick.value = feedbackDraft.projectId;
+    pick.addEventListener('change', function () { feedbackDraft.projectId = pick.value; });
+    var noteLabel = make('label', 'edit-label', 'What would you like feedback on? (optional)');
+    noteLabel.htmlFor = 'feedback-note';
+    var note = make('textarea');
+    note.id = 'feedback-note';
+    note.rows = 2;
+    note.maxLength = 200;
+    note.placeholder = 'For example: Is my conclusion clear? Are my sources good enough?';
+    note.value = feedbackDraft.note;
+    note.addEventListener('input', function () { feedbackDraft.note = note.value; });
+    var actions = make('div', 'edit-actions');
+    var send = make('button', 'btn btn-solid', askingFeedback ? 'Posting…' : 'Ask for feedback');
+    send.type = 'submit';
+    send.disabled = askingFeedback;
+    var cancel = make('button', 'btn btn-ghost', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', function () { feedbackFormOpen = false; renderFeedbackAsk(); });
+    actions.appendChild(send);
+    actions.appendChild(cancel);
+    var status = statusLine('');
+    f.appendChild(pickLabel);
+    f.appendChild(pick);
+    f.appendChild(noteLabel);
+    f.appendChild(note);
+    f.appendChild(actions);
+    f.appendChild(status);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = note.value.trim();
+      if (unkind(text, true)) { status.textContent = KIND_NOTE; note.focus(); return; }
+      if (openFeedbackRequests().some(function (r) { return r.projectId === pick.value; })) {
+        status.textContent = 'You’ve already asked for feedback on that research. It’s on the list below.';
+        return;
+      }
+      askingFeedback = true;
+      send.disabled = true;
+      status.textContent = 'Posting…';
+      client.from('feedback_requests').insert({ project_id: pick.value, note: text }).then(function (res) {
+        askingFeedback = false;
+        if (res.error) { send.disabled = false; status.textContent = dbMessage(res.error); return; }
+        state.feedback.unshift({ id: 'new-' + Date.now(), userId: me.id, projectId: pick.value, note: text, closed: false, at: Date.now() });
+        feedbackFormOpen = false;
+        feedbackDraft = { projectId: '', note: '' };
+        showToast('Posted! People can now find your research under Feedback wanted.');
+        renderFeedback();
+        refresh();
+      });
+    });
+    box.appendChild(f);
+  }
+  function closeFeedback(f) {
+    client.from('feedback_requests').update({ closed: true }).eq('id', f.id).then(function (res) {
+      if (res.error) { showToast(dbMessage(res.error)); return; }
+      f.closed = true;
+      showToast('Taken off the list. Glad you got some feedback!');
+      renderFeedback();
+    });
+  }
+
   // ---- Home: Star leaderboard, by likes on research this month ----
   function renderLeaderboard() {
     var monthStart = dayKey(Date.now()).slice(0, 8) + '01';
@@ -2493,6 +2655,7 @@
     renderRecent();
     renderTop();
     renderChallenge();
+    renderFeedback();
     renderLeaderboard();
     myPortfolioBtn.hidden = !myProfile();
     paintName(hubNameEl, state.hubName);
@@ -7200,7 +7363,8 @@
     var typingCollab = !collabPanel.hidden && collabPanel.contains(document.activeElement);
     // Unsaved team notes are kept in noteDrafts, so only pause while someone is typing in them.
     var typingNotes = (!!document.activeElement && document.activeElement.classList.contains('notes-input')) ||
-      Object.keys(pollEditing).some(function (k) { return pollEditing[k]; }) || calEditing !== null;
+      Object.keys(pollEditing).some(function (k) { return pollEditing[k]; }) || calEditing !== null ||
+      (feedbackFormOpen && $('feedback-ask').contains(document.activeElement));
     return editingId !== null || !form.hidden || !picForm.hidden || addingProfile || !hubForm.hidden || typingComment || typingCollab || typingNotes;
   }
   var routed = false;

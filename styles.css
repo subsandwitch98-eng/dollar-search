@@ -1714,3 +1714,29 @@ img { max-width: 100%; }
   .share-part { display: grid; gap: 0.35rem; }
   .share-part .edit-label { font-size: 0.72rem; }
   .share-note { color: var(--accent); }
+
+  /* Feedback wanted, at the bottom of the home screen */
+  .feedback-band { padding-block: 3rem 3.5rem; background: var(--surface); border-top: 1px solid var(--line); }
+  .feedback-ask { margin: 1.25rem 0 1rem; }
+  .feedback-hint { color: var(--muted); margin: 0; }
+  .feedback-form { display: grid; gap: 0.45rem; max-width: 34rem; padding: 1rem; border-radius: 1.25rem; background: var(--bg); border: 1px solid var(--line); }
+  .feedback-form select, .feedback-form textarea {
+    font: inherit; font-size: 0.95rem; color: var(--fg); background: var(--surface); width: 100%; box-sizing: border-box;
+    border: 1px solid var(--pink); border-radius: 0.8rem; padding: 0.55rem 0.75rem; resize: vertical;
+  }
+  .feedback-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 1rem; }
+  .feedback-item {
+    display: grid; gap: 0.5rem; align-content: start; padding: 1.1rem 1.2rem; border-radius: 1.5rem; cursor: pointer;
+    background: var(--bg); border: 1px solid var(--line); transition: border-color 0.15s;
+  }
+  .feedback-item:hover { border-color: var(--pink); }
+  .feedback-head { display: flex; align-items: center; gap: 0.6rem; }
+  .feedback-avatar { width: 2.4rem; height: 2.4rem; flex: none; }
+  .feedback-who { display: grid; min-width: 0; }
+  .feedback-name { font-weight: 700; color: var(--fg); overflow-wrap: anywhere; }
+  .feedback-when { font-size: 0.78rem; color: var(--muted); }
+  .feedback-title { font-family: var(--display); font-size: 1.15rem; margin: 0; color: var(--fg); overflow-wrap: anywhere; }
+  .feedback-note { margin: 0; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+  .feedback-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.2rem; }
+  .feedback-count { font-size: 0.82rem; font-weight: 700; color: var(--button-fg); }
+  .feedback-give { padding: 0.45rem 1rem; font-size: 0.9rem; }

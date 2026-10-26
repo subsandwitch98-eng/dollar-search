@@ -28,13 +28,13 @@ as $$
 declare
   fresh text;
   before_text text := '';
-  check_mean boolean := tg_table_name in ('project_comments', 'messages');
+  check_mean boolean := tg_table_name in ('project_comments', 'messages', 'feedback_requests');
 begin
   fresh := concat_ws(' ', to_jsonb(new) ->> 'name', to_jsonb(new) ->> 'description', to_jsonb(new) ->> 'title',
-    to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options');
+    to_jsonb(new) ->> 'body', to_jsonb(new) ->> 'question', to_jsonb(new) ->> 'options', to_jsonb(new) ->> 'note');
   if tg_op = 'UPDATE' then
     before_text := concat_ws(' ', to_jsonb(old) ->> 'name', to_jsonb(old) ->> 'description', to_jsonb(old) ->> 'title',
-      to_jsonb(old) ->> 'body', to_jsonb(old) ->> 'question', to_jsonb(old) ->> 'options');
+      to_jsonb(old) ->> 'body', to_jsonb(old) ->> 'question', to_jsonb(old) ->> 'options', to_jsonb(old) ->> 'note');
     if fresh = before_text then return new; end if;
   end if;
   if public.is_unkind(fresh, check_mean) then

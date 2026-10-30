@@ -1,0 +1,15 @@
+{
+  "name": "Dollar Search: Research and Read",
+  "short_name": "Dollar Search",
+  "description": "Share your research, read your friends' research, and build your own character.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFF9F0",
+  "theme_color": "#FFF9F0",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

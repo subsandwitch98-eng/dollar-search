@@ -72,6 +72,7 @@
   var calendarReady = false;  // your own plans can be added to the research calendar
   var draftsReady = false;    // research can be saved as a private draft
   var pdfReady = false;       // research cards can have an uploaded PDF
+  var collectionsReady = false; // research can be grouped into collections, and keeps its edit history
   var feedbackReady = false;  // people can send feedback about the website
   var me = null;          // the signed-in account, or null
   var isAdmin = false;    // can edit the homepage, add several profiles and remove any profile
@@ -102,7 +103,8 @@
       updatedAt: Date.parse(r.updated_at) || created,
       status: r.status === 'in-progress' || r.status === 'finished' ? r.status : '',
       draft: r.is_draft === true,
-      pdf: typeof r.pdf === 'string' ? r.pdf : ''
+      pdf: typeof r.pdf === 'string' ? r.pdf : '',
+      collection: typeof r.collection === 'string' ? r.collection.trim() : ''
     };
   }
   // Selects the newer columns too, falling back to the original ones if the database doesn't have them yet.
@@ -144,7 +146,8 @@
     return Promise.all([
       client.from('site_settings').select('hub_name, hub_intro').eq('id', 1).maybeSingle(),
       selectNewer('profiles', 'pinned_project', 'id, owner_id, name, description, email, avatar, created_at'),
-      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at, pdf',
+      selectTiers('projects', [PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at, pdf, collection',
+        PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at, pdf',
         PROJECT_COLUMNS + ', tags, image, updated_at, status, is_draft, published_at',
         PROJECT_COLUMNS + ', tags, image, updated_at, status', PROJECT_COLUMNS + ', tags, image, updated_at', PROJECT_COLUMNS]),
       client.from('likes').select('user_id, profile_id'),
@@ -164,10 +167,11 @@
         state.hubName = res[0].data.hub_name || 'Dollar Search';
         state.hubIntro = res[0].data.hub_intro || '';
       }
-      extrasReady = !res[1].usedFallback && res[2].tier <= 3;
-      statusReady = res[2].tier <= 2;
-      draftsReady = res[2].tier <= 1;
-      pdfReady = res[2].tier === 0;
+      extrasReady = !res[1].usedFallback && res[2].tier <= 4;
+      statusReady = res[2].tier <= 3;
+      draftsReady = res[2].tier <= 2;
+      pdfReady = res[2].tier <= 1;
+      collectionsReady = res[2].tier === 0;
       var projects = res[2].data.map(toProject);
       state.profiles = res[1].data.map(function (r) {
         return {
@@ -2080,6 +2084,7 @@
   function openReader(projectId) {
     if (!findProject(projectId)) return;
     if (readerDialog.hidden) readerOpener = document.activeElement;
+    if (speakingId && speakingId !== projectId) stopSpeaking();
     readerId = projectId;
     closeNotifs();
     renderReader();
@@ -2087,7 +2092,48 @@
     readerDialog.querySelector('.reader-dialog').scrollTop = 0;
     $('reader-close').focus();
   }
+  // Read aloud: the title, who wrote it, the description and the sources' names, read by the browser.
+  // Long text is read a few sentences at a time, because some browsers stop partway through one long piece.
+  var canSpeak = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+  var speakingId = null;
+  var speakToken = 0; // so a stopped reading can't switch off a newer one
+  function readAloud(q) {
+    stopSpeaking();
+    var owner = findProfile(q.profileId);
+    var text = q.title + '.' + (owner ? ' By ' + owner.name + '.' : '') + '\n' + q.description;
+    var names = q.sources.map(function (s) { return s.name || hostOf(cleanLink(s.link) || ''); }).filter(Boolean);
+    if (names.length) text += '\nSources: ' + names.join(', ') + '.';
+    var pieces = [];
+    (text.match(/[^.!?\n]+[.!?]*\s*/g) || []).forEach(function (s) {
+      s = s.trim();
+      if (!s) return;
+      var last = pieces.length - 1;
+      if (last >= 0 && pieces[last].length + s.length < 220) pieces[last] += ' ' + s;
+      else pieces.push(s);
+    });
+    if (!pieces.length) return;
+    speakingId = q.id;
+    var token = ++speakToken;
+    pieces.forEach(function (piece, i) {
+      var u = new SpeechSynthesisUtterance(piece);
+      u.rate = 0.95;
+      if (i === pieces.length - 1) {
+        u.onend = function () { if (token === speakToken) { speakingId = null; renderReader(); } };
+      }
+      window.speechSynthesis.speak(u);
+    });
+    renderReader();
+  }
+  function stopSpeaking() {
+    if (!canSpeak) return;
+    var was = speakingId;
+    speakingId = null;
+    speakToken++;
+    window.speechSynthesis.cancel();
+    if (was && readerId) renderReader();
+  }
   function closeReader() {
+    if (speakingId) stopSpeaking();
     readerDialog.hidden = true;
     readerId = null;
     // Remove the preview so a video or document inside stops.
@@ -2126,13 +2172,22 @@
       by.addEventListener('click', function () { closeReader(); showOnPortfolio(owner.id, q.id); });
       body.appendChild(by);
     }
-    var tags = tagChips(q);
-    var status = statusTag(q);
-    if (status) { if (!tags) tags = make('div', 'tag-row'); tags.insertBefore(status, tags.firstChild); }
+    var tags = tagRow(q);
     if (tags) body.appendChild(tags);
     body.appendChild(projectMeta(q));
     var collabLine = collabNames(q);
     if (collabLine) body.appendChild(collabLine);
+    var series = collectionBox(q);
+    if (series) body.appendChild(series);
+    // Read aloud, using the voices built into the browser.
+    if (canSpeak) {
+      var speaking = speakingId === q.id;
+      var listen = make('button', 'mini-btn read-aloud' + (speaking ? ' on' : ''), speaking ? '⏹ Stop reading' : '🔊 Read aloud');
+      listen.type = 'button';
+      listen.setAttribute('aria-pressed', speaking ? 'true' : 'false');
+      listen.addEventListener('click', function () { if (speakingId === q.id) stopSpeaking(); else readAloud(q); });
+      body.appendChild(listen);
+    }
     body.appendChild(descriptionNode(q.description));
     // The research's own link: shown right here when the site allows it, with a link to open it in a new tab.
     // It has its own spot that's only rebuilt for different research, so likes and comments don't reload it.
@@ -4391,6 +4446,99 @@
     if (!q.status) return null;
     return make('span', 'status-tag ' + q.status, q.status === 'finished' ? 'Finished ✓' : 'In progress');
   }
+  // The research checklist: a title, a description of 50+ words and at least 2 sources earn the Well-sourced badge.
+  var CHECK_WORDS = 50;
+  var CHECK_SOURCES = 2;
+  function wordCount(text) { return String(text || '').trim().split(/\s+/).filter(Boolean).length; }
+  function researchChecks(title, description, sourceCount) {
+    return [
+      { done: !!String(title || '').trim(), text: 'A title' },
+      { done: wordCount(description) >= CHECK_WORDS, text: 'A description of at least ' + CHECK_WORDS + ' words' },
+      { done: sourceCount >= CHECK_SOURCES, text: 'At least ' + CHECK_SOURCES + ' sources' }
+    ];
+  }
+  function wellSourced(q) {
+    return researchChecks(q.title, q.description, q.sources.length).every(function (c) { return c.done; });
+  }
+  // The topic chips, status and Well-sourced badge shown on research cards and in the reader.
+  function tagRow(q) {
+    var tags = tagChips(q);
+    var status = statusTag(q);
+    if (status) { if (!tags) tags = make('div', 'tag-row'); tags.insertBefore(status, tags.firstChild); }
+    if (wellSourced(q)) {
+      if (!tags) tags = make('div', 'tag-row');
+      var badge = make('span', 'well-sourced-tag', '✓ Well-sourced');
+      badge.title = 'Has a full description and at least ' + CHECK_SOURCES + ' sources';
+      tags.insertBefore(badge, tags.firstChild);
+    }
+    return tags;
+  }
+
+  // ---- Collections: research cards on one portfolio with the same collection name form a series ----
+  function collectionParts(q) {
+    if (!q.collection) return [];
+    var key = q.collection.toLowerCase();
+    var p = findProfile(q.profileId);
+    if (!p) return [q];
+    return p.projects.concat(p.drafts || []).filter(function (x) { return x.collection.toLowerCase() === key; })
+      .sort(function (a, b) { return a.createdAt - b.createdAt; });
+  }
+  // Every collection on a portfolio, with its research in order.
+  function collectionsOf(p, withDrafts) {
+    var groups = {};
+    var order = [];
+    p.projects.concat(withDrafts ? p.drafts || [] : []).forEach(function (q) {
+      if (!q.collection) return;
+      var key = q.collection.toLowerCase();
+      if (!groups[key]) { groups[key] = { name: q.collection, parts: [] }; order.push(key); }
+      groups[key].parts.push(q);
+    });
+    return order.map(function (k) {
+      groups[k].parts.sort(function (a, b) { return a.createdAt - b.createdAt; });
+      return groups[k];
+    });
+  }
+  // "📚 Collection name · Part 2 of 4", which opens the collection in the reader.
+  function collectionChip(q) {
+    var parts = collectionParts(q);
+    if (!parts.length) return null;
+    var b = make('button', 'collection-chip', '📚 ' + q.collection + ' · Part ' + (parts.indexOf(q) + 1) + ' of ' + parts.length);
+    b.type = 'button';
+    b.title = 'See the whole collection';
+    b.addEventListener('click', function () { openReader(q.id); });
+    return b;
+  }
+  // In the reader: every part of the collection, with the one you're reading highlighted.
+  function collectionBox(q) {
+    var parts = collectionParts(q);
+    if (!parts.length) return null;
+    var at = parts.indexOf(q);
+    var box = make('nav', 'collection-box');
+    box.setAttribute('aria-label', 'Collection');
+    box.appendChild(make('p', 'collection-name', '📚 ' + q.collection));
+    box.appendChild(make('p', 'collection-sub', 'Part ' + (at + 1) + ' of ' + parts.length));
+    var list = make('ol', 'collection-list');
+    parts.forEach(function (x, i) {
+      var li = make('li');
+      var b = make('button', 'collection-part' + (x === q ? ' current' : ''), (i + 1) + '. ' + x.title + (x.draft ? ' (draft)' : ''));
+      b.type = 'button';
+      if (x === q) b.setAttribute('aria-current', 'true');
+      b.addEventListener('click', function () { if (x !== q) openReader(x.id); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    var nav = make('div', 'collection-nav');
+    [[at - 1, '← Previous part'], [at + 1, 'Next part →']].forEach(function (o) {
+      if (o[0] < 0 || o[0] >= parts.length) return;
+      var b = make('button', 'mini-btn', o[1]);
+      b.type = 'button';
+      b.addEventListener('click', function () { openReader(parts[o[0]].id); });
+      nav.appendChild(b);
+    });
+    if (nav.children.length) box.appendChild(nav);
+    return box;
+  }
   // The research outline: these headings get their own line when a description uses them.
   var OUTLINE = ['Question', 'What I expected', 'How I found out', 'What I learned'];
   function outlineHeading(line) {
@@ -4691,13 +4839,10 @@
       if (window.getSelection && String(window.getSelection())) return; // let people select text
       openReader(p.id);
     });
-    var tags = tagChips(p);
-    var status = statusTag(p);
-    if (status) {
-      if (!tags) tags = make('div', 'tag-row');
-      tags.insertBefore(status, tags.firstChild);
-    }
+    var tags = tagRow(p);
     if (tags) card.appendChild(tags);
+    var series = collectionChip(p);
+    if (series) card.appendChild(series);
     card.appendChild(projectMeta(p));
     var collabLine = collabNames(p);
     if (collabLine) card.appendChild(collabLine);
@@ -5699,6 +5844,23 @@
       field('Cover picture link (optional)', imageIn, 'project-image-input').forEach(function (node) { f.appendChild(node); });
     }
 
+    // Collection: research with the same collection name is shown together as a series.
+    var collectionIn = textInput(60, isNew ? '' : p.collection);
+    if (collectionsReady) {
+      var shelf = findProfile(isNew ? current().id : p.profileId);
+      var shelfNames = shelf ? collectionsOf(shelf, true).map(function (c) { return c.name; }) : [];
+      collectionIn.placeholder = 'For example: My space series';
+      collectionIn.setAttribute('list', 'collection-names');
+      field('Collection (optional)', collectionIn, 'project-collection-input').forEach(function (node) { f.appendChild(node); });
+      var namesList = make('datalist');
+      namesList.id = 'collection-names';
+      shelfNames.forEach(function (n) { var o = make('option'); o.value = n; namesList.appendChild(o); });
+      f.appendChild(namesList);
+      f.appendChild(make('p', 'pdf-info', shelfNames.length
+        ? 'Pick one of your collections or type a new name. Research with the same collection name is shown together, in order.'
+        : 'Give research the same collection name to show it together as a series, like parts 1, 2 and 3.'));
+    }
+
     // Sources: any number of name + link rows.
     var sourcesLabel = make('span', 'edit-label', 'Sources');
     sourcesLabel.id = 'project-sources-label';
@@ -5736,6 +5898,86 @@
     f.appendChild(sourcesLabel);
     f.appendChild(rowsEl);
     f.appendChild(addSource);
+
+    // The research checklist ticks itself off as you write.
+    var checklist = make('div', 'research-checklist');
+    function paintChecklist() {
+      var linked = Array.prototype.filter.call(rowsEl.querySelectorAll('.source-link-input'), function (x) { return x.value.trim(); }).length;
+      var checks = researchChecks(titleIn.value, descIn.value, linked);
+      var words = wordCount(descIn.value);
+      var all = checks.every(function (c) { return c.done; });
+      checklist.textContent = '';
+      checklist.classList.toggle('all-done', all);
+      checklist.appendChild(make('p', 'checklist-title', all ? '✓ Well-sourced! This research gets the badge.' : 'Checklist for the Well-sourced badge'));
+      var items = make('ul', 'checklist-items');
+      checks.forEach(function (c, i) {
+        var text = c.text + (i === 1 && !c.done ? ' (' + words + ' so far)' : '');
+        items.appendChild(make('li', c.done ? 'done' : '', (c.done ? '✅ ' : '⬜ ') + text));
+      });
+      checklist.appendChild(items);
+    }
+    f.addEventListener('input', paintChecklist);
+    // Adding or removing a source row changes the count too.
+    f.addEventListener('click', function (e) { if (e.target.closest('.source-row .mini-btn, .add-source')) setTimeout(paintChecklist, 0); });
+    paintChecklist();
+    f.appendChild(checklist);
+
+    // Edit history: older versions of this research, any of which can be brought back into the form.
+    if (!isNew && collectionsReady && me) {
+      var historyBtn = make('button', 'mini-btn history-btn', '🕓 See older versions');
+      historyBtn.type = 'button';
+      historyBtn.setAttribute('aria-expanded', 'false');
+      var historyList = make('div', 'history-list');
+      historyList.hidden = true;
+      historyBtn.addEventListener('click', function () {
+        var open = historyList.hidden;
+        historyList.hidden = !open;
+        historyBtn.textContent = open ? 'Hide older versions' : '🕓 See older versions';
+        historyBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) loadHistory();
+      });
+      f.appendChild(historyBtn);
+      f.appendChild(historyList);
+    }
+    function loadHistory() {
+      historyList.textContent = '';
+      historyList.appendChild(make('p', 'pdf-info', 'Loading…'));
+      client.from('project_versions').select('id, title, link, description, sources, saved_at')
+        .eq('project_id', p.id).order('saved_at', { ascending: false }).limit(20).then(function (res) {
+          historyList.textContent = '';
+          if (res.error) { historyList.appendChild(make('p', 'pdf-info', 'Older versions couldn’t be loaded. Try again in a moment.')); return; }
+          if (!res.data.length) {
+            historyList.appendChild(make('p', 'pdf-info', 'No older versions yet. Each time you save changes, the version before is kept here.'));
+            return;
+          }
+          res.data.forEach(function (v) {
+            var when = new Date(v.saved_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+            var item = make('div', 'history-item');
+            var head = make('div', 'history-head');
+            head.appendChild(make('span', 'history-when', when));
+            var use = make('button', 'mini-btn', 'Use this version');
+            use.type = 'button';
+            use.addEventListener('click', function () {
+              titleIn.value = v.title || '';
+              descIn.value = v.description || '';
+              linkIn.value = v.link || '';
+              // A version with a link switches the form to sharing by link.
+              if (v.link && pdfReady && me) { var linkChip = f.querySelector('.share-chip'); if (linkChip) linkChip.click(); }
+              rowsEl.textContent = '';
+              normalizeSources(v.sources).forEach(addSourceRow);
+              paintChecklist();
+              statusEl.textContent = 'Brought back the version from ' + when + '. Click Save to keep it, or Cancel to leave it as it was.';
+              titleIn.focus();
+            });
+            head.appendChild(use);
+            item.appendChild(head);
+            item.appendChild(make('p', 'history-title', v.title || 'Untitled'));
+            var d = String(v.description || '').replace(/\s+/g, ' ').trim();
+            if (d) item.appendChild(make('p', 'history-snippet', d.length > 140 ? d.slice(0, 140) + '…' : d));
+            historyList.appendChild(item);
+          });
+        });
+    }
 
     var actions = make('div', 'edit-actions');
     var save = make('button', 'btn btn-solid', isNew ? 'Add project' : 'Save');
@@ -5836,6 +6078,10 @@
         row.image = image;
       }
       if (statusReady) row.status = pickedStatus;
+      if (collectionsReady) {
+        row.collection = collectionIn.value.trim().replace(/\s+/g, ' ');
+        if (unkind(row.collection)) { statusEl.textContent = KIND_NOTE; collectionIn.focus(); return; }
+      }
       if (draftsReady) {
         row.is_draft = keepDraft;
         // Publishing a draft makes it count as posted now.
@@ -5933,6 +6179,19 @@
       return q.id === editingId && canEditProject(q);
     })) editingId = null;
     projectsEl.textContent = '';
+    // This portfolio's collections, each opening its first part in the reader.
+    var shelves = collectionsReady ? collectionsOf(p, editable) : [];
+    if (shelves.length) {
+      var strip = make('div', 'collection-strip');
+      strip.appendChild(make('span', 'collection-strip-label', 'Collections'));
+      shelves.forEach(function (c) {
+        var b = make('button', 'collection-chip big', '📚 ' + c.name + ' · ' + plural(c.parts.length, 'part'));
+        b.type = 'button';
+        b.addEventListener('click', function () { openReader(c.parts[0].id); });
+        strip.appendChild(b);
+      });
+      projectsEl.appendChild(strip);
+    }
     cards.forEach(function (q) {
       var owner = findProfile(q.profileId);
       projectsEl.appendChild(editingId === q.id ? projectForm(q) : projectCard(q, !!owner && canEdit(owner)));
@@ -7390,6 +7649,35 @@
     // Load outside the callback, as Supabase recommends.
     setTimeout(refresh, 0);
   });
+  // ---- Install as an app: adds Dollar Search to a phone's home screen or a computer's apps ----
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+  var installBtn = $('install-btn');
+  var installPrompt = null;
+  var installed = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  // iPhones and iPads don't offer an install button, so they get the steps instead.
+  var isApple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  installBtn.hidden = installed || !isApple;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    installPrompt = e;
+    installBtn.hidden = installed;
+  });
+  window.addEventListener('appinstalled', function () {
+    installPrompt = null;
+    installBtn.hidden = true;
+    showToast('Dollar Search is installed! Open it from your home screen or apps.');
+  });
+  installBtn.addEventListener('click', function () {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then(function () { installPrompt = null; installBtn.hidden = true; });
+      return;
+    }
+    showToast('To install: tap the Share button in Safari, then “Add to Home Screen”.');
+  });
+
   // Pick up other people's new profiles, likes and research now and then.
   setInterval(function () { if (!busy() && document.visibilityState === 'visible') refresh(); }, 60000);
   window.addEventListener('focus', function () { if (!busy()) refresh(); });

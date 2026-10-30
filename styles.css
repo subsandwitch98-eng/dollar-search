@@ -1744,3 +1744,50 @@ img { max-width: 100%; }
   .feedback-text { margin: 0; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
   .feedback-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .feedback-when { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+
+  /* Well-sourced badge and the research checklist */
+  .well-sourced-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; border-radius: 999px; padding: 0.1rem 0.55rem;
+    color: #22607A; background: #DCEFF7;
+  }
+  :root[data-theme="dark"] .well-sourced-tag { color: #CDEBF7; background: #2D4F66; }
+  .research-checklist { display: grid; gap: 0.3rem; padding: 0.75rem 0.9rem; border-radius: 1rem; background: var(--bg); border: 1px dashed var(--pink); }
+  .research-checklist.all-done { border-style: solid; border-color: #9CCFE3; }
+  .checklist-title { margin: 0; font-family: var(--display); font-weight: 600; font-size: 0.95rem; color: var(--fg); }
+  .checklist-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; font-size: 0.88rem; color: var(--muted); }
+  .checklist-items li.done { color: var(--fg); }
+
+  /* Collections */
+  .collection-chip {
+    justify-self: start; align-self: start; font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    color: var(--button-fg); background: var(--blush); border: 1px solid var(--pink); border-radius: 999px; padding: 0.15rem 0.7rem;
+    overflow-wrap: anywhere; text-align: left;
+  }
+  .collection-chip:hover { border-color: var(--accent); }
+  .collection-chip.big { font-size: 0.9rem; padding: 0.35rem 0.9rem; }
+  .collection-strip { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .collection-strip-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 0.25rem; }
+  .collection-box { margin: 0.9rem 0; padding: 0.9rem 1rem; border-radius: 1.1rem; background: var(--bg); border: 1px solid var(--line); display: grid; gap: 0.35rem; }
+  .collection-name { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; color: var(--fg); overflow-wrap: anywhere; }
+  .collection-sub { margin: -0.3rem 0 0; font-size: 0.8rem; color: var(--muted); }
+  .collection-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+  .collection-part {
+    font: inherit; font-size: 0.9rem; text-align: left; width: 100%; cursor: pointer; color: var(--fg);
+    background: none; border: 0; border-radius: 0.6rem; padding: 0.3rem 0.5rem; overflow-wrap: anywhere;
+  }
+  .collection-part:hover { background: var(--blush); }
+  .collection-part.current { background: var(--pink); color: var(--button-fg); font-weight: 700; cursor: default; }
+  .collection-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; }
+
+  /* Read aloud */
+  .read-aloud { margin: 0.6rem 0 0.2rem; }
+  .read-aloud.on { background: var(--button); color: var(--button-fg); }
+
+  /* Edit history in the research form */
+  .history-btn { justify-self: start; }
+  .history-list { display: grid; gap: 0.5rem; max-height: 22rem; overflow-y: auto; padding: 0.2rem; }
+  .history-item { display: grid; gap: 0.2rem; padding: 0.65rem 0.8rem; border-radius: 0.9rem; background: var(--bg); border: 1px solid var(--line); }
+  .history-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem; }
+  .history-when { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+  .history-title { margin: 0; font-weight: 700; color: var(--fg); overflow-wrap: anywhere; }
+  .history-snippet { margin: 0; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
